@@ -3,14 +3,21 @@
 import { Gauge, Home, Percent, TrendingUp, Users, WalletCards } from "lucide-react";
 
 import { formatMetric } from "@/lib/api";
-import type { Summary } from "@/types";
+import type { GeographyLevel, Summary } from "@/types";
 
 type Props = {
   summary: Summary | null;
+  geographyLevel: GeographyLevel;
   loading: boolean;
 };
 
-export function SummaryCards({ summary, loading }: Props) {
+const summaryNouns: Record<GeographyLevel, string> = {
+  municipality: "GTA municipalities",
+  census_tract: "GTA census tracts"
+};
+
+export function SummaryCards({ summary, geographyLevel, loading }: Props) {
+  const regionCount = new Intl.NumberFormat("en-CA").format(summary?.region_count ?? 0);
   const cards = [
     {
       label: "Median income",
@@ -55,7 +62,7 @@ export function SummaryCards({ summary, loading }: Props) {
           <p className="text-xs text-civic-muted">
             {summary?.region_count === 1
               ? summary.selected_geographies[0]?.name
-              : `${summary?.region_count ?? 0} GTA municipalities`}
+              : `${regionCount} ${summaryNouns[geographyLevel]}`}
           </p>
         </div>
         <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">

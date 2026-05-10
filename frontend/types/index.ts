@@ -1,3 +1,5 @@
+export type GeographyLevel = "municipality" | "census_tract";
+
 export type MetricKey =
   | "median_income"
   | "median_rent"
@@ -57,6 +59,7 @@ export type MapData = {
       min: number | null;
       max: number | null;
     };
+    geography_type: GeographyLevel;
     source: string;
   };
   features: MapFeature[];

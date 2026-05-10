@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import type {
   CompareResponse,
+  GeographyLevel,
   Geography,
   MapData,
   MapFeature,
@@ -21,14 +22,29 @@ import type {
 
 import { ComparisonPanel } from "./ComparisonPanel";
 import { DetailPanel } from "./DetailPanel";
+import { GeographyLevelSelector } from "./GeographyLevelSelector";
 import { MetricSelector } from "./MetricSelector";
 import { CivicMap } from "./CivicMap";
 import { SummaryCards } from "./SummaryCards";
 
 const defaultCompareIds = ["3520005", "3521005", "3521010", "3519036", "3519028"];
 
+const geographyLabels: Record<GeographyLevel, { singular: string; plural: string; search: string }> = {
+  municipality: {
+    singular: "municipality",
+    plural: "municipalities",
+    search: "Search municipality or ID"
+  },
+  census_tract: {
+    singular: "census tract",
+    plural: "census tracts",
+    search: "Search tract, municipality, or ID"
+  }
+};
+
 export function CivicDashboard() {
   const [metric, setMetric] = useState<MetricKey>("rent_burden_pct");
+  const [geographyLevel, setGeographyLevel] = useState<GeographyLevel>("municipality");
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [comparison, setComparison] = useState<CompareResponse | null>(null);
@@ -41,20 +57,30 @@ export function CivicDashboard() {
   const [comparisonLoading, setComparisonLoading] = useState(true);
 
   const selectedGeoid = selected?.geoid;
+  const geographyLabel = geographyLabels[geographyLevel];
 
   const comparisonIds = useMemo(() => {
+    if (geographyLevel === "census_tract") {
+      return selectedGeoid ? [selectedGeoid] : [];
+    }
     if (!selectedGeoid) {
       return defaultCompareIds;
     }
     return [selectedGeoid, ...defaultCompareIds.filter((geoid) => geoid !== selectedGeoid)];
-  }, [selectedGeoid]);
+  }, [geographyLevel, selectedGeoid]);
+
+  useEffect(() => {
+    setSelected(null);
+    setSearch("");
+    setSearchResults([]);
+  }, [geographyLevel]);
 
   useEffect(() => {
     const controller = new AbortController();
     setMapLoading(true);
     setError(null);
 
-    getMapData("rent_burden_pct", controller.signal)
+    getMapData("rent_burden_pct", geographyLevel, controller.signal)
       .then((mapPayload) => {
         setMapData(mapPayload);
       })
@@ -71,14 +97,14 @@ export function CivicDashboard() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [geographyLevel]);
 
   useEffect(() => {
     const controller = new AbortController();
     setSummaryLoading(true);
     setError(null);
 
-    getSummary(selectedGeoid, controller.signal)
+    getSummary(selectedGeoid, geographyLevel, controller.signal)
       .then((summaryPayload) => setSummary(summaryPayload))
       .catch((requestError: Error) => {
         if (controller.signal.aborted) {
@@ -93,14 +119,14 @@ export function CivicDashboard() {
       });
 
     return () => controller.abort();
-  }, [selectedGeoid]);
+  }, [geographyLevel, selectedGeoid]);
 
   useEffect(() => {
     const controller = new AbortController();
     setComparisonLoading(true);
     setError(null);
 
-    getComparison(comparisonIds, controller.signal)
+    getComparison(comparisonIds, geographyLevel, controller.signal)
       .then((comparisonPayload) => setComparison(comparisonPayload))
       .catch((requestError: Error) => {
         if (controller.signal.aborted) {
@@ -115,14 +141,14 @@ export function CivicDashboard() {
       });
 
     return () => controller.abort();
-  }, [comparisonIds]);
+  }, [comparisonIds, geographyLevel]);
 
   const visibleMapData = useMemo(() => applyMetricToMapData(mapData, metric), [mapData, metric]);
 
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      searchGeographies(search, controller.signal)
+      searchGeographies(search, geographyLevel, controller.signal)
         .then((payload) => setSearchResults(payload.items))
         .catch(() => setSearchResults([]));
     }, 180);
@@ -131,7 +157,7 @@ export function CivicDashboard() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [search]);
+  }, [geographyLevel, search]);
 
   function handleFeatureSelect(feature: MapFeature["properties"]) {
     setSelected({
@@ -161,7 +187,7 @@ export function CivicDashboard() {
               Greater Toronto Housing Affordability Monitor
             </h1>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <div className="relative w-full sm:w-80">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-civic-muted"
@@ -170,7 +196,7 @@ export function CivicDashboard() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search municipality or ID"
+                placeholder={geographyLabel.search}
                 data-testid="geography-search"
                 className="h-10 w-full rounded-md border border-civic-line bg-white pl-9 pr-3 text-sm outline-none ring-civic-teal focus:ring-2"
               />
@@ -193,6 +219,7 @@ export function CivicDashboard() {
                 </div>
               )}
             </div>
+            <GeographyLevelSelector value={geographyLevel} onChange={setGeographyLevel} />
             <MetricSelector value={metric} onChange={setMetric} />
           </div>
         </div>
@@ -206,7 +233,9 @@ export function CivicDashboard() {
           <div className="flex items-center justify-between border-b border-civic-line px-4 py-3">
             <div>
               <h2 className="text-sm font-semibold text-civic-ink">Map View</h2>
-              <p className="text-xs text-civic-muted">{getMetricLabel(metric)} by municipality</p>
+              <p className="text-xs text-civic-muted">
+                {getMetricLabel(metric)} by {geographyLabel.singular}
+              </p>
             </div>
             <div className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
               {visibleMapData?.metadata.year ?? "2021"}
@@ -234,12 +263,26 @@ export function CivicDashboard() {
             </div>
           )}
 
-          <SummaryCards summary={summary} loading={summaryLoading && !summary} />
-          <DetailPanel geography={selected} metric={metric} onClear={() => setSelected(null)} />
+          <SummaryCards
+            summary={summary}
+            geographyLevel={geographyLevel}
+            loading={summaryLoading && !summary}
+          />
+          <DetailPanel
+            geography={selected}
+            metric={metric}
+            geographyLevel={geographyLevel}
+            onClear={() => setSelected(null)}
+          />
         </aside>
 
         <section className="rounded-lg border border-civic-line bg-white shadow-panel xl:col-span-2">
-          <ComparisonPanel comparison={comparison} metric={metric} loading={comparisonLoading && !comparison} />
+          <ComparisonPanel
+            comparison={comparison}
+            metric={metric}
+            geographyLevel={geographyLevel}
+            loading={comparisonLoading && !comparison}
+          />
         </section>
       </div>
     </main>

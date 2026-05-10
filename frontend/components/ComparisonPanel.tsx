@@ -11,19 +11,25 @@ import {
 } from "recharts";
 
 import { formatMetric, getMetricLabel } from "@/lib/api";
-import type { CompareResponse, MetricKey } from "@/types";
+import type { CompareResponse, GeographyLevel, MetricKey } from "@/types";
 
 type Props = {
   comparison: CompareResponse | null;
   metric: MetricKey;
+  geographyLevel: GeographyLevel;
   loading: boolean;
 };
 
-export function ComparisonPanel({ comparison, metric, loading }: Props) {
+const comparisonNouns: Record<GeographyLevel, string> = {
+  municipality: "selected municipalities",
+  census_tract: "selected census tracts"
+};
+
+export function ComparisonPanel({ comparison, metric, geographyLevel, loading }: Props) {
   const chartData =
     comparison?.items.map((item) => ({
       geoid: item.geoid,
-      name: item.name.replace(" County", ""),
+      name: chartLabel(item.name, item.type, item.geoid),
       value: item.metrics[metric] ?? 0,
       rawValue: item.metrics[metric]
     })) ?? [];
@@ -35,7 +41,7 @@ export function ComparisonPanel({ comparison, metric, loading }: Props) {
         <div>
           <h2 className="text-sm font-semibold text-civic-ink">Comparison</h2>
           <p className="text-xs text-civic-muted">
-            {getMetricLabel(metric)} across selected municipalities
+            {getMetricLabel(metric)} across {comparisonNouns[geographyLevel]}
           </p>
         </div>
         <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
@@ -102,4 +108,12 @@ export function ComparisonPanel({ comparison, metric, loading }: Props) {
       </div>
     </div>
   );
+}
+
+function chartLabel(name: string, type: string, geoid: string) {
+  if (type === "census_tract") {
+    const tractName = name.match(/census tract (.+)$/i)?.[1] ?? geoid;
+    return `CT ${tractName}`;
+  }
+  return name.replace(" County", "");
 }

@@ -19,6 +19,9 @@ from app.services.summary import build_summary
 
 router = APIRouter(prefix="/api", tags=["civic data"])
 
+DEFAULT_GEOGRAPHY_TYPE = "municipality"
+SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
+
 
 def resolve_year(db: Session, year: int | None) -> int:
     if year is not None:
@@ -33,6 +36,15 @@ def parse_ids(ids: str | None) -> list[str]:
     if not ids:
         return []
     return [item.strip() for item in ids.split(",") if item.strip()]
+
+
+def normalize_geography_type(geography_type: str | None) -> str | None:
+    if geography_type is None:
+        return None
+    normalized = geography_type.strip().lower()
+    if normalized not in SUPPORTED_GEOGRAPHY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported geography type: {geography_type}")
+    return normalized
 
 
 def serialize_metric(metric: Metric) -> dict[str, Any]:
@@ -67,12 +79,19 @@ def serialize_geography(geography: Geography, metric: Metric | None = None) -> d
     return payload
 
 
-def joined_records(db: Session, year: int, ids: list[str] | None = None):
+def joined_records(
+    db: Session,
+    year: int,
+    ids: list[str] | None = None,
+    geography_type: str | None = None,
+):
     query = (
         db.query(Geography, Metric)
         .join(Metric, Geography.geoid == Metric.geoid)
         .filter(Metric.year == year)
     )
+    if geography_type:
+        query = query.filter(Geography.type == geography_type)
     if ids:
         query = query.filter(Geography.geoid.in_(ids))
     return query.all()
@@ -81,12 +100,13 @@ def joined_records(db: Session, year: int, ids: list[str] | None = None):
 @router.get("/geographies")
 def list_geographies(
     search: str | None = Query(default=None, min_length=1),
-    geography_type: str | None = Query(default=None, alias="type"),
+    geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
     limit: int = Query(default=50, ge=1, le=200),
     year: int | None = None,
     db: Session = Depends(get_db),
 ):
     metric_year = resolve_year(db, year)
+    normalized_type = normalize_geography_type(geography_type)
     query = db.query(Geography)
 
     if search:
@@ -98,8 +118,8 @@ def list_geographies(
                 Geography.geoid.ilike(like),
             )
         )
-    if geography_type:
-        query = query.filter(Geography.type == geography_type)
+    if normalized_type:
+        query = query.filter(Geography.type == normalized_type)
 
     geographies = query.order_by(Geography.name).limit(limit).all()
     metrics = {
@@ -138,14 +158,16 @@ def get_geography(
 @router.get("/metrics")
 def list_metric_values(
     metric: str = Query(default="rent_burden_pct"),
+    geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
     year: int | None = None,
     db: Session = Depends(get_db),
 ):
     metric_key = normalize_metric_name(metric)
     if metric_key not in VALID_METRICS:
         raise HTTPException(status_code=400, detail=f"Unsupported metric: {metric}")
+    normalized_type = normalize_geography_type(geography_type)
     metric_year = resolve_year(db, year)
-    records = joined_records(db, metric_year)
+    records = joined_records(db, metric_year, geography_type=normalized_type)
     return {
         "metric": metric_key,
         "year": metric_year,
@@ -165,12 +187,14 @@ def list_metric_values(
 @router.get("/summary")
 def get_summary(
     ids: str | None = Query(default=None, description="Comma-separated GEOIDs."),
+    geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
     year: int | None = None,
     db: Session = Depends(get_db),
 ):
     metric_year = resolve_year(db, year)
     id_list = parse_ids(ids)
-    records = joined_records(db, metric_year, id_list)
+    normalized_type = normalize_geography_type(geography_type)
+    records = joined_records(db, metric_year, id_list, normalized_type)
     if id_list and not records:
         raise HTTPException(status_code=404, detail="No selected geographies were found.")
     return build_summary(records, metric_year)
@@ -179,12 +203,14 @@ def get_summary(
 @router.get("/compare")
 def compare_geographies(
     ids: str | None = Query(default=None, description="Comma-separated GEOIDs."),
+    geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
     year: int | None = None,
     db: Session = Depends(get_db),
 ):
     metric_year = resolve_year(db, year)
     id_list = parse_ids(ids)
-    records = joined_records(db, metric_year, id_list)
+    normalized_type = normalize_geography_type(geography_type)
+    records = joined_records(db, metric_year, id_list, normalized_type)
 
     if id_list:
         record_by_geoid = {geography.geoid: (geography, metric) for geography, metric in records}
@@ -210,6 +236,7 @@ def compare_geographies(
 @router.get("/map-data")
 def get_map_data(
     metric: str = Query(default="rent_burden_pct"),
+    geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
     detail: Literal["full", "display"] = Query(
         default="full",
         description="Use display for map-ready simplified geometry; full returns stored geometry.",
@@ -220,9 +247,10 @@ def get_map_data(
     metric_key = normalize_metric_name(metric)
     if metric_key not in VALID_METRICS:
         raise HTTPException(status_code=400, detail=f"Unsupported metric: {metric}")
+    normalized_type = normalize_geography_type(geography_type)
 
     metric_year = resolve_year(db, year)
-    records = joined_records(db, metric_year)
+    records = joined_records(db, metric_year, geography_type=normalized_type)
     postgis_geometries = (
         load_postgis_map_geometries(db, year=metric_year, detail=detail)
         if detail == "display"
@@ -244,7 +272,8 @@ def get_map_data(
             "metric": metric_key,
             "year": metric_year,
             "domain": domain,
-            "source": "GTA municipal metrics from the loaded database; packaged seed metrics use Statistics Canada 2021 Census Profile values.",
+            "geography_type": normalized_type,
+            "source": map_data_source(normalized_type),
         },
         "features": [
             {
@@ -276,3 +305,15 @@ def map_geometry(geometry: dict[str, Any], detail: str) -> dict[str, Any]:
     if detail == "display":
         return compact_geometry(geometry, tolerance=0.00008, precision=5)
     return geometry
+
+
+def map_data_source(geography_type: str | None) -> str:
+    if geography_type == "census_tract":
+        return (
+            "Statistics Canada 2021 census tract cartographic boundaries filtered to the GTA; "
+            "packaged tract metrics are estimated from parent municipality Census Profile values."
+        )
+    return (
+        "GTA municipal metrics from the loaded database; packaged seed metrics use "
+        "Statistics Canada 2021 Census Profile values."
+    )

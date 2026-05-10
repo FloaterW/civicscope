@@ -82,6 +82,7 @@ For a hosted demo, packaged seed data is enough to make the app usable immediate
 ```bash
 python etl/load_geo.py
 python etl/load_census.py --official-gta
+python etl/load_tracts.py
 ```
 
 To refresh the packaged seed files before building a demo image:
@@ -89,6 +90,7 @@ To refresh the packaged seed files before building a demo image:
 ```bash
 python etl/load_geo.py --update-seed
 python etl/load_census.py --update-seed
+python etl/load_tracts.py --update-seed --geojson /path/to/statcan_ct.geojson
 ```
 
 ## Pre-Deploy Checklist

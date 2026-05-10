@@ -1,6 +1,7 @@
 import type {
   CompareResponse,
   GeographiesResponse,
+  GeographyLevel,
   MapData,
   MetricKey,
   Summary
@@ -30,23 +31,39 @@ export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<
   return response.json() as Promise<T>;
 }
 
-export function getMapData(metric: MetricKey, signal?: AbortSignal) {
-  return fetchJson<MapData>(`/api/map-data?metric=${metric}&detail=display`, signal);
+function levelQuery(geographyLevel: GeographyLevel) {
+  return `type=${encodeURIComponent(geographyLevel)}`;
 }
 
-export function getSummary(geoid?: string, signal?: AbortSignal) {
-  const query = geoid ? `?ids=${encodeURIComponent(geoid)}` : "";
-  return fetchJson<Summary>(`/api/summary${query}`, signal);
+export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, signal?: AbortSignal) {
+  return fetchJson<MapData>(
+    `/api/map-data?metric=${metric}&detail=display&${levelQuery(geographyLevel)}`,
+    signal
+  );
 }
 
-export function getComparison(ids: string[], signal?: AbortSignal) {
-  const query = ids.length ? `?ids=${encodeURIComponent(ids.join(","))}` : "";
-  return fetchJson<CompareResponse>(`/api/compare${query}`, signal);
+export function getSummary(geoid: string | undefined, geographyLevel: GeographyLevel, signal?: AbortSignal) {
+  const params = new URLSearchParams({ type: geographyLevel });
+  if (geoid) {
+    params.set("ids", geoid);
+  }
+  return fetchJson<Summary>(`/api/summary?${params.toString()}`, signal);
 }
 
-export function searchGeographies(search: string, signal?: AbortSignal) {
-  const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
-  return fetchJson<GeographiesResponse>(`/api/geographies${query}`, signal);
+export function getComparison(ids: string[], geographyLevel: GeographyLevel, signal?: AbortSignal) {
+  const params = new URLSearchParams({ type: geographyLevel });
+  if (ids.length) {
+    params.set("ids", ids.join(","));
+  }
+  return fetchJson<CompareResponse>(`/api/compare?${params.toString()}`, signal);
+}
+
+export function searchGeographies(search: string, geographyLevel: GeographyLevel, signal?: AbortSignal) {
+  const params = new URLSearchParams({ type: geographyLevel });
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  return fetchJson<GeographiesResponse>(`/api/geographies?${params.toString()}`, signal);
 }
 
 export function formatMetric(metric: MetricKey, value: number | null | undefined): string {

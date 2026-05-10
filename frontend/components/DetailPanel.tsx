@@ -3,15 +3,28 @@
 import { MapPin, X } from "lucide-react";
 
 import { formatMetric, getMetricLabel } from "@/lib/api";
-import type { Geography, MetricKey } from "@/types";
+import type { Geography, GeographyLevel, MetricKey } from "@/types";
 
 type Props = {
   geography: Geography | null;
   metric: MetricKey;
+  geographyLevel: GeographyLevel;
   onClear: () => void;
 };
 
-export function DetailPanel({ geography, metric, onClear }: Props) {
+const emptyCopy: Record<GeographyLevel, string> = {
+  municipality: "Select a municipality on the map or with search",
+  census_tract: "Select a census tract on the map or with search"
+};
+
+const overviewCopy: Record<GeographyLevel, string> = {
+  municipality:
+    "The map shows GTA municipalities with 2021 Census Profile affordability metrics when loaded. Select a geography to inspect local values.",
+  census_tract:
+    "The map shows official 2021 census tract boundaries with estimated tract metrics derived from parent municipalities. Select a tract to inspect local values."
+};
+
+export function DetailPanel({ geography, metric, geographyLevel, onClear }: Props) {
   const metrics = geography?.metrics;
 
   return (
@@ -31,7 +44,7 @@ export function DetailPanel({ geography, metric, onClear }: Props) {
           <p className="text-xs text-civic-muted">
             {geography
               ? `${geography.type} ${geography.geoid}`
-              : "Select a municipality on the map or with search"}
+              : emptyCopy[geographyLevel]}
           </p>
         </div>
         {geography && (
@@ -69,7 +82,7 @@ export function DetailPanel({ geography, metric, onClear }: Props) {
         </>
       ) : (
         <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
-          The map shows GTA municipalities with 2021 Census Profile affordability metrics when loaded. Select a geography to inspect local values.
+          {overviewCopy[geographyLevel]}
         </div>
       )}
     </section>

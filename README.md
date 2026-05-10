@@ -4,9 +4,11 @@ A geospatial civic analytics platform that helps users explore housing affordabi
 
 ## Overview
 
-CivicScope is a portfolio-grade full-stack project for public-sector analytics. The MVP includes a FastAPI backend, SQLAlchemy data model, Postgres/PostGIS Docker stack, packaged Greater Toronto Area seed data, tested API endpoints, repeatable Statistics Canada ETL scripts, and a Next.js dashboard with an interactive MapLibre map, summary cards, comparison chart, search, and detail panel.
+CivicScope is a portfolio-grade full-stack project for public-sector analytics. The MVP includes a FastAPI backend, SQLAlchemy data model, Postgres/PostGIS Docker stack, packaged Greater Toronto Area seed data, tested API endpoints, repeatable Statistics Canada ETL scripts, and a Next.js dashboard with an interactive MapLibre map, municipality/census-tract level switching, summary cards, comparison chart, search, and detail panel.
 
 Municipal geometries use Statistics Canada 2021 cartographic census subdivision boundaries. Metric values use official Statistics Canada 2021 Census Profile characteristics for the selected GTA municipalities.
+
+Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Packaged tract metrics are clearly labeled estimates derived from parent municipality values so the app works offline; they are intended as a demo layer until tract-level Census Profile metrics are loaded.
 
 ## Screenshots
 
@@ -21,6 +23,10 @@ Selected municipality drilldown:
 Population growth metric view:
 
 ![Population growth metric view](docs/screenshots/population-growth.png)
+
+Census tract map layer:
+
+![Census tract map layer](docs/screenshots/census-tracts.png)
 
 Regenerate screenshots from the running app:
 
@@ -108,14 +114,14 @@ npm run dev
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Service and database health check. |
-| `GET /api/geographies` | List/search GTA municipalities. |
+| `GET /api/geographies` | List/search GTA geographies. Defaults to municipalities; pass `type=census_tract` for tracts. |
 | `GET /api/geographies/{id}` | Get one geography by internal id or GEOID. |
 | `GET /api/metrics?metric=rent_burden` | Return metric values by geography. |
 | `GET /api/summary` | GTA summary. |
 | `GET /api/summary?ids=3520005` | Summary for selected geography IDs. |
 | `GET /api/compare?ids=3520005,3521005` | Compare selected geographies. |
 | `GET /api/map-data?metric=affordability_index` | GeoJSON FeatureCollection for map rendering. |
-| `GET /api/map-data?metric=rent_burden&detail=display` | Map-ready GeoJSON simplified with PostGIS when available. |
+| `GET /api/map-data?metric=rent_burden&detail=display` | Map-ready GeoJSON simplified with PostGIS when available. Add `type=census_tract` for tract-level map data. |
 
 Supported metrics:
 
@@ -138,6 +144,8 @@ The packaged seed covers GTA lower/single-tier municipalities:
 - York municipalities: Vaughan, Markham, Richmond Hill, Aurora, Newmarket, King, Whitchurch-Stouffville, East Gwillimbury, Georgina
 - Durham municipalities: Pickering, Ajax, Whitby, Oshawa, Clarington, Uxbridge, Scugog, Brock
 - Halton municipalities: Oakville, Burlington, Milton, Halton Hills
+
+It also includes 1,334 packaged census tract features assigned to those municipalities by tract centroid. Tract boundaries are official 2021 Statistics Canada cartographic census tract polygons; tract metric values are estimated for demo use and should be replaced before publication-grade tract analysis.
 
 Current and planned sources:
 
@@ -169,6 +177,24 @@ Load GTA municipal boundaries from the Statistics Canada cartographic boundary s
 
 ```bash
 docker compose exec backend python etl/load_geo.py
+```
+
+Print the official Statistics Canada census tract boundary query URL:
+
+```bash
+docker compose exec backend python etl/load_tracts.py --print-url
+```
+
+Load packaged census tract rows into an existing local database:
+
+```bash
+docker compose exec backend python etl/load_tracts.py --from-seed
+```
+
+Refresh packaged census tract rows from a Statistics Canada CT GeoJSON file or URL:
+
+```bash
+docker compose exec backend python etl/load_tracts.py --update-seed --geojson /app/data/statcan_ct.geojson
 ```
 
 Refresh the packaged offline seed geometries from the same official service:
@@ -269,13 +295,14 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 
 ## Resume Bullets
 
-- Built CivicScope, a geospatial housing-affordability analytics platform using Next.js, FastAPI, PostgreSQL/PostGIS, and public-data-ready workflows to visualize rent burden and income patterns across Greater Toronto Area municipalities.
-- Designed ETL-ready civic data workflows for Statistics Canada boundary loading, Census Profile metric normalization, PostGIS geometry indexing, and GeoJSON API delivery for interactive map visualizations.
+- Built CivicScope, a geospatial housing-affordability analytics platform using Next.js, FastAPI, PostgreSQL/PostGIS, and public-data-ready workflows to visualize rent burden and income patterns across Greater Toronto Area municipalities and census tracts.
+- Designed ETL-ready civic data workflows for Statistics Canada municipal and census tract boundary loading, Census Profile metric normalization, PostGIS geometry indexing, and GeoJSON API delivery for interactive map visualizations.
 - Implemented production-style API, database, testing, and Docker workflows for a public-sector analytics dashboard used to compare housing affordability across regions.
 
 ## Current Limitations
 
 - Packaged seed data remains available for offline demos even though the database can refresh boundaries and metrics from Statistics Canada.
 - The native PostGIS `geom` column is currently backfilled from stored GeoJSON; a future migration can make it the canonical geometry store.
-- The current product scope is GTA municipalities. Census tracts, dissemination areas, and parcel-level workflows are planned expansion paths.
+- Census tract boundaries are included, but packaged tract metrics are estimated from parent municipality values. The next data-quality upgrade is loading official tract-level Census Profile metrics.
+- Dissemination areas and parcel-level workflows remain planned expansion paths.
 - Transit/access scoring is intentionally not implemented yet; GTFS ingestion is the next domain feature after deployment polish.

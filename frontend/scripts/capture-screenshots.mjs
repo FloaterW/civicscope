@@ -45,6 +45,15 @@ await page.getByLabel("Map metric").selectOption("population_growth_pct");
 await page.getByText("44.4", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
 await save("population-growth.png");
 
+await page.getByRole("button", { name: "Census tracts" }).click();
+await page.getByLabel("Map metric").selectOption("rent_burden_pct");
+await page.getByText("1,334 GTA census tracts", { exact: true }).waitFor({
+  state: "visible",
+  timeout: 30_000
+});
+await page.getByText("57.6", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+await save("census-tracts.png");
+
 await browser.close();
 
 console.log(`Screenshots saved to ${screenshotDir}`);

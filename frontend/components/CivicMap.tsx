@@ -66,7 +66,7 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
         center: [-79.45, 43.78],
         zoom: 8.15,
         minZoom: 7,
-        maxZoom: 11,
+        maxZoom: 12.5,
         style: {
           version: 8,
           glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
@@ -121,9 +121,19 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
               source: sourceId,
               paint: {
                 "line-color": "#314154",
-                "line-width": 1,
-                "line-opacity": 0.45
-              }
+                "line-width": [
+                  "case",
+                  ["==", ["get", "type"], "census_tract"],
+                  0.45,
+                  1
+                ],
+                "line-opacity": [
+                  "case",
+                  ["==", ["get", "type"], "census_tract"],
+                  0.32,
+                  0.45
+                ]
+              } as never
             },
             {
               id: selectedFillLayerId,
@@ -132,7 +142,7 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
               filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
               paint: {
                 "fill-color": "#fef3c7",
-                "fill-opacity": 0.44
+                "fill-opacity": 0.5
               }
             },
             {
@@ -252,7 +262,11 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
           [minLng, minLat],
           [maxLng, maxLat]
         ],
-        { padding: 96, maxZoom: 9.15, duration: 650 }
+        {
+          padding: 96,
+          maxZoom: data?.metadata.geography_type === "census_tract" ? 11.35 : 9.15,
+          duration: 650
+        }
       );
     }
   }, [data, selectedGeoid]);
@@ -264,6 +278,7 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
       data-metric={loadedMetric ?? ""}
       data-requested-metric={metric}
       data-selected-geoid={selectedGeoid ?? ""}
+      data-geography-type={data?.metadata.geography_type ?? ""}
       data-domain-min={data?.metadata.domain.min ?? ""}
       data-domain-max={data?.metadata.domain.max ?? ""}
       className="relative h-full w-full"

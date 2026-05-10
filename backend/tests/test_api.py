@@ -19,8 +19,19 @@ def test_map_data_endpoint(client):
     payload = response.json()
     assert payload["type"] == "FeatureCollection"
     assert payload["metadata"]["metric"] == "rent_burden_pct"
+    assert payload["metadata"]["geography_type"] == "municipality"
     assert len(payload["features"]) >= 6
     assert "geometry" in payload["features"][0]
+
+
+def test_map_data_endpoint_supports_census_tracts(client):
+    response = client.get("/api/map-data?metric=rent_burden&type=census_tract&detail=display")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["metadata"]["geography_type"] == "census_tract"
+    assert len(payload["features"]) > 1000
+    assert all(feature["properties"]["type"] == "census_tract" for feature in payload["features"])
+    assert payload["features"][0]["properties"]["metrics"]["median_income"] is not None
 
 
 def test_map_data_display_detail_compacts_geometry(client):
@@ -44,6 +55,14 @@ def test_compare_endpoint_preserves_requested_ids(client):
     assert response.status_code == 200
     items = response.json()["items"]
     assert [item["geoid"] for item in items] == ["3520005", "3521005"]
+
+
+def test_summary_endpoint_filters_to_census_tracts(client):
+    response = client.get("/api/summary?type=census_tract")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["region_count"] > 1000
+    assert payload["population"] > 0
 
 
 def test_invalid_metric_returns_400(client):

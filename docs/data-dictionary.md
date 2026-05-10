@@ -5,10 +5,10 @@
 | Column | Meaning |
 | --- | --- |
 | `id` | Internal primary key. |
-| `geoid` | Stable geography identifier. GTA rows use official 2021 CSDUID values such as `3520005` for Toronto. |
+| `geoid` | Stable geography identifier. Municipality rows use official 2021 CSDUID values such as `3520005` for Toronto. Census tract rows use official CTUID values such as `5350001.00`. |
 | `name` | Display name. |
-| `type` | Geography type, currently `municipality`. |
-| `county` | Upper-tier region name for filtering and display. This column is retained from the original schema and should be renamed to `region` in a future migration. |
+| `type` | Geography type: `municipality` or `census_tract`. |
+| `county` | Region-like display field. Municipality rows store upper-tier region names; census tract rows store the assigned parent municipality. This column is retained from the original schema and should be renamed to `region` or split into parent fields in a future migration. |
 | `state` | Province/region code, currently `ON`. |
 | `geometry` | Stored GeoJSON geometry retained for provenance, portability, and seed loading. |
 | `geom` | Native PostGIS geometry in EPSG:4326, backfilled from `geometry` and indexed with GiST for spatial operations and map simplification. |
@@ -26,7 +26,7 @@
 | `population` | Current population estimate. |
 | `previous_population` | Prior comparison population estimate. |
 | `renter_households` | Renter household count used as a weight. |
-| `rent_burden_pct` | Percent of tenant households spending 30 percent or more of income on shelter costs. Packaged GTA seed values come from Statistics Canada Census Profile characteristic `1478`. |
+| `rent_burden_pct` | Percent of tenant households spending 30 percent or more of income on shelter costs. Packaged municipal values come from Statistics Canada Census Profile characteristic `1478`; packaged census tract values are estimated from the parent municipality. |
 | `affordability_index` | Score where 100 equals the 30 percent rent-to-income threshold; higher is more affordable. |
 
 ## Formulas
@@ -40,3 +40,5 @@
 Municipal geometries in the seed data come from Statistics Canada 2021 cartographic census subdivision boundaries filtered to GTA municipalities. They can now be refreshed with `backend/etl/load_geo.py`.
 
 Packaged seed metrics use official Statistics Canada 2021 Census Profile values for the selected GTA municipalities. Refresh them with `backend/etl/load_census.py --update-seed`, or refresh the database directly with `backend/etl/load_census.py --official-gta`.
+
+Census tract geometries in the seed data come from Statistics Canada 2021 cartographic census tract boundaries. `backend/etl/load_tracts.py` filters candidate tract features to the current GTA municipalities by tract representative point and assigns them to parent municipalities. Tract metrics in the packaged seed are estimated and should be replaced with official tract-level Census Profile values for publication-grade analysis.

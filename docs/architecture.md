@@ -14,7 +14,7 @@ flowchart LR
 
 ## Phase 1-3 shape
 
-CivicScope is split into a typed Next.js frontend and a FastAPI backend. The backend owns metric formulas, seed loading, API validation, and GeoJSON delivery. The frontend fetches map features with all available metrics, then switches the active map metric locally so dropdown changes repaint immediately without waiting on another map request.
+CivicScope is split into a typed Next.js frontend and a FastAPI backend. The backend owns metric formulas, seed loading, API validation, geography-level filtering, and GeoJSON delivery. The frontend fetches map features with all available metrics for the active geography level, then switches the active map metric locally so dropdown changes repaint immediately without waiting on another map request.
 
 The Docker Compose stack starts:
 
@@ -24,9 +24,9 @@ The Docker Compose stack starts:
 
 ## Data boundary
 
-The MVP keeps source GeoJSON in `geographies.geometry` and backfills native PostGIS geometry in `geographies.geom`. `backend/etl/load_geo.py` can refresh GTA CSD boundaries from the Statistics Canada ArcGIS service, and the seed/ETL path syncs `geom` after geography updates.
+The MVP keeps source GeoJSON in `geographies.geometry` and backfills native PostGIS geometry in `geographies.geom`. `backend/etl/load_geo.py` can refresh GTA CSD boundaries from the Statistics Canada ArcGIS service, while `backend/etl/load_tracts.py` can load or refresh census tract boundaries. The seed/ETL path syncs `geom` after geography updates.
 
-Map endpoints keep two geometry delivery modes: `detail=full` returns the stored boundary and `detail=display` uses `ST_SimplifyPreserveTopology` through PostGIS when available. SQLite and other non-PostGIS environments fall back to Python GeoJSON compaction.
+Map endpoints keep two geometry delivery modes: `detail=full` returns the stored boundary and `detail=display` uses `ST_SimplifyPreserveTopology` through PostGIS when available. They also accept `type=municipality` or `type=census_tract` so the same API contract supports regional and tract-scale map views. SQLite and other non-PostGIS environments fall back to Python GeoJSON compaction.
 
 ## Deployment boundary
 

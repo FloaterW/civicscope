@@ -27,6 +27,7 @@ type MapPayload = {
       min: number | null;
       max: number | null;
     };
+    geography_type: "municipality" | "census_tract";
   };
   features: MapFeaturePayload[];
 };
@@ -38,6 +39,7 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const payload = (await response.json()) as MapPayload;
     expect(payload.type).toBe("FeatureCollection");
+    expect(payload.metadata.geography_type).toBe("municipality");
     expect(payload.features).toHaveLength(25);
     expect(payload.metadata.domain.min).toBeGreaterThan(20);
     expect(payload.metadata.domain.max).toBeLessThan(60);
@@ -52,6 +54,29 @@ test.describe("CivicScope dashboard regressions", () => {
       expect(feature.properties.metrics.rent_burden_pct).toBeGreaterThan(0);
       expect(feature.properties.metrics.affordability_index).toBeGreaterThan(0);
     }
+  });
+
+  test("geography level selector loads census tract map data and tract search", async ({ page }) => {
+    await blockExternalMapAssets(page);
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+
+    const map = page.getByTestId("civic-map");
+    await expect(page.getByText("Rent burden by census tract")).toBeVisible();
+    await expect(page.getByTestId("summary-panel")).toContainText("1,334 GTA census tracts");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract");
+    await expect(map).toHaveAttribute("data-feature-count", "1334");
+    await expect(page.getByTestId("detail-panel")).toContainText("estimated tract metrics");
+
+    await page.getByTestId("geography-search").fill("5350001.00");
+    const tractResult = page.getByRole("button").filter({ hasText: "5350001.00" });
+    await expect(tractResult).toHaveCount(1);
+    await tractResult.click();
+
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0001.00");
+    await expect(page.getByTestId("detail-panel")).not.toContainText("No data");
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
   });
 
   test("overview renders summary values, map canvas, legend, and comparison chart", async ({ page }) => {

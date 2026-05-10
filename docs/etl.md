@@ -20,6 +20,25 @@ Source:
 
 - Statistics Canada 2021 Cartographic Boundary Files service: `https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/9`
 
+## Census Tract Loader
+
+`backend/etl/load_tracts.py` loads Statistics Canada 2021 cartographic census tract boundaries and filters them to the current GTA municipality set by tract representative point. Packaged tract metrics are estimated from parent municipality values for offline demo use.
+
+Useful commands:
+
+```bash
+docker compose exec backend python etl/load_tracts.py --print-url
+docker compose exec backend python etl/load_tracts.py --from-seed
+docker compose exec backend python etl/load_tracts.py --update-seed --geojson /app/data/statcan_ct.geojson
+docker compose exec backend python etl/load_tracts.py
+```
+
+Use `--from-seed` when an existing local database already has municipality rows and needs the packaged census tract rows added without recreating the Postgres volume. Use `--update-seed` when refreshing the packaged offline seed after downloading an official CT GeoJSON extract.
+
+Source:
+
+- Statistics Canada 2021 Cartographic Boundary Files census tract service: `https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/11`
+
 ## Census Metric Loader
 
 `backend/etl/load_census.py` supports four production-facing workflows:
@@ -70,7 +89,8 @@ Alembic migrations create the core tables and the native `geographies.geom geome
 
 - `detail=full`: stored GeoJSON geometry, best for export or debugging.
 - `detail=display`: PostGIS `ST_SimplifyPreserveTopology` output when available, best for interactive map rendering.
+- `type=municipality` or `type=census_tract`: geography level selection for the dashboard map and summaries.
 
-The frontend uses `detail=display` by default so the map remains responsive while the database keeps higher-detail municipal boundaries. In SQLite tests, the API falls back to Python GeoJSON compaction.
+The frontend uses `detail=display` by default so the map remains responsive while the database keeps higher-detail municipal and tract boundaries. In SQLite tests, the API falls back to Python GeoJSON compaction.
 
 The map payload includes all metric values for each feature. The frontend changes the active metric locally for immediate color and legend updates, while the API still validates metric names and exposes `metadata.metric` for direct API consumers.
