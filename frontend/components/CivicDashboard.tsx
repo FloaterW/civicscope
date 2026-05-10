@@ -21,6 +21,7 @@ import type {
 } from "@/types";
 
 import { ComparisonPanel } from "./ComparisonPanel";
+import { DataQualityBadge } from "./DataQualityBadge";
 import { DetailPanel } from "./DetailPanel";
 import { GeographyLevelSelector } from "./GeographyLevelSelector";
 import { MetricSelector } from "./MetricSelector";
@@ -230,15 +231,18 @@ export function CivicDashboard() {
           data-testid="map-panel"
           className="min-h-[560px] overflow-hidden rounded-lg border border-civic-line bg-white shadow-panel"
         >
-          <div className="flex items-center justify-between border-b border-civic-line px-4 py-3">
+          <div className="flex flex-col gap-2 border-b border-civic-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold text-civic-ink">Map View</h2>
               <p className="text-xs text-civic-muted">
                 {getMetricLabel(metric)} by {geographyLabel.singular}
               </p>
             </div>
-            <div className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-              {visibleMapData?.metadata.year ?? "2021"}
+            <div className="flex items-center gap-2">
+              <DataQualityBadge geographyLevel={geographyLevel} />
+              <div className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
+                {visibleMapData?.metadata.year ?? "2021"}
+              </div>
             </div>
           </div>
           <div className="h-[520px]">

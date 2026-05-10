@@ -39,6 +39,8 @@ Source:
 
 - Statistics Canada 2021 Cartographic Boundary Files census tract service: `https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/11`
 
+See `tract-metric-upgrade.md` for the recommended path to replace packaged tract estimates with official tract-level Census Profile metrics.
+
 ## Census Metric Loader
 
 `backend/etl/load_census.py` supports four production-facing workflows:

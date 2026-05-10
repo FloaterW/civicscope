@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "demo:video": "node scripts/capture-demo-video.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "start": "next start",
     "test:e2e": "playwright test",

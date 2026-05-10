@@ -20,6 +20,7 @@ def test_map_data_endpoint(client):
     assert payload["type"] == "FeatureCollection"
     assert payload["metadata"]["metric"] == "rent_burden_pct"
     assert payload["metadata"]["geography_type"] == "municipality"
+    assert payload["metadata"]["data_quality"]["metric_status"] == "official"
     assert len(payload["features"]) >= 6
     assert "geometry" in payload["features"][0]
 
@@ -29,6 +30,7 @@ def test_map_data_endpoint_supports_census_tracts(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["metadata"]["geography_type"] == "census_tract"
+    assert payload["metadata"]["data_quality"]["metric_status"] == "estimated"
     assert len(payload["features"]) > 1000
     assert all(feature["properties"]["type"] == "census_tract" for feature in payload["features"])
     assert payload["features"][0]["properties"]["metrics"]["median_income"] is not None

@@ -273,6 +273,7 @@ def get_map_data(
             "year": metric_year,
             "domain": domain,
             "geography_type": normalized_type,
+            "data_quality": data_quality(normalized_type),
             "source": map_data_source(normalized_type),
         },
         "features": [
@@ -317,3 +318,20 @@ def map_data_source(geography_type: str | None) -> str:
         "GTA municipal metrics from the loaded database; packaged seed metrics use "
         "Statistics Canada 2021 Census Profile values."
     )
+
+
+def data_quality(geography_type: str | None) -> dict[str, str]:
+    if geography_type == "census_tract":
+        return {
+            "metric_status": "estimated",
+            "label": "Estimated tract metrics",
+            "description": (
+                "Census tract geometries are official Statistics Canada 2021 boundaries; "
+                "packaged tract metrics are estimated from parent municipality values."
+            ),
+        }
+    return {
+        "metric_status": "official",
+        "label": "Official municipal metrics",
+        "description": "Packaged municipal metrics use official Statistics Canada 2021 Census Profile values.",
+    }

@@ -28,6 +28,9 @@ type MapPayload = {
       max: number | null;
     };
     geography_type: "municipality" | "census_tract";
+    data_quality: {
+      metric_status: "official" | "estimated";
+    };
   };
   features: MapFeaturePayload[];
 };
@@ -40,6 +43,7 @@ test.describe("CivicScope dashboard regressions", () => {
     const payload = (await response.json()) as MapPayload;
     expect(payload.type).toBe("FeatureCollection");
     expect(payload.metadata.geography_type).toBe("municipality");
+    expect(payload.metadata.data_quality.metric_status).toBe("official");
     expect(payload.features).toHaveLength(25);
     expect(payload.metadata.domain.min).toBeGreaterThan(20);
     expect(payload.metadata.domain.max).toBeLessThan(60);
@@ -65,6 +69,9 @@ test.describe("CivicScope dashboard regressions", () => {
     const map = page.getByTestId("civic-map");
     await expect(page.getByText("Rent burden by census tract")).toBeVisible();
     await expect(page.getByTestId("summary-panel")).toContainText("1,334 GTA census tracts");
+    await expect(
+      page.getByTestId("data-quality-badge").filter({ hasText: "Estimated tract metrics" })
+    ).toHaveCount(2);
     await expect(map).toHaveAttribute("data-geography-type", "census_tract");
     await expect(map).toHaveAttribute("data-feature-count", "1334");
     await expect(page.getByTestId("detail-panel")).toContainText("estimated tract metrics");

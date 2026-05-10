@@ -12,6 +12,10 @@ Census tract geometries use Statistics Canada 2021 cartographic census tract bou
 
 ## Screenshots
 
+Demo video:
+
+[CivicScope demo walkthrough](docs/demo/civicscope-demo.webm)
+
 Overview dashboard with GTA municipal rent burden:
 
 ![CivicScope overview dashboard](docs/screenshots/overview-dashboard.png)
@@ -34,6 +38,23 @@ Regenerate screenshots from the running app:
 cd frontend
 npm run screenshots
 ```
+
+Regenerate the demo video from the running app:
+
+```bash
+cd frontend
+npm run demo:video
+```
+
+## Case Study
+
+CivicScope answers a practical planning question: where are GTA housing affordability conditions most strained relative to local incomes, and how do those conditions differ between nearby municipalities and census tracts?
+
+The core workflow is designed for a policy analyst or planner: scan the regional overview, switch metrics, search or click a geography, inspect local affordability indicators, and compare selected areas. The app intentionally separates official municipal metrics from estimated tract metrics with visible data-quality labels.
+
+See [docs/case-study.md](docs/case-study.md) for the full project narrative.
+
+See [docs/tract-metric-upgrade.md](docs/tract-metric-upgrade.md) for the official tract-metric upgrade path.
 
 ## Architecture
 
@@ -64,7 +85,10 @@ civicscope/
     lib/
     types/
   docs/
+    case-study.md
+    demo/
     etl.md
+    tract-metric-upgrade.md
     deployment.md
     screenshots/
   docker-compose.yml

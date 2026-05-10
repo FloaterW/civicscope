@@ -60,6 +60,11 @@ export type MapData = {
       max: number | null;
     };
     geography_type: GeographyLevel;
+    data_quality: {
+      metric_status: "official" | "estimated";
+      label: string;
+      description: string;
+    };
     source: string;
   };
   features: MapFeature[];

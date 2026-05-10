@@ -5,6 +5,8 @@ import { MapPin, X } from "lucide-react";
 import { formatMetric, getMetricLabel } from "@/lib/api";
 import type { Geography, GeographyLevel, MetricKey } from "@/types";
 
+import { DataQualityBadge } from "./DataQualityBadge";
+
 type Props = {
   geography: Geography | null;
   metric: MetricKey;
@@ -46,6 +48,9 @@ export function DetailPanel({ geography, metric, geographyLevel, onClear }: Prop
               ? `${geography.type} ${geography.geoid}`
               : emptyCopy[geographyLevel]}
           </p>
+          <div className="mt-2">
+            <DataQualityBadge geographyLevel={geographyLevel} />
+          </div>
         </div>
         {geography && (
           <button
