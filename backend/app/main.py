@@ -1,0 +1,52 @@
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.api.routes import router as api_router
+from app.core.config import settings
+from app.db.init_db import init_db
+from app.db.session import SessionLocal, get_db
+from app.services.seed import seed_demo_data
+
+
+def create_app(auto_initialize: bool = True) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if auto_initialize:
+            init_db()
+            if settings.seed_on_startup:
+                db = SessionLocal()
+                try:
+                    seed_demo_data(db)
+                finally:
+                    db.close()
+        yield
+
+    app = FastAPI(
+        title=settings.app_name,
+        version="0.1.0",
+        description="Geospatial civic analytics API for Greater Toronto housing affordability metrics.",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.get("/health", tags=["system"])
+    def health(db: Session = Depends(get_db)):
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "service": "civicscope-api", "database": "ok"}
+
+    app.include_router(api_router)
+    return app
+
+
+app = create_app()
