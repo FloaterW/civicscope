@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import ETLRun, Geography, Metric
+from app.models import CmhcMetric, ETLRun, Geography, Metric
 from app.services.metric_calculations import (
     calculate_affordability_index,
     estimate_rent_burden_pct,
@@ -20,12 +20,18 @@ def load_demo_seed() -> dict[str, Any]:
     return json.loads(seed_path.read_text(encoding="utf-8"))
 
 
+def load_cmhc_seed() -> dict[str, Any]:
+    seed_path = files("app.data").joinpath("cmhc_seed.json")
+    return json.loads(seed_path.read_text(encoding="utf-8"))
+
+
 def seed_demo_data(db: Session, force: bool = False) -> int:
     existing = db.query(Geography).count()
     if existing and not force:
         return 0
 
     if force:
+        db.query(CmhcMetric).delete()
         db.query(Metric).delete()
         db.query(Geography).delete()
         db.flush()
@@ -82,5 +88,51 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
             error_message=None,
         )
     )
+    db.commit()
+    return row_count
+
+
+def seed_cmhc_data(db: Session, force: bool = False) -> int:
+    existing = db.query(CmhcMetric).count()
+    if existing and not force:
+        return 0
+
+    if force:
+        db.query(CmhcMetric).delete()
+        db.flush()
+
+    # Build set of known geoids for fast lookup
+    known_geoids = {row[0] for row in db.query(Geography.geoid).all()}
+
+    seed = load_cmhc_seed()
+    row_count = 0
+
+    for item in seed["metrics"]:
+        if item["geoid"] not in known_geoids:
+            continue
+        cmhc = CmhcMetric(
+            geoid=item["geoid"],
+            year=item["year"],
+            vacancy_rate=item.get("vacancy_rate"),
+            average_rent_total=item.get("average_rent_total"),
+            average_rent_bachelor=item.get("average_rent_bachelor"),
+            average_rent_1br=item.get("average_rent_1br"),
+            average_rent_2br=item.get("average_rent_2br"),
+            average_rent_3br_plus=item.get("average_rent_3br_plus"),
+            turnover_rate=item.get("turnover_rate"),
+            availability_rate=item.get("availability_rate"),
+            rental_universe=item.get("rental_universe"),
+            housing_starts_total=item.get("housing_starts_total"),
+            housing_starts_single=item.get("housing_starts_single"),
+            housing_starts_semi=item.get("housing_starts_semi"),
+            housing_starts_row=item.get("housing_starts_row"),
+            housing_starts_apartment=item.get("housing_starts_apartment"),
+            housing_completions=item.get("housing_completions"),
+            units_under_construction=item.get("units_under_construction"),
+        )
+        db.add(cmhc)
+        row_count += 1
+
+    db.flush()
     db.commit()
     return row_count

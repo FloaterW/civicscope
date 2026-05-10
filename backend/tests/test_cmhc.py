@@ -101,3 +101,70 @@ def test_geography_cmhc_metrics_relationship(db_session):
 
     geo = db_session.query(Geography).filter(Geography.geoid == "3520005").one()
     assert len(geo.cmhc_metrics) == 2
+
+
+from app.services.metric_calculations import (
+    CMHC_METRICS, VALID_METRICS, is_cmhc_metric, metric_value, normalize_metric_name,
+)
+from app.services.seed import load_cmhc_seed, seed_cmhc_data
+
+
+def test_cmhc_metrics_are_valid():
+    for key in CMHC_METRICS:
+        assert key in VALID_METRICS
+
+
+def test_cmhc_aliases():
+    assert normalize_metric_name("vacancy") == "vacancy_rate"
+    assert normalize_metric_name("starts") == "housing_starts_total"
+    assert normalize_metric_name("completions") == "housing_completions"
+    assert normalize_metric_name("rent_cmhc") == "average_rent_total"
+    assert normalize_metric_name("turnover") == "turnover_rate"
+    assert normalize_metric_name("availability") == "availability_rate"
+    assert normalize_metric_name("universe") == "rental_universe"
+
+
+def test_is_cmhc_metric():
+    assert is_cmhc_metric("vacancy_rate") is True
+    assert is_cmhc_metric("housing_starts_total") is True
+    assert is_cmhc_metric("median_income") is False
+
+
+def test_metric_value_reads_cmhc_row(db_session):
+    from app.models import CmhcMetric
+    cmhc = CmhcMetric(geoid="3520005", year=2024, vacancy_rate=2.1, average_rent_total=1850)
+    db_session.add(cmhc)
+    db_session.flush()
+    loaded = db_session.query(CmhcMetric).filter(CmhcMetric.geoid == "3520005", CmhcMetric.year == 2024).one()
+    assert metric_value("vacancy_rate", loaded) == 2.1
+    assert metric_value("average_rent_total", loaded) == 1850
+    assert metric_value("housing_starts_total", loaded) is None
+
+
+def test_load_cmhc_seed_returns_dict():
+    seed = load_cmhc_seed()
+    assert "metadata" in seed
+    assert "metrics" in seed
+    assert isinstance(seed["metrics"], list)
+
+
+def test_seed_cmhc_data_inserts_rows(db_session):
+    count = seed_cmhc_data(db_session)
+    assert count > 0
+    from app.models import CmhcMetric
+    rows = db_session.query(CmhcMetric).all()
+    assert len(rows) > 0
+
+
+def test_seed_cmhc_data_skips_when_exists(db_session):
+    first = seed_cmhc_data(db_session)
+    assert first > 0
+    second = seed_cmhc_data(db_session)
+    assert second == 0
+
+
+def test_seed_cmhc_data_force_reloads(db_session):
+    first = seed_cmhc_data(db_session)
+    assert first > 0
+    second = seed_cmhc_data(db_session, force=True)
+    assert second > 0

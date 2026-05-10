@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "source": "cmhc_hmip_rental_market_and_starts_completions",
+    "years": [2021],
+    "fetched_at": "2026-05-10T00:00:00Z",
+    "notes": ["Placeholder seed with sample CMHC data for testing.", "Run etl/load_cmhc.py --update-seed to fetch real data."]
+  },
+  "metrics": [
+    {
+      "geoid": "3520005", "year": 2021,
+      "vacancy_rate": 3.1, "average_rent_total": 1427, "average_rent_bachelor": 1116,
+      "average_rent_1br": 1300, "average_rent_2br": 1530, "average_rent_3br_plus": 1795,
+      "turnover_rate": 13.2, "availability_rate": 4.1, "rental_universe": 358455,
+      "housing_starts_total": 17219, "housing_starts_single": 1055, "housing_starts_semi": 186,
+      "housing_starts_row": 1723, "housing_starts_apartment": 14255,
+      "housing_completions": 14872, "units_under_construction": 57890
+    },
+    {
+      "geoid": "3521005", "year": 2021,
+      "vacancy_rate": 2.3, "average_rent_total": 1385, "average_rent_bachelor": 1050,
+      "average_rent_1br": 1250, "average_rent_2br": 1480, "average_rent_3br_plus": 1680,
+      "turnover_rate": 11.8, "availability_rate": 3.5, "rental_universe": 42500,
+      "housing_starts_total": 3200, "housing_starts_single": 420, "housing_starts_semi": 65,
+      "housing_starts_row": 380, "housing_starts_apartment": 2335,
+      "housing_completions": 2850, "units_under_construction": 9200
+    }
+  ]
+}
