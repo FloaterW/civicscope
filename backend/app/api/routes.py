@@ -349,7 +349,7 @@ def map_data_source(geography_type: str | None) -> str:
     if geography_type == "census_tract":
         return (
             "Statistics Canada 2021 census tract cartographic boundaries filtered to the GTA; "
-            "packaged tract metrics are estimated from parent municipality Census Profile values."
+            "tract metrics are official 2021 Census Profile values fetched via the SDMX DF_CT dataflow."
         )
     return (
         "GTA municipal metrics from the loaded database; packaged seed metrics use "
@@ -360,11 +360,11 @@ def map_data_source(geography_type: str | None) -> str:
 def data_quality(geography_type: str | None) -> dict[str, str]:
     if geography_type == "census_tract":
         return {
-            "metric_status": "estimated",
-            "label": "Estimated tract metrics",
+            "metric_status": "official",
+            "label": "Official tract metrics",
             "description": (
-                "Census tract geometries are official Statistics Canada 2021 boundaries; "
-                "packaged tract metrics are estimated from parent municipality values."
+                "Census tract geometries and metrics are official Statistics Canada 2021 "
+                "Census Profile values fetched via the SDMX DF_CT dataflow."
             ),
         }
     return {
