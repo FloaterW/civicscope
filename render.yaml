@@ -21,3 +21,5 @@ databases:
   - name: civicscope-db
     databaseName: civicscope
     user: civicscope
+    postgresMajorVersion: 16
+    ipAllowList: []
