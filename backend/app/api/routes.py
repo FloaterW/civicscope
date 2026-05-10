@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.db.session import get_db
 from app.models import Geography, Metric
@@ -84,12 +84,26 @@ def joined_records(
     year: int,
     ids: list[str] | None = None,
     geography_type: str | None = None,
+    include_geometry: bool = True,
 ):
     query = (
         db.query(Geography, Metric)
         .join(Metric, Geography.geoid == Metric.geoid)
         .filter(Metric.year == year)
     )
+    if not include_geometry:
+        query = query.options(
+            load_only(
+                Geography.id,
+                Geography.geoid,
+                Geography.name,
+                Geography.type,
+                Geography.county,
+                Geography.state,
+                Geography.bbox,
+                Geography.geometry_source,
+            )
+        )
     if geography_type:
         query = query.filter(Geography.type == geography_type)
     if ids:
@@ -167,7 +181,7 @@ def list_metric_values(
         raise HTTPException(status_code=400, detail=f"Unsupported metric: {metric}")
     normalized_type = normalize_geography_type(geography_type)
     metric_year = resolve_year(db, year)
-    records = joined_records(db, metric_year, geography_type=normalized_type)
+    records = joined_records(db, metric_year, geography_type=normalized_type, include_geometry=False)
     return {
         "metric": metric_key,
         "year": metric_year,
@@ -194,7 +208,7 @@ def get_summary(
     metric_year = resolve_year(db, year)
     id_list = parse_ids(ids)
     normalized_type = normalize_geography_type(geography_type)
-    records = joined_records(db, metric_year, id_list, normalized_type)
+    records = joined_records(db, metric_year, id_list, normalized_type, include_geometry=False)
     if id_list and not records:
         raise HTTPException(status_code=404, detail="No selected geographies were found.")
     return build_summary(records, metric_year)
@@ -210,7 +224,7 @@ def compare_geographies(
     metric_year = resolve_year(db, year)
     id_list = parse_ids(ids)
     normalized_type = normalize_geography_type(geography_type)
-    records = joined_records(db, metric_year, id_list, normalized_type)
+    records = joined_records(db, metric_year, id_list, normalized_type, include_geometry=False)
 
     if id_list:
         record_by_geoid = {geography.geoid: (geography, metric) for geography, metric in records}
@@ -250,11 +264,21 @@ def get_map_data(
     normalized_type = normalize_geography_type(geography_type)
 
     metric_year = resolve_year(db, year)
-    records = joined_records(db, metric_year, geography_type=normalized_type)
     postgis_geometries = (
-        load_postgis_map_geometries(db, year=metric_year, detail=detail)
+        load_postgis_map_geometries(
+            db,
+            year=metric_year,
+            detail=detail,
+            geography_type=normalized_type,
+        )
         if detail == "display"
         else {}
+    )
+    records = joined_records(
+        db,
+        metric_year,
+        geography_type=normalized_type,
+        include_geometry=not postgis_geometries,
     )
     values = [
         value
@@ -281,7 +305,7 @@ def get_map_data(
                 "type": "Feature",
                 "geometry": postgis_geometries.get(
                     geography.geoid,
-                    map_geometry(geography.geometry, detail),
+                    map_geometry(geography.geometry, detail, normalized_type),
                 ),
                 "properties": {
                     "id": geography.id,
@@ -302,9 +326,10 @@ def get_map_data(
     }
 
 
-def map_geometry(geometry: dict[str, Any], detail: str) -> dict[str, Any]:
+def map_geometry(geometry: dict[str, Any], detail: str, geography_type: str | None) -> dict[str, Any]:
     if detail == "display":
-        return compact_geometry(geometry, tolerance=0.00008, precision=5)
+        tolerance = 0.00035 if geography_type == "census_tract" else 0.00008
+        return compact_geometry(geometry, tolerance=tolerance, precision=5)
     return geometry
 
 

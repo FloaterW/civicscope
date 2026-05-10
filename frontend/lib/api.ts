@@ -20,10 +20,18 @@ export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: s
 ];
 
 export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    cache: "no-store",
-    signal
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      cache: "no-store",
+      signal
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
+  }
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || `Request failed: ${response.status}`);

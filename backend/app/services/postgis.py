@@ -52,6 +52,7 @@ def load_postgis_map_geometries(
     *,
     year: int,
     detail: str,
+    geography_type: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     if not has_geom_column(db):
         return {}
@@ -61,6 +62,8 @@ def load_postgis_map_geometries(
     else:
         geometry_sql = "ST_AsGeoJSON(g.geom, 8)"
 
+    geography_filter = "AND g.type = :geography_type" if geography_type else ""
+
     rows = db.execute(
         text(
             f"""
@@ -68,10 +71,15 @@ def load_postgis_map_geometries(
             FROM geographies g
             JOIN metrics m ON m.geoid = g.geoid
             WHERE m.year = :year
+              {geography_filter}
               AND g.geom IS NOT NULL
             """
         ),
-        {"year": year, "tolerance": 0.00008},
+        {
+            "year": year,
+            "tolerance": display_tolerance(geography_type),
+            "geography_type": geography_type,
+        },
     ).mappings()
 
     return {
@@ -79,3 +87,9 @@ def load_postgis_map_geometries(
         for row in rows
         if row["geometry"] is not None
     }
+
+
+def display_tolerance(geography_type: str | None) -> float:
+    if geography_type == "census_tract":
+        return 0.00035
+    return 0.00008

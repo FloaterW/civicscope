@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Database, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getComparison,
@@ -46,7 +46,7 @@ const geographyLabels: Record<GeographyLevel, { singular: string; plural: string
 export function CivicDashboard() {
   const [metric, setMetric] = useState<MetricKey>("rent_burden_pct");
   const [geographyLevel, setGeographyLevel] = useState<GeographyLevel>("municipality");
-  const [mapData, setMapData] = useState<MapData | null>(null);
+  const [mapDataByLevel, setMapDataByLevel] = useState<Partial<Record<GeographyLevel, MapData>>>({});
   const [summary, setSummary] = useState<Summary | null>(null);
   const [comparison, setComparison] = useState<CompareResponse | null>(null);
   const [selected, setSelected] = useState<Geography | null>(null);
@@ -56,9 +56,12 @@ export function CivicDashboard() {
   const [mapLoading, setMapLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [comparisonLoading, setComparisonLoading] = useState(true);
+  const mapRequestsRef = useRef<Partial<Record<GeographyLevel, Promise<MapData>>>>({});
 
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
+  const mapData = mapDataByLevel[geographyLevel] ?? null;
+  const hasCachedMapData = Boolean(mapData);
 
   const comparisonIds = useMemo(() => {
     if (geographyLevel === "census_tract") {
@@ -77,28 +80,81 @@ export function CivicDashboard() {
   }, [geographyLevel]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
+    if (hasCachedMapData) {
+      setMapLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
     setMapLoading(true);
     setError(null);
 
-    getMapData("rent_burden_pct", geographyLevel, controller.signal)
+    if (!mapRequestsRef.current[geographyLevel]) {
+      mapRequestsRef.current[geographyLevel] = getMapData("rent_burden_pct", geographyLevel).finally(() => {
+        delete mapRequestsRef.current[geographyLevel];
+      });
+    }
+
+    mapRequestsRef.current[geographyLevel]
       .then((mapPayload) => {
-        setMapData(mapPayload);
+        setMapDataByLevel((current) =>
+          current[geographyLevel]
+            ? current
+            : {
+                ...current,
+                [geographyLevel]: mapPayload
+              }
+        );
       })
       .catch((requestError: Error) => {
-        if (controller.signal.aborted) {
+        if (cancelled) {
           return;
         }
         setError(requestError.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
+        if (!cancelled) {
           setMapLoading(false);
         }
       });
 
-    return () => controller.abort();
-  }, [geographyLevel]);
+    return () => {
+      cancelled = true;
+    };
+  }, [geographyLevel, hasCachedMapData]);
+
+  useEffect(() => {
+    if (!mapData) {
+      return;
+    }
+    const inactiveLevel: GeographyLevel =
+      geographyLevel === "municipality" ? "census_tract" : "municipality";
+    if (mapDataByLevel[inactiveLevel] || mapRequestsRef.current[inactiveLevel]) {
+      return;
+    }
+
+    const prefetchRequest = getMapData("rent_burden_pct", inactiveLevel);
+    mapRequestsRef.current[inactiveLevel] = prefetchRequest;
+    prefetchRequest
+      .then((mapPayload) => {
+        setMapDataByLevel((current) =>
+          current[inactiveLevel]
+            ? current
+            : {
+                ...current,
+                [inactiveLevel]: mapPayload
+              }
+        );
+        return mapPayload;
+      })
+      .catch(() => {
+        // Prefetch is opportunistic; the active view will surface errors if a user switches levels.
+      })
+      .finally(() => {
+        delete mapRequestsRef.current[inactiveLevel];
+      });
+  }, [geographyLevel, mapData, mapDataByLevel]);
 
   useEffect(() => {
     const controller = new AbortController();
