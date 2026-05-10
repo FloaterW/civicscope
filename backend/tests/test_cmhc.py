@@ -101,8 +101,8 @@ def test_geography_cmhc_metrics_relationship(db_session):
     db_session.flush()
 
     geo = db_session.query(Geography).filter(Geography.geoid == "3520005").one()
-    # 2 new + 1 from seed (year=2021)
-    assert len(geo.cmhc_metrics) >= 2
+    # 2 new + 1 from seed (year=2021) = 3 total
+    assert len(geo.cmhc_metrics) == 3
 
 
 from app.services.metric_calculations import (
