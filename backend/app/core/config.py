@@ -14,11 +14,21 @@ def _env_tuple(name: str, default: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in raw.split(",") if item.strip())
 
 
+def _normalize_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "CivicScope")
     app_env: str = os.getenv("APP_ENV", "development")
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./civicscope.db")
+    database_url: str = _normalize_database_url(
+        os.getenv("DATABASE_URL", "sqlite:///./civicscope.db")
+    )
     seed_on_startup: bool = _env_bool("SEED_ON_STARTUP", True)
     cors_origins: tuple[str, ...] = _env_tuple(
         "CORS_ORIGINS",
