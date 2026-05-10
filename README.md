@@ -88,10 +88,12 @@ civicscope/
     case-study.md
     demo/
     etl.md
+    launch-checklist.md
     tract-metric-upgrade.md
     deployment.md
     screenshots/
   docker-compose.yml
+  render.yaml
   Makefile
 ```
 
@@ -102,6 +104,8 @@ Copy the example environment file if you want local overrides:
 ```bash
 cp .env.example .env
 ```
+
+Production-style environment values are documented in `.env.production.example`.
 
 Run the full stack with Docker:
 
@@ -307,11 +311,14 @@ npm run screenshots
 ## Deployment Notes
 
 See `docs/deployment.md` for a deployment checklist.
+See `docs/launch-checklist.md` for the exact GitHub, Render, and Vercel launch sequence.
 
 Recommended split:
 
 - Backend API: Render, Fly.io, or Railway with managed PostgreSQL/PostGIS.
 - Frontend dashboard: Vercel with `NEXT_PUBLIC_API_URL` pointed at the deployed FastAPI service.
+- Render Blueprint: `render.yaml`
+- Vercel project config: `frontend/vercel.json`
 - Migrations: run `alembic upgrade head` as a release step before backend startup.
 - CORS: set `CORS_ORIGINS` to the deployed frontend URL and any local preview URLs needed for testing.
 

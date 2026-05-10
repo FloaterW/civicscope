@@ -6,6 +6,13 @@ This guide assumes the portfolio deployment uses:
 - Database: managed PostgreSQL with PostGIS enabled
 - Frontend: Vercel
 
+The repository includes:
+
+- `render.yaml` for a Render Blueprint backend/database setup.
+- `frontend/vercel.json` for the Vercel frontend project.
+- `.env.production.example` for production environment variable names.
+- `docs/launch-checklist.md` for the end-to-end GitHub, Render, and Vercel sequence.
+
 ## Backend
 
 Required environment variables:
@@ -33,6 +40,12 @@ Start command:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+```
+
+The production Dockerfile already runs migrations before startup:
+
+```bash
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 ```
 
 Health check:
@@ -65,6 +78,12 @@ Build command:
 
 ```bash
 npm run build
+```
+
+When importing the repository into Vercel, set the project root directory to:
+
+```text
+frontend
 ```
 
 Output:
