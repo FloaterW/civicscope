@@ -2,6 +2,25 @@ from __future__ import annotations
 
 from typing import Any
 
+CMHC_METRICS = {
+    "vacancy_rate",
+    "average_rent_total",
+    "average_rent_bachelor",
+    "average_rent_1br",
+    "average_rent_2br",
+    "average_rent_3br_plus",
+    "turnover_rate",
+    "availability_rate",
+    "rental_universe",
+    "housing_starts_total",
+    "housing_starts_single",
+    "housing_starts_semi",
+    "housing_starts_row",
+    "housing_starts_apartment",
+    "housing_completions",
+    "units_under_construction",
+}
+
 VALID_METRICS = {
     "median_income",
     "median_rent",
@@ -10,7 +29,7 @@ VALID_METRICS = {
     "population_growth_pct",
     "affordability_index",
     "rent_to_income_ratio",
-}
+} | CMHC_METRICS
 
 METRIC_ALIASES = {
     "income": "median_income",
@@ -20,12 +39,24 @@ METRIC_ALIASES = {
     "population_growth": "population_growth_pct",
     "affordability": "affordability_index",
     "ratio": "rent_to_income_ratio",
+    # CMHC aliases
+    "vacancy": "vacancy_rate",
+    "starts": "housing_starts_total",
+    "completions": "housing_completions",
+    "rent_cmhc": "average_rent_total",
+    "turnover": "turnover_rate",
+    "availability": "availability_rate",
+    "universe": "rental_universe",
 }
 
 
 def normalize_metric_name(metric: str) -> str:
     key = metric.strip().lower()
     return METRIC_ALIASES.get(key, key)
+
+
+def is_cmhc_metric(metric: str) -> bool:
+    return normalize_metric_name(metric) in CMHC_METRICS
 
 
 def calculate_rent_to_income_ratio(
