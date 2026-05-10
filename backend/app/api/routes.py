@@ -7,10 +7,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, load_only
 
 from app.db.session import get_db
-from app.models import Geography, Metric
+from app.models import CmhcMetric, Geography, Metric
 from app.services.geojson import compact_geometry
 from app.services.metric_calculations import (
+    CMHC_METRICS,
     VALID_METRICS,
+    is_cmhc_metric,
     metric_value,
     normalize_metric_name,
 )
@@ -77,6 +79,47 @@ def serialize_geography(geography: Geography, metric: Metric | None = None) -> d
     if metric is not None:
         payload["metrics"] = serialize_metric(metric)
     return payload
+
+
+def resolve_cmhc_year(db: Session, year: int | None) -> int:
+    if year is not None:
+        return year
+    latest_year = db.query(func.max(CmhcMetric.year)).scalar()
+    if latest_year is None:
+        raise HTTPException(status_code=404, detail="No CMHC metrics have been loaded.")
+    return int(latest_year)
+
+
+def available_cmhc_years(db: Session, geography_type: str | None = None) -> list[int]:
+    query = db.query(CmhcMetric.year).distinct()
+    if geography_type:
+        query = query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
+            Geography.type == geography_type
+        )
+    years = sorted(row[0] for row in query.all())
+    return years
+
+
+def serialize_cmhc_metric(cmhc: CmhcMetric) -> dict[str, Any]:
+    return {
+        "year": cmhc.year,
+        "vacancy_rate": cmhc.vacancy_rate,
+        "average_rent_total": cmhc.average_rent_total,
+        "average_rent_bachelor": cmhc.average_rent_bachelor,
+        "average_rent_1br": cmhc.average_rent_1br,
+        "average_rent_2br": cmhc.average_rent_2br,
+        "average_rent_3br_plus": cmhc.average_rent_3br_plus,
+        "turnover_rate": cmhc.turnover_rate,
+        "availability_rate": cmhc.availability_rate,
+        "rental_universe": cmhc.rental_universe,
+        "housing_starts_total": cmhc.housing_starts_total,
+        "housing_starts_single": cmhc.housing_starts_single,
+        "housing_starts_semi": cmhc.housing_starts_semi,
+        "housing_starts_row": cmhc.housing_starts_row,
+        "housing_starts_apartment": cmhc.housing_starts_apartment,
+        "housing_completions": cmhc.housing_completions,
+        "units_under_construction": cmhc.units_under_construction,
+    }
 
 
 def joined_records(
@@ -223,7 +266,22 @@ def get_summary(
     records = joined_records(db, metric_year, id_list, normalized_type, include_geometry=False)
     if id_list and not records:
         raise HTTPException(status_code=404, detail="No selected geographies were found.")
-    return build_summary(records, metric_year)
+
+    cmhc_query = db.query(CmhcMetric)
+    cmhc_latest = db.query(func.max(CmhcMetric.year)).scalar()
+    if cmhc_latest:
+        cmhc_query = cmhc_query.filter(CmhcMetric.year == cmhc_latest)
+        if normalized_type:
+            cmhc_query = cmhc_query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
+                Geography.type == normalized_type
+            )
+        if id_list:
+            cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(id_list))
+        cmhc_records = cmhc_query.all()
+    else:
+        cmhc_records = []
+
+    return build_summary(records, metric_year, cmhc_records=cmhc_records)
 
 
 @router.get("/compare")
@@ -244,18 +302,31 @@ def compare_geographies(
     else:
         ordered_records = sorted(records, key=lambda item: item[1].population or 0, reverse=True)[:6]
 
+    cmhc_year = resolve_cmhc_year(db, None) if db.query(CmhcMetric).count() > 0 else metric_year
+    cmhc_by_geoid = {
+        row.geoid: row
+        for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
+    }
+
+    items = []
+    for geography, metric in ordered_records:
+        item: dict[str, Any] = {
+            "geoid": geography.geoid,
+            "name": geography.name,
+            "type": geography.type,
+            "county": geography.county,
+            "metrics": serialize_metric(metric),
+        }
+        cmhc_row = cmhc_by_geoid.get(geography.geoid)
+        if cmhc_row:
+            item["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row)
+        else:
+            item["cmhc_metrics"] = None
+        items.append(item)
+
     return {
         "year": metric_year,
-        "items": [
-            {
-                "geoid": geography.geoid,
-                "name": geography.name,
-                "type": geography.type,
-                "county": geography.county,
-                "metrics": serialize_metric(metric),
-            }
-            for geography, metric in ordered_records
-        ],
+        "items": items,
     }
 
 
@@ -274,6 +345,7 @@ def get_map_data(
     if metric_key not in VALID_METRICS:
         raise HTTPException(status_code=400, detail=f"Unsupported metric: {metric}")
     normalized_type = normalize_geography_type(geography_type)
+    cmhc = is_cmhc_metric(metric_key)
 
     metric_year = resolve_year(db, year)
     postgis_geometries = (
@@ -292,49 +364,82 @@ def get_map_data(
         geography_type=normalized_type,
         include_geometry=not postgis_geometries,
     )
-    values = [
-        value
-        for _, row in records
-        if (value := metric_value(metric_key, row)) is not None
-    ]
+
+    # CMHC metric handling
+    cmhc_by_geoid: dict[str, CmhcMetric] = {}
+    cmhc_year = metric_year
+    if cmhc:
+        cmhc_year = resolve_cmhc_year(db, year)
+        cmhc_by_geoid = {
+            row.geoid: row
+            for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
+        }
+
+    if cmhc:
+        values = [
+            metric_value(metric_key, cmhc_row)
+            for cmhc_row in cmhc_by_geoid.values()
+            if metric_value(metric_key, cmhc_row) is not None
+        ]
+    else:
+        values = [
+            value
+            for _, row in records
+            if (value := metric_value(metric_key, row)) is not None
+        ]
     domain = {
         "min": min(values) if values else None,
         "max": max(values) if values else None,
     }
 
-    return {
-        "type": "FeatureCollection",
-        "metadata": {
+    metadata: dict[str, Any] = {
+        "metric": metric_key,
+        "year": cmhc_year if cmhc else metric_year,
+        "domain": domain,
+        "geography_type": normalized_type,
+        "data_quality": data_quality(normalized_type, cmhc=cmhc),
+        "source": map_data_source(normalized_type, cmhc=cmhc),
+    }
+    if cmhc:
+        metadata["available_years"] = available_cmhc_years(db, normalized_type)
+
+    features = []
+    for geography, row in records:
+        props: dict[str, Any] = {
+            "id": geography.id,
+            "geoid": geography.geoid,
+            "name": geography.name,
+            "type": geography.type,
+            "county": geography.county,
+            "state": geography.state,
+            "bbox": geography.bbox,
+            "geometry_source": geography.geometry_source,
             "metric": metric_key,
-            "year": metric_year,
-            "domain": domain,
-            "geography_type": normalized_type,
-            "data_quality": data_quality(normalized_type),
-            "source": map_data_source(normalized_type),
-        },
-        "features": [
+            "metrics": serialize_metric(row),
+        }
+        cmhc_row = cmhc_by_geoid.get(geography.geoid)
+        if cmhc:
+            props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
+        else:
+            props["value"] = metric_value(metric_key, row)
+        if cmhc_row:
+            props["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row)
+            props["cmhc_year"] = cmhc_year
+        features.append(
             {
                 "type": "Feature",
                 "geometry": postgis_geometries.get(
                     geography.geoid,
                     map_geometry(geography.geometry, detail, normalized_type),
                 ),
-                "properties": {
-                    "id": geography.id,
-                    "geoid": geography.geoid,
-                    "name": geography.name,
-                    "type": geography.type,
-                    "county": geography.county,
-                    "state": geography.state,
-                    "bbox": geography.bbox,
-                    "geometry_source": geography.geometry_source,
-                    "metric": metric_key,
-                    "value": metric_value(metric_key, row),
-                    "metrics": serialize_metric(row),
-                },
+                "properties": props,
             }
-            for geography, row in records
-        ],
+        )
+
+    return {
+        "type": "FeatureCollection",
+        "metadata": metadata,
+        "features": features,
     }
 
 
@@ -345,7 +450,12 @@ def map_geometry(geometry: dict[str, Any], detail: str, geography_type: str | No
     return geometry
 
 
-def map_data_source(geography_type: str | None) -> str:
+def map_data_source(geography_type: str | None, cmhc: bool = False) -> str:
+    if cmhc:
+        return (
+            "CMHC Rental Market Survey and Starts & Completions Survey data "
+            "from the Housing Market Information Portal."
+        )
     if geography_type == "census_tract":
         return (
             "Statistics Canada 2021 census tract cartographic boundaries filtered to the GTA; "
@@ -357,7 +467,16 @@ def map_data_source(geography_type: str | None) -> str:
     )
 
 
-def data_quality(geography_type: str | None) -> dict[str, str]:
+def data_quality(geography_type: str | None, cmhc: bool = False) -> dict[str, str]:
+    if cmhc:
+        return {
+            "metric_status": "official",
+            "label": "CMHC Rental Market Survey",
+            "description": (
+                "CMHC Rental Market Survey and Starts & Completions Survey data "
+                "from the Housing Market Information Portal."
+            ),
+        }
     if geography_type == "census_tract":
         return {
             "metric_status": "official",

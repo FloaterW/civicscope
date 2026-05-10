@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-from app.services.seed import seed_demo_data
+from app.services.seed import seed_cmhc_data, seed_demo_data
 
 
 @pytest.fixture()
@@ -29,6 +29,7 @@ def db_session():
 
     db = TestingSessionLocal()
     seed_demo_data(db)
+    seed_cmhc_data(db)
     try:
         yield db
     finally:

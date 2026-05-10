@@ -22,7 +22,11 @@ def weighted_average(values: list[float | None], weights: list[int | None]) -> f
     return round(weighted_total / weight_total, 2)
 
 
-def build_summary(records: list[tuple[Any, Any]], year: int) -> dict[str, Any]:
+def build_summary(
+    records: list[tuple[Any, Any]],
+    year: int,
+    cmhc_records: list[Any] | None = None,
+) -> dict[str, Any]:
     if not records:
         return {
             "year": year,
@@ -35,6 +39,10 @@ def build_summary(records: list[tuple[Any, Any]], year: int) -> dict[str, Any]:
             "rent_to_income_ratio": None,
             "rent_burden_pct": None,
             "affordability_index": None,
+            "vacancy_rate": None,
+            "average_rent_total": None,
+            "housing_starts_total": None,
+            "housing_completions": None,
             "selected_geographies": [],
             "notes": ["No matching geographies were found."],
         }
@@ -58,6 +66,29 @@ def build_summary(records: list[tuple[Any, Any]], year: int) -> dict[str, Any]:
         [metric.renter_households for metric in metrics],
     )
 
+    # CMHC summary values
+    cmhc_values: dict[str, Any] = {
+        "vacancy_rate": None,
+        "average_rent_total": None,
+        "housing_starts_total": None,
+        "housing_completions": None,
+    }
+    if cmhc_records:
+        vacancy_values = [r.vacancy_rate for r in cmhc_records if r.vacancy_rate is not None]
+        universe_weights = [r.rental_universe or 0 for r in cmhc_records if r.vacancy_rate is not None]
+        cmhc_values["vacancy_rate"] = weighted_average(vacancy_values, universe_weights)
+
+        rent_values = [r.average_rent_total for r in cmhc_records if r.average_rent_total is not None]
+        rent_weights = [r.rental_universe or 0 for r in cmhc_records if r.average_rent_total is not None]
+        cmhc_values["average_rent_total"] = weighted_average(rent_values, rent_weights)
+
+        cmhc_values["housing_starts_total"] = sum(
+            r.housing_starts_total for r in cmhc_records if r.housing_starts_total is not None
+        ) or None
+        cmhc_values["housing_completions"] = sum(
+            r.housing_completions for r in cmhc_records if r.housing_completions is not None
+        ) or None
+
     return {
         "year": year,
         "region_count": len(records),
@@ -70,6 +101,7 @@ def build_summary(records: list[tuple[Any, Any]], year: int) -> dict[str, Any]:
         "rent_burden_pct": rent_burden_pct,
         "affordability_index": calculate_affordability_index(median_rent, median_income),
         "renter_households": renter_households,
+        **cmhc_values,
         "selected_geographies": [
             {
                 "geoid": geography.geoid,
