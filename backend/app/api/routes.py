@@ -302,7 +302,8 @@ def compare_geographies(
     else:
         ordered_records = sorted(records, key=lambda item: item[1].population or 0, reverse=True)[:6]
 
-    cmhc_year = resolve_cmhc_year(db, None) if db.query(CmhcMetric).count() > 0 else metric_year
+    cmhc_latest = db.query(func.max(CmhcMetric.year)).scalar()
+    cmhc_year = cmhc_latest if cmhc_latest is not None else metric_year
     cmhc_by_geoid = {
         row.geoid: row
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
@@ -377,9 +378,9 @@ def get_map_data(
 
     if cmhc:
         values = [
-            metric_value(metric_key, cmhc_row)
+            v
             for cmhc_row in cmhc_by_geoid.values()
-            if metric_value(metric_key, cmhc_row) is not None
+            if (v := metric_value(metric_key, cmhc_row)) is not None
         ]
     else:
         values = [
