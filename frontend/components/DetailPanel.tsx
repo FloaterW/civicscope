@@ -23,7 +23,7 @@ const overviewCopy: Record<GeographyLevel, string> = {
   municipality:
     "The map shows GTA municipalities with 2021 Census Profile affordability metrics when loaded. Select a geography to inspect local values.",
   census_tract:
-    "The map shows official 2021 census tract boundaries with estimated tract metrics derived from parent municipalities. Select a tract to inspect local values."
+    "The map shows GTA census tracts with official 2021 Census Profile affordability metrics. Select a tract to inspect local values."
 };
 
 export function DetailPanel({ geography, metric, geographyLevel, onClear }: Props) {

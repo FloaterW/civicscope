@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, CircleAlert } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 
 import type { GeographyLevel } from "@/types";
 
@@ -18,9 +18,9 @@ const qualityCopy: Record<
     icon: BadgeCheck
   },
   census_tract: {
-    label: "Estimated tract metrics",
-    tone: "border-amber-200 bg-amber-50 text-amber-950",
-    icon: CircleAlert
+    label: "Official tract metrics",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    icon: BadgeCheck
   }
 };
 
