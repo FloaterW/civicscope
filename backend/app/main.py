@@ -21,7 +21,7 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
             if settings.seed_on_startup:
                 db = SessionLocal()
                 try:
-                    seed_demo_data(db)
+                    seed_demo_data(db, force=settings.force_reseed)
                 finally:
                     db.close()
         yield
