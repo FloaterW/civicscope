@@ -70,11 +70,11 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByText("Rent burden by census tract")).toBeVisible();
     await expect(page.getByTestId("summary-panel")).toContainText("1,334 GTA census tracts");
     await expect(
-      page.getByTestId("data-quality-badge").filter({ hasText: "Estimated tract metrics" })
+      page.getByTestId("data-quality-badge").filter({ hasText: "Official tract metrics" })
     ).toHaveCount(2);
     await expect(map).toHaveAttribute("data-geography-type", "census_tract");
     await expect(map).toHaveAttribute("data-feature-count", "1334");
-    await expect(page.getByTestId("detail-panel")).toContainText("estimated tract metrics");
+    await expect(page.getByTestId("detail-panel")).toContainText("official 2021 Census Profile");
 
     await page.getByTestId("geography-search").fill("5350001.00");
     const tractResult = page.getByRole("button").filter({ hasText: "5350001.00" });

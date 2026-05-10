@@ -2,13 +2,22 @@
 
 A geospatial civic analytics platform that helps users explore housing affordability, income, population growth, and access patterns across Greater Toronto Area communities using public-data-ready workflows.
 
+## Live Demo
+
+- **Frontend:** https://civicscope-gold.vercel.app
+- **Backend API:** https://civicscope.onrender.com
+- **Health check:** https://civicscope.onrender.com/health
+- **API docs:** https://civicscope.onrender.com/docs
+
+> The backend runs on Render's free tier and spins down after inactivity. The first request after idle may take ~30 seconds while the instance wakes up.
+
 ## Overview
 
 CivicScope is a portfolio-grade full-stack project for public-sector analytics. The MVP includes a FastAPI backend, SQLAlchemy data model, Postgres/PostGIS Docker stack, packaged Greater Toronto Area seed data, tested API endpoints, repeatable Statistics Canada ETL scripts, and a Next.js dashboard with an interactive MapLibre map, municipality/census-tract level switching, summary cards, comparison chart, search, and detail panel.
 
 Municipal geometries use Statistics Canada 2021 cartographic census subdivision boundaries. Metric values use official Statistics Canada 2021 Census Profile characteristics for the selected GTA municipalities.
 
-Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Packaged tract metrics are clearly labeled estimates derived from parent municipality values so the app works offline; they are intended as a demo layer until tract-level Census Profile metrics are loaded.
+Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Tract-level metrics are official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow.
 
 ## Screenshots
 
@@ -313,13 +322,14 @@ npm run screenshots
 See `docs/deployment.md` for a deployment checklist.
 See `docs/launch-checklist.md` for the exact GitHub, Render, and Vercel launch sequence.
 
-Recommended split:
+Current production stack:
 
-- Backend API: Render, Fly.io, or Railway with managed PostgreSQL/PostGIS.
-- Frontend dashboard: Vercel with `NEXT_PUBLIC_API_URL` pointed at the deployed FastAPI service.
+- **Database:** Neon PostgreSQL (free tier, AWS US East 1)
+- **Backend API:** Render free-tier web service (Docker), connected to Neon
+- **Frontend:** Vercel (Next.js auto-deploy from `main` branch)
 - Render Blueprint: `render.yaml`
 - Vercel project config: `frontend/vercel.json`
-- Migrations: run `alembic upgrade head` as a release step before backend startup.
+- Migrations: `alembic upgrade head` runs automatically on backend startup.
 - CORS: set `CORS_ORIGINS` to the deployed frontend URL and any local preview URLs needed for testing.
 
 SQLite test databases still use SQLAlchemy metadata creation for fast isolated tests.
@@ -334,6 +344,6 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 
 - Packaged seed data remains available for offline demos even though the database can refresh boundaries and metrics from Statistics Canada.
 - The native PostGIS `geom` column is currently backfilled from stored GeoJSON; a future migration can make it the canonical geometry store.
-- Census tract boundaries are included, but packaged tract metrics are estimated from parent municipality values. The next data-quality upgrade is loading official tract-level Census Profile metrics.
+- Census tract boundaries and metrics now use official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow. A small number of tracts (~1%) have suppressed values for privacy.
 - Dissemination areas and parcel-level workflows remain planned expansion paths.
 - Transit/access scoring is intentionally not implemented yet; GTFS ingestion is the next domain feature after deployment polish.
