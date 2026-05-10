@@ -22,3 +22,4 @@ class Geography(Base):
     )
 
     metrics = relationship("Metric", back_populates="geography", cascade="all, delete-orphan")
+    cmhc_metrics = relationship("CmhcMetric", back_populates="geography", cascade="all, delete-orphan")
