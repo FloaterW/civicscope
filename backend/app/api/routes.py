@@ -135,6 +135,18 @@ def list_geographies(
     if normalized_type:
         query = query.filter(Geography.type == normalized_type)
 
+    query = query.options(
+        load_only(
+            Geography.id,
+            Geography.geoid,
+            Geography.name,
+            Geography.type,
+            Geography.county,
+            Geography.state,
+            Geography.bbox,
+            Geography.geometry_source,
+        )
+    )
     geographies = query.order_by(Geography.name).limit(limit).all()
     metrics = {
         metric.geoid: metric

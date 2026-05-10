@@ -44,8 +44,13 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
 
     @app.get("/health", tags=["system"])
     def health(db: Session = Depends(get_db)):
-        db.execute(text("SELECT 1"))
-        return {"status": "ok", "service": "civicscope-api", "database": "ok"}
+        try:
+            db.execute(text("SELECT 1"))
+            db_status = "ok"
+        except Exception:
+            db_status = "unavailable"
+        status = "ok" if db_status == "ok" else "degraded"
+        return {"status": status, "service": "civicscope-api", "database": db_status}
 
     app.include_router(api_router)
     return app

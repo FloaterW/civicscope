@@ -45,7 +45,7 @@ export function DetailPanel({ geography, metric, geographyLevel, onClear }: Prop
           </h2>
           <p className="text-xs text-civic-muted">
             {geography
-              ? `${geography.type} ${geography.geoid}`
+              ? `${geography.type === "census_tract" ? "Census tract" : "Municipality"} · ${geography.geoid}`
               : emptyCopy[geographyLevel]}
           </p>
           <div className="mt-2">

@@ -45,7 +45,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading }:
           </p>
         </div>
         <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-          {comparison?.year ?? "2022"}
+          {comparison?.year ?? "2021"}
         </span>
       </div>
 

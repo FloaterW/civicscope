@@ -146,6 +146,35 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
   });
 
+  test("switching between municipalities and census tracts does not produce API errors", async ({ page }) => {
+    const apiErrors: string[] = [];
+    page.on("response", (response) => {
+      if (response.url().includes("/api/") && response.status() >= 400) {
+        apiErrors.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    await blockExternalMapAssets(page);
+
+    await page.goto("/");
+    const map = page.getByTestId("civic-map");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+    await expect(map).toHaveAttribute("data-feature-count", "25");
+
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(map).toHaveAttribute("data-feature-count", "1334", { timeout: 30000 });
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract");
+
+    await page.getByRole("button", { name: "Municipalities" }).click();
+    await expect(map).toHaveAttribute("data-geography-type", "municipality");
+    await expect(map).toHaveAttribute("data-feature-count", "25");
+
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract");
+    await expect(map).toHaveAttribute("data-feature-count", "1334");
+
+    expect(apiErrors).toEqual([]);
+  });
+
   test("metric selector repaints map state and polygon clicks select a municipality", async ({ page }) => {
     await blockExternalMapAssets(page);
 
