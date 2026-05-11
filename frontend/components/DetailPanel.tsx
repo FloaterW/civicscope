@@ -2,7 +2,7 @@
 
 import { MapPin, X } from "lucide-react";
 
-import { formatMetric, getMetricLabel } from "@/lib/api";
+import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
 import type { CmhcMetricValues, Geography, GeographyLevel, MetricKey } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
@@ -23,11 +23,18 @@ const emptyCopy: Record<GeographyLevel, string> = {
   census_tract: "Select a census tract on the map or with search"
 };
 
-const overviewCopy: Record<GeographyLevel, string> = {
+const censusCopy: Record<GeographyLevel, string> = {
   municipality:
     "The map shows GTA municipalities with 2021 Census Profile affordability metrics when loaded. Select a geography to inspect local values.",
   census_tract:
     "The map shows GTA census tracts with official 2021 Census Profile affordability metrics. Select a tract to inspect local values."
+};
+
+const cmhcCopy: Record<GeographyLevel, string> = {
+  municipality:
+    "The map shows GTA municipalities with CMHC Rental Market Survey data. Select a geography to inspect local values.",
+  census_tract:
+    "The map shows GTA census tracts with CMHC Rental Market Survey data (inherited from parent municipality). Select a tract to inspect local values."
 };
 
 export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
@@ -117,7 +124,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
         </>
       ) : (
         <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
-          {overviewCopy[geographyLevel]}
+          {isCmhcMetric(metric) ? cmhcCopy[geographyLevel] : censusCopy[geographyLevel]}
         </div>
       )}
     </section>

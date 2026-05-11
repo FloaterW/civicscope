@@ -39,6 +39,7 @@ const referencePlaces = {
 export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const mapReadyRef = useRef(false);
   const onSelectRef = useRef(onSelect);
   const isReady = Boolean(data);
   const loadedMetric = data?.metadata.metric ?? null;
@@ -191,6 +192,7 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
 
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
       map.on("load", () => {
+        mapReadyRef.current = true;
         fitToDataBounds(map, initialData, false);
       });
 
@@ -217,6 +219,7 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
 
     return () => {
       cancelled = true;
+      mapReadyRef.current = false;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -226,8 +229,11 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
 
   useEffect(() => {
     const map = mapRef.current;
-    const source = map?.getSource(sourceId);
-    if (!map || !data || !source) {
+    if (!map || !data || !mapReadyRef.current) {
+      return;
+    }
+    const source = map.getSource(sourceId);
+    if (!source) {
       return;
     }
     if ("setData" in source) {

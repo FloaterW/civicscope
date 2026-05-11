@@ -376,23 +376,26 @@ def compare_geographies(
             "metrics": serialize_metric(metric),
         }
         # Census tracts inherit CMHC data from parent municipality
-        is_tract_inherited = False
         if normalized_type == "census_tract" and geography.county:
             parent_geoid = municipality_name_to_geoid.get(geography.county)
             cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
-            is_tract_inherited = True
+            is_tract_inherited = cmhc_row is not None
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
+            is_tract_inherited = False
         if cmhc_row:
             item["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row, tract_inherited=is_tract_inherited)
         else:
             item["cmhc_metrics"] = None
         items.append(item)
 
-    return {
+    result: dict[str, Any] = {
         "year": metric_year,
         "items": items,
     }
+    if cmhc_by_geoid:
+        result["cmhc_year"] = cmhc_year
+    return result
 
 
 @router.get("/map-data")
@@ -458,11 +461,16 @@ def get_map_data(
             }
 
     if cmhc:
-        values = [
-            v
-            for cmhc_row in cmhc_by_geoid.values()
-            if (v := metric_value(metric_key, cmhc_row)) is not None
-        ]
+        # Count metrics are nulled out for census tracts, so the domain
+        # would be meaningless (all features have value=None).
+        if normalized_type == "census_tract" and metric_key in CMHC_COUNT_METRICS:
+            values = []
+        else:
+            values = [
+                v
+                for cmhc_row in cmhc_by_geoid.values()
+                if (v := metric_value(metric_key, cmhc_row)) is not None
+            ]
     else:
         values = [
             value
@@ -500,13 +508,13 @@ def get_map_data(
             "metrics": serialize_metric(row),
         }
         # For census tracts, resolve CMHC row from parent municipality
-        is_tract_inherited = False
         if normalized_type == "census_tract" and geography.county:
             parent_geoid = municipality_name_to_geoid.get(geography.county)
             cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
-            is_tract_inherited = True
+            is_tract_inherited = cmhc_row is not None
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
+            is_tract_inherited = False
         if cmhc:
             if is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
                 props["value"] = None

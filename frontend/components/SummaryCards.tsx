@@ -52,8 +52,14 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
     ...(summary?.vacancy_rate !== undefined && summary?.vacancy_rate !== null
       ? [{ label: "Vacancy rate", value: formatMetric("vacancy_rate", summary.vacancy_rate), icon: KeyRound }]
       : []),
+    ...(summary?.average_rent_total !== undefined && summary?.average_rent_total !== null
+      ? [{ label: "Avg CMHC rent", value: formatMetric("average_rent_total", summary.average_rent_total), icon: Home }]
+      : []),
     ...(summary?.housing_starts_total !== undefined && summary?.housing_starts_total !== null
       ? [{ label: "Housing starts", value: formatMetric("housing_starts_total", summary.housing_starts_total), icon: Building2 }]
+      : []),
+    ...(summary?.housing_completions !== undefined && summary?.housing_completions !== null
+      ? [{ label: "Completions", value: formatMetric("housing_completions", summary.housing_completions), icon: Building2 }]
       : [])
   ];
 
