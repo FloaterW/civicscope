@@ -38,18 +38,53 @@ TORONTO_CMA_GEO_ID = 2270
 
 # HMIP GeographyTypeIds
 GEO_TYPE_CMA = 3
+GEO_TYPE_CSD = 4  # Census subdivision (municipality-level Scss queries)
 GEO_TYPE_ZONE = 5  # Survey zone breakdown (used by RMS)
 
 # The RMS Summary table (2.1.31.3) returns vacancy rate, availability rate,
 # average rent, median rent, rent % change, and rental universe in one CSV.
 TABLE_RMS_SUMMARY = "2.1.31.3"
 
+# Scss (Starts & Completions Survey) tables — queried per CSD
+TABLE_SCSS_STARTS = "1.1.1"  # Housing starts by dwelling type
+TABLE_SCSS_COMPLETIONS = "1.2.2"  # Historical completions by dwelling type
+TABLE_SCSS_UNDER_CONSTRUCTION = "1.2.3"  # Historical under-construction inventory
+
 # RMS survey month — the Rental Market Survey is conducted in October each year.
 RMS_SURVEY_MONTH = 10
 
 SEED_PATH = PROJECT_ROOT / "app" / "data" / "cmhc_seed.json"
 
-REQUEST_DELAY = 0.5  # seconds between requests to be polite
+REQUEST_DELAY = 0.3  # seconds between requests to be polite
+
+# All 25 GTA municipalities — used for per-CSD Scss queries
+ALL_GTA_GEOIDS: dict[str, str] = {
+    "3518001": "Pickering",
+    "3518005": "Ajax",
+    "3518009": "Whitby",
+    "3518013": "Oshawa",
+    "3518017": "Clarington",
+    "3518020": "Scugog",
+    "3518029": "Uxbridge",
+    "3518039": "Brock",
+    "3519028": "Vaughan",
+    "3519036": "Markham",
+    "3519038": "Richmond Hill",
+    "3519044": "Whitchurch-Stouffville",
+    "3519046": "Aurora",
+    "3519048": "Newmarket",
+    "3519049": "King",
+    "3519054": "East Gwillimbury",
+    "3519070": "Georgina",
+    "3520005": "Toronto",
+    "3521005": "Mississauga",
+    "3521010": "Brampton",
+    "3521024": "Caledon",
+    "3524001": "Oakville",
+    "3524002": "Burlington",
+    "3524009": "Milton",
+    "3524015": "Halton Hills",
+}
 
 # Default year range: 2018-2025 (8 years of RMS data)
 DEFAULT_START_YEAR = 2018
@@ -291,6 +326,254 @@ def _parse_csv_line(line: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Scss (Starts & Completions Survey) — per-CSD queries
+# ---------------------------------------------------------------------------
+
+# Month abbreviations used in HMIP historical CSV rows (e.g. "Jan 2024", "Dec 2025")
+_MONTH_ABBREVS = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
+
+
+def fetch_scss_csv(
+    geoid: str,
+    table_id: str,
+    year: int,
+    month: int = 12,
+    ytd: bool = True,
+) -> str:
+    """Fetch an Scss CSV from HMIP for one CSD.
+
+    For starts (table 1.1.1): use Ytd=True, Month=12 for annual totals.
+    For completions (1.2.2) / under construction (1.2.3): use Ytd=False,
+    Month=1 to get historical monthly rows from Jan of that year forward.
+    """
+    params = {
+        "TableId": table_id,
+        "GeographyId": geoid,
+        "GeographyTypeId": str(GEO_TYPE_CSD),
+        "DisplayAs": "Table",
+        "Ytd": str(ytd),
+        "Survey": "Scss",
+        "ForTimePeriod.Year": str(year),
+        "ForTimePeriod.Month": str(month),
+        "ExportType": "csv",
+    }
+    data = urlencode(params).encode("utf-8")
+    try:
+        request = Request(
+            HMIP_EXPORT_URL,
+            data=data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://www03.cmhc-schl.gc.ca/hmip-pimh/en/TableMapChart/Table",
+            },
+        )
+        with urlopen(request, timeout=60) as response:
+            return response.read().decode("cp1252")
+    except HTTPError as exc:
+        print(
+            f"  Warning: HTTP {exc.code} fetching Scss {table_id} for {geoid}",
+            file=sys.stderr,
+        )
+        return ""
+    except Exception as exc:
+        print(
+            f"  Warning: {exc} fetching Scss {table_id} for {geoid}",
+            file=sys.stderr,
+        )
+        return ""
+
+
+@dataclass
+class ScssStartsRow:
+    """Annual housing starts for a single CSD and year."""
+
+    single: int | None = None
+    semi: int | None = None
+    row: int | None = None
+    apartment: int | None = None
+    total: int | None = None
+
+
+def parse_scss_starts_csv(csv_text: str) -> ScssStartsRow | None:
+    """Parse annual starts CSV (table 1.1.1 with Ytd=True).
+
+    Format:
+      Line 1: " — Starts by Dwelling Type"
+      Line 2: "January - December 2025 Intended Markets - All"
+      Line 3: "Single,Semi-Detached,Row,Apartment,All,"
+      Line 4: "230,0,771,\"1,004\",\"2,005\","
+    """
+    if not csv_text:
+        return None
+
+    for line in csv_text.strip().split("\n"):
+        line = line.strip()
+        if not line or line.startswith(" ") or line.startswith(","):
+            continue
+        if any(kw in line.lower() for kw in ["source", "single", "starts"]):
+            continue
+        # This is the data row
+        fields = _parse_csv_line(line)
+        if len(fields) < 5:
+            continue
+        return ScssStartsRow(
+            single=_optional_int(fields[0]),
+            semi=_optional_int(fields[1]),
+            row=_optional_int(fields[2]),
+            apartment=_optional_int(fields[3]),
+            total=_optional_int(fields[4]),
+        )
+    return None
+
+
+@dataclass
+class ScssMonthlyRow:
+    """One month of historical completions or under-construction data."""
+
+    year: int
+    month: int
+    total: int | None = None
+
+
+def parse_scss_historical_csv(csv_text: str) -> list[ScssMonthlyRow]:
+    """Parse historical monthly CSV (tables 1.2.2 / 1.2.3).
+
+    Format:
+      Line 1: " — Historical Completions by Dwelling Type"
+      Line 2: "January 2024 to March 2026 Intended Markets - All"
+      Line 3: ",Single,Semi-Detached,Row,Apartment,All,"
+      Line 4+: "Jan 2024,15,0,138,0,153,"  or  "Dec 2024,14,0,13,0,27,"
+    """
+    rows: list[ScssMonthlyRow] = []
+    if not csv_text:
+        return rows
+
+    for line in csv_text.strip().split("\n"):
+        line = line.strip()
+        if not line or line.startswith(" ") or line.startswith(","):
+            continue
+        if any(kw in line.lower() for kw in ["source", "single"]):
+            continue
+
+        fields = _parse_csv_line(line)
+        if len(fields) < 6:
+            continue
+
+        # First field is "Mon YYYY" (e.g. "Jan 2024", "Dec 2025")
+        date_parts = fields[0].strip().split()
+        if len(date_parts) != 2:
+            continue
+        month_num = _MONTH_ABBREVS.get(date_parts[0])
+        if month_num is None:
+            continue
+        try:
+            row_year = int(date_parts[1])
+        except ValueError:
+            continue
+
+        # "All" (total) is the last real column — field index 5
+        rows.append(
+            ScssMonthlyRow(
+                year=row_year,
+                month=month_num,
+                total=_optional_int(fields[5]),
+            )
+        )
+
+    return rows
+
+
+def _sum_completions_for_year(monthly_rows: list[ScssMonthlyRow], year: int) -> int | None:
+    """Sum monthly completions for a calendar year. Returns None if no data."""
+    yearly = [r.total for r in monthly_rows if r.year == year and r.total is not None]
+    return sum(yearly) if yearly else None
+
+
+def _dec_snapshot_for_year(monthly_rows: list[ScssMonthlyRow], year: int) -> int | None:
+    """Get the December snapshot value for under-construction inventory."""
+    for r in monthly_rows:
+        if r.year == year and r.month == 12:
+            return r.total
+    return None
+
+
+def fetch_scss_for_municipality(
+    geoid: str,
+    years: list[int],
+) -> dict[int, dict[str, Any]]:
+    """Fetch all Scss data for one municipality across all years.
+
+    Returns: {year: {housing_starts_total, ..single, ..semi, ..row, ..apartment,
+                     housing_completions, units_under_construction}}
+    """
+    result: dict[int, dict[str, Any]] = {}
+
+    # 1. Fetch starts — one call per year (Ytd=True gives annual total)
+    for year in years:
+        csv_text = fetch_scss_csv(geoid, TABLE_SCSS_STARTS, year, month=12, ytd=True)
+        starts = parse_scss_starts_csv(csv_text)
+        result[year] = {
+            "housing_starts_total": starts.total if starts else None,
+            "housing_starts_single": starts.single if starts else None,
+            "housing_starts_semi": starts.semi if starts else None,
+            "housing_starts_row": starts.row if starts else None,
+            "housing_starts_apartment": starts.apartment if starts else None,
+            "housing_completions": None,
+            "units_under_construction": None,
+        }
+        time.sleep(REQUEST_DELAY)
+
+    # 2. Fetch completions — one call from start year, returns all months
+    csv_text = fetch_scss_csv(
+        geoid, TABLE_SCSS_COMPLETIONS, years[0], month=1, ytd=False
+    )
+    comp_monthly = parse_scss_historical_csv(csv_text)
+    for year in years:
+        result[year]["housing_completions"] = _sum_completions_for_year(comp_monthly, year)
+    time.sleep(REQUEST_DELAY)
+
+    # 3. Fetch under construction — one call from start year, take Dec snapshot
+    csv_text = fetch_scss_csv(
+        geoid, TABLE_SCSS_UNDER_CONSTRUCTION, years[0], month=1, ytd=False
+    )
+    uc_monthly = parse_scss_historical_csv(csv_text)
+    for year in years:
+        result[year]["units_under_construction"] = _dec_snapshot_for_year(uc_monthly, year)
+    time.sleep(REQUEST_DELAY)
+
+    return result
+
+
+def fetch_scss_all_municipalities(
+    years: list[int],
+) -> dict[str, dict[int, dict[str, Any]]]:
+    """Fetch Scss data for all 25 GTA municipalities.
+
+    Returns: {geoid: {year: {starts, completions, under_construction fields}}}
+    """
+    all_scss: dict[str, dict[int, dict[str, Any]]] = {}
+    total = len(ALL_GTA_GEOIDS)
+
+    for idx, (geoid, name) in enumerate(sorted(ALL_GTA_GEOIDS.items()), 1):
+        print(f"  [{idx}/{total}] Fetching Scss for {name} ({geoid})...")
+        try:
+            scss_data = fetch_scss_for_municipality(geoid, years)
+            all_scss[geoid] = scss_data
+            # Log a sample for verification
+            latest = years[-1]
+            starts = scss_data.get(latest, {}).get("housing_starts_total")
+            print(f"    {latest} starts: {starts}")
+        except Exception as exc:
+            print(f"    Warning: {exc} — skipping", file=sys.stderr)
+
+    return all_scss
+
+
+# ---------------------------------------------------------------------------
 # Aggregation: survey zones → municipality-level metrics
 # ---------------------------------------------------------------------------
 
@@ -398,16 +681,18 @@ def load_geoids_from_seed() -> list[str]:
 def write_seed(metrics: list[CmhcRow], years: list[int]) -> int:
     seed = {
         "metadata": {
-            "source": "cmhc_hmip_rental_market_survey",
+            "source": "cmhc_hmip",
             "years": sorted(years),
             "fetched_at": datetime.now(UTC).isoformat(),
             "notes": [
-                "Rental Market Survey data from CMHC Housing Market Information Portal.",
-                "Data fetched from HMIP ExportTable POST endpoint (RMS Summary table 2.1.31.3).",
-                "Survey zones aggregated to municipality level using unit-weighted averages.",
-                "Combined zones (e.g. Richmond Hill/Vaughan/King) share the same values.",
-                "Starts & Completions data series archived by CMHC — fields set to null.",
-                "Bedroom-specific rents and turnover rate not available from summary endpoint.",
+                "Rental Market Survey (RMS) and Starts & Completions Survey (Scss) data",
+                "from CMHC Housing Market Information Portal (HMIP ExportTable endpoint).",
+                "RMS: Table 2.1.31.3 at survey-zone level, aggregated to municipalities.",
+                "Scss: Tables 1.1.1, 1.2.2, 1.2.3 queried per CSD (municipality).",
+                "Housing starts are annual totals (Jan-Dec YTD).",
+                "Completions are annual sums of monthly completions.",
+                "Under construction is December point-in-time inventory.",
+                "Municipalities without RMS zone coverage still get Scss data.",
             ],
         },
         "metrics": [asdict(m) for m in metrics],
@@ -454,12 +739,15 @@ def load_from_seed() -> int:
 
 
 def update_seed(years: list[int] | None = None) -> int:
-    """Fetch RMS data from HMIP for the given years and write the seed file."""
+    """Fetch RMS + Scss data from HMIP for the given years and write the seed file."""
     if years is None:
         years = list(range(DEFAULT_START_YEAR, DEFAULT_END_YEAR + 1))
 
-    all_metrics: list[CmhcRow] = []
     known_geoids = set(load_geoids_from_seed())
+
+    # ---- Phase 1: RMS (rental market data at survey-zone level) ----
+    print("\n=== Phase 1: Rental Market Survey (RMS) ===")
+    rms_by_key: dict[tuple[str, int], CmhcRow] = {}
 
     for year in years:
         print(f"  Fetching RMS Summary for {year}...")
@@ -472,12 +760,46 @@ def update_seed(years: list[int] | None = None) -> int:
         print(f"    Parsed {len(zones)} survey zones.")
 
         rows = aggregate_zones_to_municipalities(zones, year)
-        # Filter to only known geoids
         rows = [r for r in rows if r.geoid in known_geoids]
         print(f"    Mapped to {len(rows)} municipalities.")
 
-        all_metrics.extend(rows)
+        for row in rows:
+            rms_by_key[(row.geoid, row.year)] = row
         time.sleep(REQUEST_DELAY)
+
+    # ---- Phase 2: Scss (starts & completions per CSD) ----
+    print("\n=== Phase 2: Starts & Completions Survey (Scss) ===")
+    all_scss = fetch_scss_all_municipalities(years)
+
+    # ---- Phase 3: Merge RMS + Scss into unified CmhcRow list ----
+    print("\n=== Phase 3: Merging RMS + Scss data ===")
+    all_metrics: list[CmhcRow] = []
+
+    # Build the full set of (geoid, year) pairs — union of RMS and Scss coverage
+    all_keys: set[tuple[str, int]] = set(rms_by_key.keys())
+    for geoid, year_data in all_scss.items():
+        if geoid in known_geoids:
+            for year in year_data:
+                all_keys.add((geoid, year))
+
+    for geoid, year in sorted(all_keys):
+        # Start with RMS data if available, otherwise create empty row
+        row = rms_by_key.get((geoid, year))
+        if row is None:
+            row = CmhcRow(geoid=geoid, year=year)
+
+        # Overlay Scss fields
+        scss_year_data = all_scss.get(geoid, {}).get(year)
+        if scss_year_data:
+            row.housing_starts_total = scss_year_data.get("housing_starts_total")
+            row.housing_starts_single = scss_year_data.get("housing_starts_single")
+            row.housing_starts_semi = scss_year_data.get("housing_starts_semi")
+            row.housing_starts_row = scss_year_data.get("housing_starts_row")
+            row.housing_starts_apartment = scss_year_data.get("housing_starts_apartment")
+            row.housing_completions = scss_year_data.get("housing_completions")
+            row.units_under_construction = scss_year_data.get("units_under_construction")
+
+        all_metrics.append(row)
 
     if not all_metrics:
         print("No data fetched. Seed file not updated.")
@@ -485,6 +807,19 @@ def update_seed(years: list[int] | None = None) -> int:
 
     count = write_seed(all_metrics, years)
     print(f"\nWrote {count} metric rows to {SEED_PATH}")
+
+    # Quick verification: check that starts vary across municipalities
+    sample_year = years[-1]
+    starts_vals = {
+        m.geoid: m.housing_starts_total
+        for m in all_metrics
+        if m.year == sample_year and m.housing_starts_total is not None
+    }
+    unique_starts = len(set(starts_vals.values()))
+    print(f"Verification: {unique_starts} unique housing_starts_total values for {sample_year}")
+    if unique_starts <= 1 and len(starts_vals) > 1:
+        print("  WARNING: All municipalities have the same value — Scss fetch may have failed!")
+
     return count
 
 
