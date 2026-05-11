@@ -195,7 +195,7 @@ export function CivicDashboard() {
     setSummaryLoading(true);
     setError(null);
 
-    getSummary(selectedGeoid, geographyLevel, controller.signal)
+    getSummary(selectedGeoid, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
       .then((summaryPayload) => setSummary(summaryPayload))
       .catch((requestError: Error) => {
         if (controller.signal.aborted) {
@@ -210,14 +210,14 @@ export function CivicDashboard() {
       });
 
     return () => controller.abort();
-  }, [geographyLevel, selectedGeoid]);
+  }, [geographyLevel, selectedGeoid, selectedYear, isCmhc]);
 
   useEffect(() => {
     const controller = new AbortController();
     setComparisonLoading(true);
     setError(null);
 
-    getComparison(comparisonIds, geographyLevel, controller.signal)
+    getComparison(comparisonIds, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
       .then((comparisonPayload) => setComparison(comparisonPayload))
       .catch((requestError: Error) => {
         if (controller.signal.aborted) {
@@ -232,7 +232,7 @@ export function CivicDashboard() {
       });
 
     return () => controller.abort();
-  }, [comparisonIds, geographyLevel]);
+  }, [comparisonIds, geographyLevel, selectedYear, isCmhc]);
 
   const visibleMapData = useMemo(() => applyMetricToMapData(mapData, metric), [mapData, metric]);
 
