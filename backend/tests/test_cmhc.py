@@ -7,7 +7,7 @@ from app.models import CmhcMetric, Geography
 def test_cmhc_metric_creation(db_session):
     metric = CmhcMetric(
         geoid="3520005",
-        year=2024,
+        year=2010,
         vacancy_rate=2.5,
         average_rent_total=1850.0,
         average_rent_bachelor=1200.0,
@@ -33,7 +33,7 @@ def test_cmhc_metric_creation(db_session):
 
     assert loaded is not None
     assert loaded.geoid == "3520005"
-    assert loaded.year == 2024
+    assert loaded.year == 2010
     assert loaded.vacancy_rate == pytest.approx(2.5)
     assert loaded.average_rent_total == pytest.approx(1850.0)
     assert loaded.average_rent_bachelor == pytest.approx(1200.0)
@@ -55,7 +55,7 @@ def test_cmhc_metric_creation(db_session):
 def test_cmhc_metric_nullable_fields(db_session):
     metric = CmhcMetric(
         geoid="3520005",
-        year=2023,
+        year=2011,
         vacancy_rate=1.8,
     )
     db_session.add(metric)
@@ -83,8 +83,8 @@ def test_cmhc_metric_nullable_fields(db_session):
 
 
 def test_cmhc_metric_unique_constraint(db_session):
-    metric_a = CmhcMetric(geoid="3520005", year=2022, vacancy_rate=3.0)
-    metric_b = CmhcMetric(geoid="3520005", year=2022, vacancy_rate=4.0)
+    metric_a = CmhcMetric(geoid="3520005", year=2012, vacancy_rate=3.0)
+    metric_b = CmhcMetric(geoid="3520005", year=2012, vacancy_rate=4.0)
     db_session.add(metric_a)
     db_session.flush()
 
@@ -94,15 +94,15 @@ def test_cmhc_metric_unique_constraint(db_session):
 
 
 def test_geography_cmhc_metrics_relationship(db_session):
-    # Fixture seeds year=2021; use different years to avoid unique constraint
-    metric_a = CmhcMetric(geoid="3520005", year=2022, vacancy_rate=3.0)
-    metric_b = CmhcMetric(geoid="3520005", year=2023, vacancy_rate=2.8)
+    # Fixture seeds years 2018-2025 (8 rows); add 2 more outside that range
+    metric_a = CmhcMetric(geoid="3520005", year=2013, vacancy_rate=3.0)
+    metric_b = CmhcMetric(geoid="3520005", year=2014, vacancy_rate=2.8)
     db_session.add_all([metric_a, metric_b])
     db_session.flush()
 
     geo = db_session.query(Geography).filter(Geography.geoid == "3520005").one()
-    # 2 new + 1 from seed (year=2021) = 3 total
-    assert len(geo.cmhc_metrics) == 3
+    # 2 new + 8 from seed (2018-2025) = 10 total
+    assert len(geo.cmhc_metrics) == 10
 
 
 from app.services.metric_calculations import (
@@ -134,10 +134,10 @@ def test_is_cmhc_metric():
 
 def test_metric_value_reads_cmhc_row(db_session):
     from app.models import CmhcMetric
-    cmhc = CmhcMetric(geoid="3520005", year=2024, vacancy_rate=2.1, average_rent_total=1850)
+    cmhc = CmhcMetric(geoid="3520005", year=2015, vacancy_rate=2.1, average_rent_total=1850)
     db_session.add(cmhc)
     db_session.flush()
-    loaded = db_session.query(CmhcMetric).filter(CmhcMetric.geoid == "3520005", CmhcMetric.year == 2024).one()
+    loaded = db_session.query(CmhcMetric).filter(CmhcMetric.geoid == "3520005", CmhcMetric.year == 2015).one()
     assert metric_value("vacancy_rate", loaded) == 2.1
     assert metric_value("average_rent_total", loaded) == 1850
     assert metric_value("housing_starts_total", loaded) is None
