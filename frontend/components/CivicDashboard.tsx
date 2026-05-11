@@ -4,13 +4,16 @@ import { AlertCircle, Database, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  CMHC_METRIC_KEYS,
   getComparison,
   getMapData,
   getMetricLabel,
   getSummary,
+  isCmhcMetric,
   searchGeographies
 } from "@/lib/api";
 import type {
+  CmhcMetricValues,
   CompareResponse,
   GeographyLevel,
   Geography,
@@ -27,6 +30,7 @@ import { GeographyLevelSelector } from "./GeographyLevelSelector";
 import { MetricSelector } from "./MetricSelector";
 import { CivicMap } from "./CivicMap";
 import { SummaryCards } from "./SummaryCards";
+import { YearSelector } from "./YearSelector";
 
 const defaultCompareIds = ["3520005", "3521005", "3521010", "3519036", "3519028"];
 
@@ -52,6 +56,10 @@ export function CivicDashboard() {
   const [selected, setSelected] = useState<Geography | null>(null);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Geography[]>([]);
+  const [selectedCmhcMetrics, setSelectedCmhcMetrics] = useState<CmhcMetricValues | null>(null);
+  const [selectedCmhcYear, setSelectedCmhcYear] = useState<number | undefined>(undefined);
+  const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
+  const [availableYears, setAvailableYears] = useState<number[]>([2021]);
   const [error, setError] = useState<string | null>(null);
   const [mapLoading, setMapLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -62,6 +70,8 @@ export function CivicDashboard() {
   const geographyLabel = geographyLabels[geographyLevel];
   const mapData = mapDataByLevel[geographyLevel] ?? null;
   const hasCachedMapData = Boolean(mapData);
+  const isCmhc = isCmhcMetric(metric);
+  const displayYear = isCmhc ? (selectedYear ?? availableYears[availableYears.length - 1]) : 2021;
 
   const comparisonIds = useMemo(() => {
     if (geographyLevel === "census_tract") {
@@ -80,6 +90,10 @@ export function CivicDashboard() {
   }, [geographyLevel]);
 
   useEffect(() => {
+    setMapDataByLevel({});
+  }, [metric, selectedYear]);
+
+  useEffect(() => {
     let cancelled = false;
     if (hasCachedMapData) {
       setMapLoading(false);
@@ -91,13 +105,16 @@ export function CivicDashboard() {
     setError(null);
 
     if (!mapRequestsRef.current[geographyLevel]) {
-      mapRequestsRef.current[geographyLevel] = getMapData("rent_burden_pct", geographyLevel).finally(() => {
+      mapRequestsRef.current[geographyLevel] = getMapData(metric, geographyLevel, undefined, isCmhc ? selectedYear : undefined).finally(() => {
         delete mapRequestsRef.current[geographyLevel];
       });
     }
 
     mapRequestsRef.current[geographyLevel]
       .then((mapPayload) => {
+        if (mapPayload.metadata.available_years) {
+          setAvailableYears(mapPayload.metadata.available_years);
+        }
         setMapDataByLevel((current) =>
           current[geographyLevel]
             ? current
@@ -122,7 +139,7 @@ export function CivicDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [geographyLevel, hasCachedMapData]);
+  }, [geographyLevel, hasCachedMapData, metric, selectedYear, isCmhc]);
 
   useEffect(() => {
     if (!mapData) {
@@ -134,7 +151,7 @@ export function CivicDashboard() {
       return;
     }
 
-    const prefetchRequest = getMapData("rent_burden_pct", inactiveLevel);
+    const prefetchRequest = getMapData(metric, inactiveLevel, undefined, isCmhc ? selectedYear : undefined);
     mapRequestsRef.current[inactiveLevel] = prefetchRequest;
     prefetchRequest
       .then((mapPayload) => {
@@ -229,6 +246,8 @@ export function CivicDashboard() {
       geometry_source: feature.geometry_source,
       metrics: feature.metrics
     });
+    setSelectedCmhcMetrics(feature.cmhc_metrics ?? null);
+    setSelectedCmhcYear(feature.cmhc_year);
   }
 
   return (
@@ -278,6 +297,12 @@ export function CivicDashboard() {
             </div>
             <GeographyLevelSelector value={geographyLevel} onChange={setGeographyLevel} />
             <MetricSelector value={metric} onChange={setMetric} />
+            <YearSelector
+              value={displayYear}
+              availableYears={isCmhc ? availableYears : [2021]}
+              disabled={!isCmhc}
+              onChange={(year) => setSelectedYear(year)}
+            />
           </div>
         </div>
       </header>
@@ -332,7 +357,13 @@ export function CivicDashboard() {
             geography={selected}
             metric={metric}
             geographyLevel={geographyLevel}
-            onClear={() => setSelected(null)}
+            cmhcMetrics={selectedCmhcMetrics}
+            cmhcYear={selectedCmhcYear}
+            onClear={() => {
+              setSelected(null);
+              setSelectedCmhcMetrics(null);
+              setSelectedCmhcYear(undefined);
+            }}
           />
         </aside>
 
