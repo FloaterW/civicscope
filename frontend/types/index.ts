@@ -44,6 +44,7 @@ export type MetricValues = {
 };
 
 export type CmhcMetricValues = {
+  year: number;
   vacancy_rate: number | null;
   average_rent_total: number | null;
   average_rent_bachelor: number | null;

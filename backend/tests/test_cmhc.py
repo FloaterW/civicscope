@@ -221,3 +221,9 @@ def test_compare_includes_cmhc_metrics(client):
     assert len(items) == 2
     assert "cmhc_metrics" in items[0]
     assert items[0]["cmhc_metrics"]["vacancy_rate"] is not None
+
+
+def test_metrics_endpoint_rejects_cmhc_metric(client):
+    response = client.get("/api/metrics?metric=vacancy_rate")
+    assert response.status_code == 400
+    assert "CMHC metric" in response.json()["detail"]

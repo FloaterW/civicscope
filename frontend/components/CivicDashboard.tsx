@@ -171,7 +171,7 @@ export function CivicDashboard() {
       .finally(() => {
         delete mapRequestsRef.current[inactiveLevel];
       });
-  }, [geographyLevel, mapData, mapDataByLevel]);
+  }, [geographyLevel, mapData, mapDataByLevel, metric, selectedYear, isCmhc]);
 
   useEffect(() => {
     const controller = new AbortController();
