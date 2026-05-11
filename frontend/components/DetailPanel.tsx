@@ -3,7 +3,7 @@
 import { MapPin, X } from "lucide-react";
 
 import { formatMetric, getMetricLabel } from "@/lib/api";
-import type { Geography, GeographyLevel, MetricKey } from "@/types";
+import type { CmhcMetricValues, Geography, GeographyLevel, MetricKey } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
 
@@ -11,6 +11,8 @@ type Props = {
   geography: Geography | null;
   metric: MetricKey;
   geographyLevel: GeographyLevel;
+  cmhcMetrics?: CmhcMetricValues | null;
+  cmhcYear?: number;
   onClear: () => void;
 };
 
@@ -26,7 +28,7 @@ const overviewCopy: Record<GeographyLevel, string> = {
     "The map shows GTA census tracts with official 2021 Census Profile affordability metrics. Select a tract to inspect local values."
 };
 
-export function DetailPanel({ geography, metric, geographyLevel, onClear }: Props) {
+export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, onClear }: Props) {
   const metrics = geography?.metrics;
 
   return (
@@ -80,6 +82,32 @@ export function DetailPanel({ geography, metric, geographyLevel, onClear }: Prop
               value={formatMetric("affordability_index", metrics?.affordability_index)}
             />
           </div>
+
+          {cmhcMetrics && (
+            <div className="mt-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
+                CMHC Rental Market {cmhcYear ? `(${cmhcYear})` : ""}
+              </h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <MetricLine label="Vacancy" value={formatMetric("vacancy_rate", cmhcMetrics.vacancy_rate)} />
+                <MetricLine label="Availability" value={formatMetric("availability_rate", cmhcMetrics.availability_rate)} />
+                <MetricLine label="Avg rent" value={formatMetric("average_rent_total", cmhcMetrics.average_rent_total)} />
+                <MetricLine label="Turnover" value={formatMetric("turnover_rate", cmhcMetrics.turnover_rate)} />
+                <MetricLine label="Bachelor" value={formatMetric("average_rent_bachelor", cmhcMetrics.average_rent_bachelor)} />
+                <MetricLine label="1BR" value={formatMetric("average_rent_1br", cmhcMetrics.average_rent_1br)} />
+                <MetricLine label="2BR" value={formatMetric("average_rent_2br", cmhcMetrics.average_rent_2br)} />
+                <MetricLine label="3BR+" value={formatMetric("average_rent_3br_plus", cmhcMetrics.average_rent_3br_plus)} />
+                <MetricLine label="Universe" value={formatMetric("rental_universe", cmhcMetrics.rental_universe)} />
+                {cmhcMetrics.housing_starts_total !== null && (
+                  <>
+                    <MetricLine label="Starts" value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)} />
+                    <MetricLine label="Completions" value={formatMetric("housing_completions", cmhcMetrics.housing_completions)} />
+                    <MetricLine label="Under construction" value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} />
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
             {geography.geometry_source}

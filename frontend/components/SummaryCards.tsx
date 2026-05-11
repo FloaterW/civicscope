@@ -1,6 +1,6 @@
 "use client";
 
-import { Gauge, Home, Percent, TrendingUp, Users, WalletCards } from "lucide-react";
+import { Building2, Gauge, Home, KeyRound, Percent, TrendingUp, Users, WalletCards } from "lucide-react";
 
 import { formatMetric } from "@/lib/api";
 import type { GeographyLevel, Summary } from "@/types";
@@ -48,7 +48,13 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
       label: "Affordability",
       value: formatMetric("affordability_index", summary?.affordability_index),
       icon: Gauge
-    }
+    },
+    ...(summary?.vacancy_rate !== undefined && summary?.vacancy_rate !== null
+      ? [{ label: "Vacancy rate", value: formatMetric("vacancy_rate", summary.vacancy_rate), icon: KeyRound }]
+      : []),
+    ...(summary?.housing_starts_total !== undefined && summary?.housing_starts_total !== null
+      ? [{ label: "Housing starts", value: formatMetric("housing_starts_total", summary.housing_starts_total), icon: Building2 }]
+      : [])
   ];
 
   return (
