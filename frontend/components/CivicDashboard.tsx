@@ -93,6 +93,20 @@ export function CivicDashboard() {
     setMapDataByLevel({});
   }, [metric, selectedYear]);
 
+  // Keep selected geography's CMHC data in sync with current map data.
+  // Handles: search selection, metric switch, year switch — all paths
+  // that change mapData while a geography is selected.
+  useEffect(() => {
+    if (!selected || !mapData) {
+      return;
+    }
+    const feature = mapData.features.find(
+      (f) => f.properties.geoid === selected.geoid
+    );
+    setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
+    setSelectedCmhcYear(feature?.properties.cmhc_year);
+  }, [selected, mapData]);
+
   useEffect(() => {
     let cancelled = false;
     if (hasCachedMapData) {
@@ -285,6 +299,13 @@ export function CivicDashboard() {
                       onClick={() => {
                         setSelected(geography);
                         setSearch(geography.name);
+                        // Propagate CMHC metrics from current map data so
+                        // the detail panel displays them (same as map-click path).
+                        const feature = mapData?.features.find(
+                          (f) => f.properties.geoid === geography.geoid
+                        );
+                        setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
+                        setSelectedCmhcYear(feature?.properties.cmhc_year);
                       }}
                       className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm hover:bg-slate-50"
                     >
