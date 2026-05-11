@@ -93,18 +93,24 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
 
 
 def seed_cmhc_data(db: Session, force: bool = False) -> int:
-    existing = db.query(CmhcMetric).count()
-    if existing and not force:
+    seed = load_cmhc_seed()
+    expected_count = len(seed["metrics"])
+    existing_count = db.query(CmhcMetric).count()
+
+    # Auto-detect stale seed: if DB has fewer rows than the seed file,
+    # the seed has been updated and we should reload.
+    needs_reseed = force or (existing_count > 0 and existing_count < expected_count)
+
+    if existing_count and not force and not needs_reseed:
         return 0
 
-    if force:
+    if existing_count:
         db.query(CmhcMetric).delete()
         db.flush()
 
     # Build set of known geoids for fast lookup
     known_geoids = {row[0] for row in db.query(Geography.geoid).all()}
 
-    seed = load_cmhc_seed()
     row_count = 0
 
     for item in seed["metrics"]:
