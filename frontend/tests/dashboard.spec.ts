@@ -208,6 +208,61 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
     await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
   });
+
+  test("grouped metric selector renders optgroup tags and CMHC metrics", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    const select = page.getByLabel("Map metric");
+    const optgroups = select.locator("optgroup");
+    await expect(optgroups).toHaveCount(2);
+    await expect(optgroups.first()).toHaveAttribute("label", "Census Profile");
+    await expect(optgroups.last()).toHaveAttribute("label", "CMHC Rental Market");
+
+    await select.selectOption("vacancy_rate");
+    await expect(page.getByText("Vacancy rate by municipality")).toBeVisible();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "vacancy_rate");
+  });
+
+  test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    const yearSelect = page.getByLabel("Data year");
+    await expect(yearSelect).toBeDisabled();
+
+    await page.getByLabel("Map metric").selectOption("vacancy_rate");
+    await expect(yearSelect).toBeEnabled();
+
+    await page.getByLabel("Map metric").selectOption("rent_burden_pct");
+    await expect(yearSelect).toBeDisabled();
+  });
+
+  test("switching between Census and CMHC metrics does not produce API errors", async ({ page }) => {
+    const apiErrors: string[] = [];
+    page.on("response", (response) => {
+      if (response.url().includes("/api/") && response.status() >= 400) {
+        apiErrors.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    await blockExternalMapAssets(page);
+
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    await page.getByLabel("Map metric").selectOption("vacancy_rate");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "vacancy_rate");
+
+    await page.getByLabel("Map metric").selectOption("median_income");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "median_income");
+
+    await page.getByLabel("Map metric").selectOption("housing_starts_total");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "housing_starts_total");
+
+    expect(apiErrors).toEqual([]);
+  });
 });
 
 function countCoordinatePairs(value: unknown): number {
