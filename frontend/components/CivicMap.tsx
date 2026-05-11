@@ -311,7 +311,20 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
 function colorExpression(data: MapData): unknown[] {
   const min = data.metadata.domain.min ?? 0;
   const max = data.metadata.domain.max ?? 1;
-  const mid = min + (max - min) / 2 || 1;
+
+  // When all features have the same value (e.g. CMA-level CMHC data),
+  // min === max makes interpolate stops non-monotonic which silently
+  // kills MapLibre rendering.  Use a flat color instead.
+  if (min === max) {
+    return [
+      "case",
+      ["==", ["get", "value"], null],
+      "#d8dee6",
+      "#68b7aa"
+    ];
+  }
+
+  const mid = min + (max - min) / 2;
   return [
     "case",
     ["==", ["get", "value"], null],

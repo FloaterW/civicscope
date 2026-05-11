@@ -18,6 +18,8 @@ type Props = {
   metric: MetricKey;
   geographyLevel: GeographyLevel;
   loading: boolean;
+  /** Override the year shown in the badge (e.g. CMHC year). */
+  displayYear?: number;
 };
 
 const comparisonNouns: Record<GeographyLevel, string> = {
@@ -25,7 +27,7 @@ const comparisonNouns: Record<GeographyLevel, string> = {
   census_tract: "selected census tracts"
 };
 
-export function ComparisonPanel({ comparison, metric, geographyLevel, loading }: Props) {
+export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear }: Props) {
   const chartData =
     comparison?.items.map((item) => {
       const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, number | null>;
@@ -48,7 +50,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading }:
           </p>
         </div>
         <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-          {comparison?.year ?? "2021"}
+          {displayYear ?? comparison?.year ?? "2021"}
         </span>
       </div>
 
