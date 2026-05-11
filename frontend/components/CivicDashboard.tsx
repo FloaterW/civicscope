@@ -355,7 +355,10 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
   }
 
   const values = data.features
-    .map((feature) => feature.properties.metrics[metric])
+    .map((feature) => {
+      const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, number | null>;
+      return allMetrics[metric];
+    })
     .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
 
   return {
@@ -368,13 +371,16 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
         max: values.length ? Math.max(...values) : null
       }
     },
-    features: data.features.map((feature) => ({
-      ...feature,
-      properties: {
-        ...feature.properties,
-        metric,
-        value: feature.properties.metrics[metric] ?? null
-      }
-    }))
+    features: data.features.map((feature) => {
+      const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, number | null>;
+      return {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          metric,
+          value: allMetrics[metric] ?? null
+        }
+      };
+    })
   };
 }

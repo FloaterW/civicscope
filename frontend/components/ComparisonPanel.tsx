@@ -27,12 +27,15 @@ const comparisonNouns: Record<GeographyLevel, string> = {
 
 export function ComparisonPanel({ comparison, metric, geographyLevel, loading }: Props) {
   const chartData =
-    comparison?.items.map((item) => ({
-      geoid: item.geoid,
-      name: chartLabel(item.name, item.type, item.geoid),
-      value: item.metrics[metric] ?? 0,
-      rawValue: item.metrics[metric]
-    })) ?? [];
+    comparison?.items.map((item) => {
+      const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, number | null>;
+      return {
+        geoid: item.geoid,
+        name: chartLabel(item.name, item.type, item.geoid),
+        value: allMetrics[metric] ?? 0,
+        rawValue: allMetrics[metric]
+      };
+    }) ?? [];
   const hasChartData = chartData.length > 0;
 
   return (
@@ -94,7 +97,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading }:
                   <tr key={item.geoid} className="border-t border-civic-line">
                     <td className="px-3 py-2 font-medium text-civic-ink">{source?.name}</td>
                     <td className="px-3 py-2 text-civic-ink">
-                      {formatMetric(metric, source?.metrics[metric])}
+                      {formatMetric(metric, ({ ...source?.metrics, ...source?.cmhc_metrics } as Record<string, number | null>)[metric])}
                     </td>
                     <td className="px-3 py-2 text-civic-muted">
                       {formatMetric("rent_to_income_ratio", source?.metrics.rent_to_income_ratio)}
