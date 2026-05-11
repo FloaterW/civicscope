@@ -267,7 +267,8 @@ def get_summary(
     year: int | None = None,
     db: Session = Depends(get_db),
 ):
-    metric_year = resolve_year(db, year)
+    # Census data year is always latest (2021); the year param only affects CMHC.
+    metric_year = resolve_year(db, None)
     id_list = parse_ids(ids)
     normalized_type = normalize_geography_type(geography_type)
     records = joined_records(db, metric_year, id_list, normalized_type, include_geometry=False)
@@ -294,7 +295,8 @@ def compare_geographies(
     year: int | None = None,
     db: Session = Depends(get_db),
 ):
-    metric_year = resolve_year(db, year)
+    # Census data year is always latest (2021); the year param only affects CMHC.
+    metric_year = resolve_year(db, None)
     id_list = parse_ids(ids)
     normalized_type = normalize_geography_type(geography_type)
     records = joined_records(db, metric_year, id_list, normalized_type, include_geometry=False)
