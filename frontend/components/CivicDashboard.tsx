@@ -356,6 +356,7 @@ export function CivicDashboard() {
           </div>
           <div className="h-[520px]">
             <CivicMap
+              key={geographyLevel}
               data={visibleMapData}
               loading={mapLoading}
               metric={metric}
