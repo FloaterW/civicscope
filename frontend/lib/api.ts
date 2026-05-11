@@ -72,18 +72,24 @@ export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, si
   return fetchJson<MapData>(`/api/map-data?${params.toString()}`, signal);
 }
 
-export function getSummary(geoid: string | undefined, geographyLevel: GeographyLevel, signal?: AbortSignal) {
+export function getSummary(geoid: string | undefined, geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
   const params = new URLSearchParams({ type: geographyLevel });
   if (geoid) {
     params.set("ids", geoid);
   }
+  if (year !== undefined) {
+    params.set("year", String(year));
+  }
   return fetchJson<Summary>(`/api/summary?${params.toString()}`, signal);
 }
 
-export function getComparison(ids: string[], geographyLevel: GeographyLevel, signal?: AbortSignal) {
+export function getComparison(ids: string[], geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
   const params = new URLSearchParams({ type: geographyLevel });
   if (ids.length) {
     params.set("ids", ids.join(","));
+  }
+  if (year !== undefined) {
+    params.set("year", String(year));
   }
   return fetchJson<CompareResponse>(`/api/compare?${params.toString()}`, signal);
 }

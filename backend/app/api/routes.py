@@ -274,19 +274,15 @@ def get_summary(
     if id_list and not records:
         raise HTTPException(status_code=404, detail="No selected geographies were found.")
 
-    cmhc_query = db.query(CmhcMetric)
-    cmhc_latest = db.query(func.max(CmhcMetric.year)).scalar()
-    if cmhc_latest:
-        cmhc_query = cmhc_query.filter(CmhcMetric.year == cmhc_latest)
-        if normalized_type:
-            cmhc_query = cmhc_query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
-                Geography.type == normalized_type
-            )
-        if id_list:
-            cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(id_list))
-        cmhc_records = cmhc_query.all()
-    else:
-        cmhc_records = []
+    cmhc_year = resolve_cmhc_year(db, year)
+    cmhc_query = db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year)
+    if normalized_type:
+        cmhc_query = cmhc_query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
+            Geography.type == normalized_type
+        )
+    if id_list:
+        cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(id_list))
+    cmhc_records = cmhc_query.all()
 
     return build_summary(records, metric_year, cmhc_records=cmhc_records)
 
@@ -309,8 +305,7 @@ def compare_geographies(
     else:
         ordered_records = sorted(records, key=lambda item: item[1].population or 0, reverse=True)[:6]
 
-    cmhc_latest = db.query(func.max(CmhcMetric.year)).scalar()
-    cmhc_year = cmhc_latest if cmhc_latest is not None else metric_year
+    cmhc_year = resolve_cmhc_year(db, year)
     cmhc_by_geoid = {
         row.geoid: row
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
