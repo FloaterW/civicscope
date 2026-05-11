@@ -82,12 +82,10 @@ def build_summary(
         rent_weights = [r.rental_universe or 0 for r in cmhc_records if r.average_rent_total is not None]
         cmhc_values["average_rent_total"] = weighted_average(rent_values, rent_weights)
 
-        cmhc_values["housing_starts_total"] = sum(
-            r.housing_starts_total for r in cmhc_records if r.housing_starts_total is not None
-        ) or None
-        cmhc_values["housing_completions"] = sum(
-            r.housing_completions for r in cmhc_records if r.housing_completions is not None
-        ) or None
+        starts_vals = [r.housing_starts_total for r in cmhc_records if r.housing_starts_total is not None]
+        cmhc_values["housing_starts_total"] = sum(starts_vals) if starts_vals else None
+        completions_vals = [r.housing_completions for r in cmhc_records if r.housing_completions is not None]
+        cmhc_values["housing_completions"] = sum(completions_vals) if completions_vals else None
 
     return {
         "year": year,

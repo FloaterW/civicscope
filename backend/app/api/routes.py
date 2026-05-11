@@ -234,6 +234,11 @@ def list_metric_values(
     metric_key = normalize_metric_name(metric)
     if metric_key not in VALID_METRICS:
         raise HTTPException(status_code=400, detail=f"Unsupported metric: {metric}")
+    if is_cmhc_metric(metric_key):
+        raise HTTPException(
+            status_code=400,
+            detail=f"CMHC metric '{metric_key}' is not available on this endpoint. Use /api/map-data instead.",
+        )
     normalized_type = normalize_geography_type(geography_type)
     metric_year = resolve_year(db, year)
     records = joined_records(db, metric_year, geography_type=normalized_type, include_geometry=False)
