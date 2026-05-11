@@ -92,14 +92,48 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
     return row_count
 
 
+def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bool:
+    """Spot-check whether seed content has changed beyond just row count.
+
+    Compares a sample of fields from the seed file against the DB to detect
+    updates where the row count stays the same but values changed (e.g.
+    housing_starts_total going from NULL to a real value).
+    """
+    if not seed_metrics:
+        return False
+    sample = seed_metrics[0]
+    db_row = (
+        db.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == sample["geoid"], CmhcMetric.year == sample["year"])
+        .first()
+    )
+    if db_row is None:
+        return True
+    # Check fields that may have been added or updated
+    check_fields = [
+        ("housing_starts_total", "housing_starts_total"),
+        ("housing_completions", "housing_completions"),
+        ("units_under_construction", "units_under_construction"),
+        ("vacancy_rate", "vacancy_rate"),
+    ]
+    for seed_key, db_attr in check_fields:
+        seed_val = sample.get(seed_key)
+        db_val = getattr(db_row, db_attr, None)
+        if seed_val is not None and db_val is None:
+            return True
+    return False
+
+
 def seed_cmhc_data(db: Session, force: bool = False) -> int:
     seed = load_cmhc_seed()
     expected_count = len(seed["metrics"])
     existing_count = db.query(CmhcMetric).count()
 
-    # Auto-detect stale seed: if DB has fewer rows than the seed file,
-    # the seed has been updated and we should reload.
+    # Auto-detect stale seed: trigger reseed if row count changed OR
+    # if seed content has changed (e.g. new fields populated).
     needs_reseed = force or (existing_count > 0 and existing_count < expected_count)
+    if not needs_reseed and existing_count > 0:
+        needs_reseed = _seed_content_changed(db, seed["metrics"])
 
     if existing_count and not force and not needs_reseed:
         return 0
