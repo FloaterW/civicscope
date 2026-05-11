@@ -7,7 +7,23 @@ export type MetricKey =
   | "population"
   | "population_growth_pct"
   | "affordability_index"
-  | "rent_to_income_ratio";
+  | "rent_to_income_ratio"
+  | "vacancy_rate"
+  | "average_rent_total"
+  | "average_rent_bachelor"
+  | "average_rent_1br"
+  | "average_rent_2br"
+  | "average_rent_3br_plus"
+  | "turnover_rate"
+  | "availability_rate"
+  | "rental_universe"
+  | "housing_starts_total"
+  | "housing_starts_single"
+  | "housing_starts_semi"
+  | "housing_starts_row"
+  | "housing_starts_apartment"
+  | "housing_completions"
+  | "units_under_construction";
 
 export type GeoJsonGeometry = {
   type: string;
@@ -25,6 +41,25 @@ export type MetricValues = {
   rent_burden_pct: number | null;
   rent_to_income_ratio: number | null;
   affordability_index: number | null;
+};
+
+export type CmhcMetricValues = {
+  vacancy_rate: number | null;
+  average_rent_total: number | null;
+  average_rent_bachelor: number | null;
+  average_rent_1br: number | null;
+  average_rent_2br: number | null;
+  average_rent_3br_plus: number | null;
+  turnover_rate: number | null;
+  availability_rate: number | null;
+  rental_universe: number | null;
+  housing_starts_total: number | null;
+  housing_starts_single: number | null;
+  housing_starts_semi: number | null;
+  housing_starts_row: number | null;
+  housing_starts_apartment: number | null;
+  housing_completions: number | null;
+  units_under_construction: number | null;
 };
 
 export type Geography = {
@@ -47,6 +82,8 @@ export type MapFeature = {
     metric: MetricKey;
     value: number | null;
     metrics: MetricValues;
+    cmhc_metrics?: CmhcMetricValues;
+    cmhc_year?: number;
   };
 };
 
@@ -60,6 +97,7 @@ export type MapData = {
       max: number | null;
     };
     geography_type: GeographyLevel;
+    available_years?: number[];
     data_quality: {
       metric_status: "official" | "estimated";
       label: string;
@@ -82,6 +120,10 @@ export type Summary = {
   rent_burden_pct: number | null;
   affordability_index: number | null;
   renter_households: number;
+  vacancy_rate?: number | null;
+  average_rent_total?: number | null;
+  housing_starts_total?: number | null;
+  housing_completions?: number | null;
   selected_geographies: Array<{
     geoid: string;
     name: string;
@@ -99,6 +141,7 @@ export type CompareResponse = {
     type: string;
     county: string | null;
     metrics: MetricValues;
+    cmhc_metrics?: CmhcMetricValues;
   }>;
 };
 

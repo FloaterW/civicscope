@@ -67,7 +67,7 @@ export function DetailPanel({ geography, metric, geographyLevel, onClear }: Prop
       {geography ? (
         <>
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-            <MetricLine label={getMetricLabel(metric)} value={formatMetric(metric, metrics?.[metric])} />
+            <MetricLine label={getMetricLabel(metric)} value={formatMetric(metric, ({ ...metrics } as Record<string, number | null | undefined>)[metric])} />
             <MetricLine label="Income" value={formatMetric("median_income", metrics?.median_income)} />
             <MetricLine label="Rent" value={formatMetric("median_rent", metrics?.median_rent)} />
             <MetricLine label="Burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} />
