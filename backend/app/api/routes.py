@@ -24,6 +24,21 @@ router = APIRouter(prefix="/api", tags=["civic data"])
 DEFAULT_GEOGRAPHY_TYPE = "municipality"
 SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
 
+# Count-based CMHC metrics that represent municipal *totals* and must NOT be
+# inherited by census tracts (they would misleadingly appear as tract-level
+# values).  Rate/average metrics like vacancy and rents are kept because they
+# describe market conditions applicable within the municipality.
+CMHC_COUNT_METRICS = frozenset({
+    "rental_universe",
+    "housing_starts_total",
+    "housing_starts_single",
+    "housing_starts_semi",
+    "housing_starts_row",
+    "housing_starts_apartment",
+    "housing_completions",
+    "units_under_construction",
+})
+
 
 def resolve_year(db: Session, year: int | None) -> int:
     if year is not None:
@@ -102,8 +117,18 @@ def available_cmhc_years(db: Session) -> list[int]:
     return years
 
 
-def serialize_cmhc_metric(cmhc: CmhcMetric) -> dict[str, Any]:
-    return {
+def serialize_cmhc_metric(cmhc: CmhcMetric, *, tract_inherited: bool = False) -> dict[str, Any]:
+    """Serialize a CmhcMetric row to a dict.
+
+    When ``tract_inherited`` is True the row is a municipality-level record
+    being attached to a census tract.  Count-based metrics (housing starts,
+    completions, units under construction, rental universe) are municipal
+    *totals* and have no meaning at the tract level, so they are nulled out.
+    Rate-based metrics (vacancy, rents, turnover, availability) describe
+    market conditions and are reasonable proxies for a tract within that
+    municipality.
+    """
+    result: dict[str, Any] = {
         "year": cmhc.year,
         "vacancy_rate": cmhc.vacancy_rate,
         "average_rent_total": cmhc.average_rent_total,
@@ -113,15 +138,16 @@ def serialize_cmhc_metric(cmhc: CmhcMetric) -> dict[str, Any]:
         "average_rent_3br_plus": cmhc.average_rent_3br_plus,
         "turnover_rate": cmhc.turnover_rate,
         "availability_rate": cmhc.availability_rate,
-        "rental_universe": cmhc.rental_universe,
-        "housing_starts_total": cmhc.housing_starts_total,
-        "housing_starts_single": cmhc.housing_starts_single,
-        "housing_starts_semi": cmhc.housing_starts_semi,
-        "housing_starts_row": cmhc.housing_starts_row,
-        "housing_starts_apartment": cmhc.housing_starts_apartment,
-        "housing_completions": cmhc.housing_completions,
-        "units_under_construction": cmhc.units_under_construction,
+        "rental_universe": None if tract_inherited else cmhc.rental_universe,
+        "housing_starts_total": None if tract_inherited else cmhc.housing_starts_total,
+        "housing_starts_single": None if tract_inherited else cmhc.housing_starts_single,
+        "housing_starts_semi": None if tract_inherited else cmhc.housing_starts_semi,
+        "housing_starts_row": None if tract_inherited else cmhc.housing_starts_row,
+        "housing_starts_apartment": None if tract_inherited else cmhc.housing_starts_apartment,
+        "housing_completions": None if tract_inherited else cmhc.housing_completions,
+        "units_under_construction": None if tract_inherited else cmhc.units_under_construction,
     }
+    return result
 
 
 def joined_records(
@@ -276,12 +302,30 @@ def get_summary(
         raise HTTPException(status_code=404, detail="No selected geographies were found.")
 
     cmhc_year = resolve_cmhc_year(db, year)
+    # CMHC data is stored at municipality level only.  For census tract mode
+    # we aggregate the municipality-level rows so the summary still reports
+    # meaningful GTA-wide CMHC stats.
     cmhc_query = db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year)
-    if normalized_type:
-        cmhc_query = cmhc_query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
-            Geography.type == normalized_type
+    cmhc_query = cmhc_query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
+        Geography.type == "municipality"
+    )
+    if id_list and normalized_type == "census_tract":
+        # Resolve selected tracts' parent municipalities via the county name
+        parent_names = (
+            db.query(Geography.county)
+            .filter(Geography.geoid.in_(id_list), Geography.county.isnot(None))
+            .distinct()
+            .all()
         )
-    if id_list:
+        if parent_names:
+            parent_geoids = [
+                geoid
+                for (geoid,) in db.query(Geography.geoid)
+                .filter(Geography.type == "municipality", Geography.name.in_([n for (n,) in parent_names]))
+                .all()
+            ]
+            cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(parent_geoids))
+    elif id_list:
         cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(id_list))
     cmhc_records = cmhc_query.all()
 
@@ -332,13 +376,15 @@ def compare_geographies(
             "metrics": serialize_metric(metric),
         }
         # Census tracts inherit CMHC data from parent municipality
+        is_tract_inherited = False
         if normalized_type == "census_tract" and geography.county:
             parent_geoid = municipality_name_to_geoid.get(geography.county)
             cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
+            is_tract_inherited = True
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
         if cmhc_row:
-            item["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row)
+            item["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row, tract_inherited=is_tract_inherited)
         else:
             item["cmhc_metrics"] = None
         items.append(item)
@@ -454,17 +500,22 @@ def get_map_data(
             "metrics": serialize_metric(row),
         }
         # For census tracts, resolve CMHC row from parent municipality
+        is_tract_inherited = False
         if normalized_type == "census_tract" and geography.county:
             parent_geoid = municipality_name_to_geoid.get(geography.county)
             cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
+            is_tract_inherited = True
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
         if cmhc:
-            props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
+            if is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
+                props["value"] = None
+            else:
+                props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
         else:
             props["value"] = metric_value(metric_key, row)
         if cmhc_row:
-            props["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row)
+            props["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row, tract_inherited=is_tract_inherited)
             props["cmhc_year"] = cmhc_year
         features.append(
             {
