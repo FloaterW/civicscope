@@ -13,6 +13,8 @@ type Props = {
   geographyLevel: GeographyLevel;
   cmhcMetrics?: CmhcMetricValues | null;
   cmhcYear?: number;
+  dataQualityLabel?: string;
+  metricStatus?: "official" | "estimated";
   onClear: () => void;
 };
 
@@ -28,7 +30,7 @@ const overviewCopy: Record<GeographyLevel, string> = {
     "The map shows GTA census tracts with official 2021 Census Profile affordability metrics. Select a tract to inspect local values."
 };
 
-export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, onClear }: Props) {
+export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
   const metrics = geography?.metrics;
 
   return (
@@ -51,7 +53,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
               : emptyCopy[geographyLevel]}
           </p>
           <div className="mt-2">
-            <DataQualityBadge geographyLevel={geographyLevel} />
+            <DataQualityBadge geographyLevel={geographyLevel} dataQualityLabel={dataQualityLabel} metricStatus={metricStatus} />
           </div>
         </div>
         {geography && (

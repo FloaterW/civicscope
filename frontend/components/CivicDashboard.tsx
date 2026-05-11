@@ -341,7 +341,11 @@ export function CivicDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <DataQualityBadge geographyLevel={geographyLevel} />
+              <DataQualityBadge
+                geographyLevel={geographyLevel}
+                dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
+                metricStatus={visibleMapData?.metadata.data_quality?.metric_status}
+              />
               <div className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
                 {visibleMapData?.metadata.year ?? "2021"}
               </div>
@@ -380,6 +384,8 @@ export function CivicDashboard() {
             geographyLevel={geographyLevel}
             cmhcMetrics={selectedCmhcMetrics}
             cmhcYear={selectedCmhcYear}
+            dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
+            metricStatus={visibleMapData?.metadata.data_quality?.metric_status}
             onClear={() => {
               setSelected(null);
               setSelectedCmhcMetrics(null);
@@ -394,6 +400,7 @@ export function CivicDashboard() {
             metric={metric}
             geographyLevel={geographyLevel}
             loading={comparisonLoading && !comparison}
+            displayYear={isCmhc ? displayYear : undefined}
           />
         </section>
       </div>

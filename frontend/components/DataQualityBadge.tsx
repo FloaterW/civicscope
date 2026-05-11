@@ -6,6 +6,10 @@ import type { GeographyLevel } from "@/types";
 
 type Props = {
   geographyLevel: GeographyLevel;
+  /** When supplied (from API metadata), overrides the default label. */
+  dataQualityLabel?: string;
+  /** When "estimated", badge uses amber tones instead of green. */
+  metricStatus?: "official" | "estimated";
 };
 
 const qualityCopy: Record<
@@ -24,17 +28,21 @@ const qualityCopy: Record<
   }
 };
 
-export function DataQualityBadge({ geographyLevel }: Props) {
+const estimatedTone = "border-amber-200 bg-amber-50 text-amber-900";
+
+export function DataQualityBadge({ geographyLevel, dataQualityLabel, metricStatus }: Props) {
   const quality = qualityCopy[geographyLevel];
   const Icon = quality.icon;
+  const label = dataQualityLabel ?? quality.label;
+  const tone = metricStatus === "estimated" ? estimatedTone : quality.tone;
 
   return (
     <div
       data-testid="data-quality-badge"
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium ${quality.tone}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium ${tone}`}
     >
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {quality.label}
+      {label}
     </div>
   );
 }
