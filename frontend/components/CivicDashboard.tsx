@@ -90,7 +90,10 @@ export function CivicDashboard() {
   }, [geographyLevel]);
 
   useEffect(() => {
+    // Clear all cached map data and cancel in-flight prefetches so stale
+    // responses from the previous metric don't re-pollute the cache.
     setMapDataByLevel({});
+    mapRequestsRef.current = {};
   }, [metric, selectedYear]);
 
   // Keep selected geography's CMHC data in sync with current map data.
