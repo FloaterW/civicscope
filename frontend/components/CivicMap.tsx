@@ -341,6 +341,10 @@ function normalizeFeatureProperties(feature: {
       : properties.metrics;
   const bbox =
     typeof properties.bbox === "string" ? JSON.parse(properties.bbox) : properties.bbox;
+  const cmhc_metrics =
+    typeof properties.cmhc_metrics === "string"
+      ? JSON.parse(properties.cmhc_metrics)
+      : properties.cmhc_metrics ?? undefined;
 
   return {
     id: Number(properties.id),
@@ -354,7 +358,9 @@ function normalizeFeatureProperties(feature: {
     geometry_source: String(properties.geometry_source),
     metric: String(properties.metric) as MetricKey,
     value: properties.value === null ? null : Number(properties.value),
-    metrics: metrics as MapFeature["properties"]["metrics"]
+    metrics: metrics as MapFeature["properties"]["metrics"],
+    cmhc_metrics: cmhc_metrics,
+    cmhc_year: properties.cmhc_year != null ? Number(properties.cmhc_year) : undefined,
   };
 }
 
