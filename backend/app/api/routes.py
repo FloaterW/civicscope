@@ -90,12 +90,14 @@ def resolve_cmhc_year(db: Session, year: int | None) -> int:
     return int(latest_year)
 
 
-def available_cmhc_years(db: Session, geography_type: str | None = None) -> list[int]:
+def available_cmhc_years(db: Session) -> list[int]:
+    """Return all distinct CMHC years.
+
+    CMHC data is stored at municipality level only; census tracts inherit
+    from their parent municipality, so the available years are the same
+    regardless of the requested geography type.
+    """
     query = db.query(CmhcMetric.year).distinct()
-    if geography_type:
-        query = query.join(Geography, Geography.geoid == CmhcMetric.geoid).filter(
-            Geography.type == geography_type
-        )
     years = sorted(row[0] for row in query.all())
     return years
 
@@ -313,6 +315,15 @@ def compare_geographies(
         row.geoid: row
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
     }
+    # Build name→geoid lookup for census tract CMHC inheritance
+    municipality_name_to_geoid: dict[str, str] = {}
+    if normalized_type == "census_tract":
+        municipality_name_to_geoid = {
+            name: geoid
+            for geoid, name in db.query(Geography.geoid, Geography.name)
+            .filter(Geography.type == "municipality")
+            .all()
+        }
 
     items = []
     for geography, metric in ordered_records:
@@ -323,7 +334,12 @@ def compare_geographies(
             "county": geography.county,
             "metrics": serialize_metric(metric),
         }
-        cmhc_row = cmhc_by_geoid.get(geography.geoid)
+        # Census tracts inherit CMHC data from parent municipality
+        if normalized_type == "census_tract" and geography.county:
+            parent_geoid = municipality_name_to_geoid.get(geography.county)
+            cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
+        else:
+            cmhc_row = cmhc_by_geoid.get(geography.geoid)
         if cmhc_row:
             item["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row)
         else:
@@ -371,15 +387,26 @@ def get_map_data(
         include_geometry=not postgis_geometries,
     )
 
-    # CMHC metric handling
+    # CMHC metric handling — data is stored at municipality level only.
+    # Census tracts inherit their parent municipality's CMHC row via the
+    # county field (which stores the municipality name).
     cmhc_by_geoid: dict[str, CmhcMetric] = {}
     cmhc_year = metric_year
+    municipality_name_to_geoid: dict[str, str] = {}
     if cmhc:
         cmhc_year = resolve_cmhc_year(db, year)
         cmhc_by_geoid = {
             row.geoid: row
             for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
         }
+        # Build name→geoid lookup so census tracts can find parent CMHC data
+        if normalized_type == "census_tract":
+            municipality_name_to_geoid = {
+                name: geoid
+                for geoid, name in db.query(Geography.geoid, Geography.name)
+                .filter(Geography.type == "municipality")
+                .all()
+            }
 
     if cmhc:
         values = [
@@ -407,7 +434,7 @@ def get_map_data(
         "source": map_data_source(normalized_type, cmhc=cmhc),
     }
     if cmhc:
-        metadata["available_years"] = available_cmhc_years(db, normalized_type)
+        metadata["available_years"] = available_cmhc_years(db)
 
     features = []
     for geography, row in records:
@@ -423,7 +450,12 @@ def get_map_data(
             "metric": metric_key,
             "metrics": serialize_metric(row),
         }
-        cmhc_row = cmhc_by_geoid.get(geography.geoid)
+        # For census tracts, resolve CMHC row from parent municipality
+        if normalized_type == "census_tract" and geography.county:
+            parent_geoid = municipality_name_to_geoid.get(geography.county)
+            cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
+        else:
+            cmhc_row = cmhc_by_geoid.get(geography.geoid)
         if cmhc:
             props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
         else:
@@ -474,12 +506,21 @@ def map_data_source(geography_type: str | None, cmhc: bool = False) -> str:
 
 
 def data_quality(geography_type: str | None, cmhc: bool = False) -> dict[str, str]:
+    if cmhc and geography_type == "census_tract":
+        return {
+            "metric_status": "estimated",
+            "label": "CMHC Rental Market Survey (municipal)",
+            "description": (
+                "Census tracts inherit CMHC data from their parent municipality. "
+                "Values shown are municipal-level CMHC Rental Market Survey data."
+            ),
+        }
     if cmhc:
         return {
             "metric_status": "official",
             "label": "CMHC Rental Market Survey",
             "description": (
-                "CMHC Rental Market Survey and Starts & Completions Survey data "
+                "CMHC Rental Market Survey data "
                 "from the Housing Market Information Portal."
             ),
         }
