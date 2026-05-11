@@ -369,7 +369,13 @@ def get_map_data(
     normalized_type = normalize_geography_type(geography_type)
     cmhc = is_cmhc_metric(metric_key)
 
-    metric_year = resolve_year(db, year)
+    # For CMHC metrics the user-selected year applies to the CMHC data only;
+    # the Geography+Metric (census) join always uses the latest census year so
+    # we still get geography records even for years that have no census data.
+    if cmhc:
+        metric_year = resolve_year(db, None)  # always latest census year
+    else:
+        metric_year = resolve_year(db, year)
     postgis_geometries = (
         load_postgis_map_geometries(
             db,

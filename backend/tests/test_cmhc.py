@@ -197,6 +197,23 @@ def test_map_data_cmhc_housing_starts(client):
     assert payload["metadata"]["metric"] == "housing_starts_total"
 
 
+def test_map_data_cmhc_metric_with_non_census_year(client):
+    """CMHC metrics should return features even for years with no census data.
+
+    Census data only exists for 2021, but CMHC data spans 2018-2025.
+    Requesting year=2022 must still produce features (using census 2021
+    geometry with CMHC 2022 values).
+    """
+    response = client.get("/api/map-data?metric=housing_completions&year=2022")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["metadata"]["metric"] == "housing_completions"
+    assert payload["metadata"]["year"] == 2022
+    assert len(payload["features"]) >= 1
+    features_with_data = [f for f in payload["features"] if f["properties"]["value"] is not None]
+    assert len(features_with_data) >= 1
+
+
 def test_map_data_census_metric_unchanged(client):
     response = client.get("/api/map-data?metric=rent_burden")
     assert response.status_code == 200
