@@ -23,4 +23,13 @@ class Metric(Base):
     rent_burden_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     affordability_index: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    dwellings_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dwellings_single_detached: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dwellings_semi_detached: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dwellings_row_house: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dwellings_apt_duplex: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dwellings_apt_low_rise: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dwellings_apt_high_rise: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    owner_households: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     geography = relationship("Geography", back_populates="metrics")

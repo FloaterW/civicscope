@@ -41,6 +41,14 @@ export type MetricValues = {
   rent_burden_pct: number | null;
   rent_to_income_ratio: number | null;
   affordability_index: number | null;
+  dwellings_total: number | null;
+  dwellings_single_detached: number | null;
+  dwellings_semi_detached: number | null;
+  dwellings_row_house: number | null;
+  dwellings_apt_duplex: number | null;
+  dwellings_apt_low_rise: number | null;
+  dwellings_apt_high_rise: number | null;
+  owner_households: number | null;
 };
 
 export type CmhcMetricValues = {

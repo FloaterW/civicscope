@@ -72,6 +72,14 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
                 rent_burden_pct=rent_burden_pct,
                 affordability_index=metric_item.get("affordability_index")
                 or calculate_affordability_index(median_rent, median_income),
+                dwellings_total=metric_item.get("dwellings_total"),
+                dwellings_single_detached=metric_item.get("dwellings_single_detached"),
+                dwellings_semi_detached=metric_item.get("dwellings_semi_detached"),
+                dwellings_row_house=metric_item.get("dwellings_row_house"),
+                dwellings_apt_duplex=metric_item.get("dwellings_apt_duplex"),
+                dwellings_apt_low_rise=metric_item.get("dwellings_apt_low_rise"),
+                dwellings_apt_high_rise=metric_item.get("dwellings_apt_high_rise"),
+                owner_households=metric_item.get("owner_households"),
             )
             db.add(metric)
             row_count += 1

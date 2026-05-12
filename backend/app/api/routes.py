@@ -82,6 +82,14 @@ def serialize_metric(metric: Metric) -> dict[str, Any]:
         "rent_burden_pct": metric.rent_burden_pct,
         "rent_to_income_ratio": metric_value("rent_to_income_ratio", metric),
         "affordability_index": metric.affordability_index,
+        "dwellings_total": metric.dwellings_total,
+        "dwellings_single_detached": metric.dwellings_single_detached,
+        "dwellings_semi_detached": metric.dwellings_semi_detached,
+        "dwellings_row_house": metric.dwellings_row_house,
+        "dwellings_apt_duplex": metric.dwellings_apt_duplex,
+        "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
+        "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
+        "owner_households": metric.owner_households,
     }
 
 
