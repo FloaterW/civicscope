@@ -104,8 +104,14 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           {/* CMHC Rental Market */}
           {cmhcMetrics && (hasAnyRentalData || hasAnySupplyData) ? (
             <>
-              {hasAnyRentalData && (
+              {hasAnyRentalData ? (
                 <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
+              ) : (
+                <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
+                  {cmhcMetrics.rms_surveyed
+                    ? "Rental market data suppressed for confidentiality in this survey zone."
+                    : "Not covered by the CMHC Rental Market Survey."}
+                </div>
               )}
 
               {hasAnySupplyData && (

@@ -1,4 +1,4 @@
-from sqlalchemy import Float, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -36,5 +36,6 @@ class CmhcMetric(Base):
     housing_completions: Mapped[int | None] = mapped_column(Integer, nullable=True)
     units_under_construction: Mapped[int | None] = mapped_column(Integer, nullable=True)
     unabsorbed_units: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rms_surveyed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
 
     geography = relationship("Geography", back_populates="cmhc_metrics")

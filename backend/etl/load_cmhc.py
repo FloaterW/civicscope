@@ -178,6 +178,7 @@ class CmhcRow:
     housing_completions: int | None = None
     units_under_construction: int | None = None
     unabsorbed_units: int | None = None
+    rms_surveyed: bool = False
 
 
 @dataclass
@@ -798,11 +799,16 @@ def update_seed(years: list[int] | None = None) -> int:
             for year in year_data:
                 all_keys.add((geoid, year))
 
+    # Build set of geoids that have any RMS zone mapping
+    rms_covered_geoids = {gid for zone_geoids in ZONE_TO_GEOIDS.values() for gid in zone_geoids}
+
     for geoid, year in sorted(all_keys):
         # Start with RMS data if available, otherwise create empty row
         row = rms_by_key.get((geoid, year))
         if row is None:
             row = CmhcRow(geoid=geoid, year=year)
+
+        row.rms_surveyed = geoid in rms_covered_geoids
 
         # Overlay Scss fields
         scss_year_data = all_scss.get(geoid, {}).get(year)
