@@ -119,8 +119,11 @@ export function CivicDashboard() {
     getMapData(metric, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
       .then((mapPayload) => {
         if (controller.signal.aborted) return;
-        if (mapPayload.metadata.available_years) {
+        if (mapPayload.metadata.available_years?.length) {
           setAvailableYears(mapPayload.metadata.available_years);
+        }
+        if (mapPayload.metadata.cmhc_year !== undefined) {
+          setSelectedCmhcYear(mapPayload.metadata.cmhc_year);
         }
         setMapDataByLevel((current) =>
           current[geographyLevel]
