@@ -49,6 +49,7 @@ TABLE_RMS_SUMMARY = "2.1.31.3"
 TABLE_SCSS_STARTS = "1.1.1"  # Housing starts by dwelling type
 TABLE_SCSS_COMPLETIONS = "1.2.2"  # Historical completions by dwelling type
 TABLE_SCSS_UNDER_CONSTRUCTION = "1.2.3"  # Historical under-construction inventory
+TABLE_SCSS_UNABSORBED = "1.2.4"  # Historical completed-and-unabsorbed inventory
 
 # RMS survey month — the Rental Market Survey is conducted in October each year.
 RMS_SURVEY_MONTH = 10
@@ -176,6 +177,7 @@ class CmhcRow:
     housing_starts_apartment: int | None = None
     housing_completions: int | None = None
     units_under_construction: int | None = None
+    unabsorbed_units: int | None = None
 
 
 @dataclass
@@ -524,6 +526,7 @@ def fetch_scss_for_municipality(
             "housing_starts_apartment": starts.apartment if starts else None,
             "housing_completions": None,
             "units_under_construction": None,
+            "unabsorbed_units": None,
         }
         time.sleep(REQUEST_DELAY)
 
@@ -543,6 +546,15 @@ def fetch_scss_for_municipality(
     uc_monthly = parse_scss_historical_csv(csv_text)
     for year in years:
         result[year]["units_under_construction"] = _dec_snapshot_for_year(uc_monthly, year)
+    time.sleep(REQUEST_DELAY)
+
+    # 4. Fetch unabsorbed inventory — one call from start year, take Dec snapshot
+    csv_text = fetch_scss_csv(
+        geoid, TABLE_SCSS_UNABSORBED, years[0], month=1, ytd=False
+    )
+    ua_monthly = parse_scss_historical_csv(csv_text)
+    for year in years:
+        result[year]["unabsorbed_units"] = _dec_snapshot_for_year(ua_monthly, year)
     time.sleep(REQUEST_DELAY)
 
     return result
@@ -688,10 +700,11 @@ def write_seed(metrics: list[CmhcRow], years: list[int]) -> int:
                 "Rental Market Survey (RMS) and Starts & Completions Survey (Scss) data",
                 "from CMHC Housing Market Information Portal (HMIP ExportTable endpoint).",
                 "RMS: Table 2.1.31.3 at survey-zone level, aggregated to municipalities.",
-                "Scss: Tables 1.1.1, 1.2.2, 1.2.3 queried per CSD (municipality).",
+                "Scss: Tables 1.1.1, 1.2.2, 1.2.3, 1.2.4 queried per CSD (municipality).",
                 "Housing starts are annual totals (Jan-Dec YTD).",
                 "Completions are annual sums of monthly completions.",
                 "Under construction is December point-in-time inventory.",
+                "Unabsorbed units is December point-in-time count of completed but unsold/unrented units.",
                 "Municipalities without RMS zone coverage still get Scss data.",
             ],
         },
@@ -801,6 +814,7 @@ def update_seed(years: list[int] | None = None) -> int:
             row.housing_starts_apartment = scss_year_data.get("housing_starts_apartment")
             row.housing_completions = scss_year_data.get("housing_completions")
             row.units_under_construction = scss_year_data.get("units_under_construction")
+            row.unabsorbed_units = scss_year_data.get("unabsorbed_units")
 
         all_metrics.append(row)
 

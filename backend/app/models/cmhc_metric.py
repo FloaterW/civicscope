@@ -35,5 +35,6 @@ class CmhcMetric(Base):
     housing_starts_apartment: Mapped[int | None] = mapped_column(Integer, nullable=True)
     housing_completions: Mapped[int | None] = mapped_column(Integer, nullable=True)
     units_under_construction: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    unabsorbed_units: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     geography = relationship("Geography", back_populates="cmhc_metrics")

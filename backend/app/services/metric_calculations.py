@@ -19,6 +19,7 @@ CMHC_METRICS = {
     "housing_starts_apartment",
     "housing_completions",
     "units_under_construction",
+    "unabsorbed_units",
 }
 
 VALID_METRICS = {

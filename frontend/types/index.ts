@@ -23,7 +23,8 @@ export type MetricKey =
   | "housing_starts_row"
   | "housing_starts_apartment"
   | "housing_completions"
-  | "units_under_construction";
+  | "units_under_construction"
+  | "unabsorbed_units";
 
 export type GeoJsonGeometry = {
   type: string;
@@ -69,6 +70,7 @@ export type CmhcMetricValues = {
   housing_starts_apartment: number | null;
   housing_completions: number | null;
   units_under_construction: number | null;
+  unabsorbed_units: number | null;
 };
 
 export type Geography = {
@@ -134,6 +136,7 @@ export type Summary = {
   average_rent_total?: number | null;
   housing_starts_total?: number | null;
   housing_completions?: number | null;
+  unabsorbed_units?: number | null;
   selected_geographies: Array<{
     geoid: string;
     name: string;

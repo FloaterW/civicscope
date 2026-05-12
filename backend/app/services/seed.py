@@ -122,6 +122,7 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
         ("housing_starts_total", "housing_starts_total"),
         ("housing_completions", "housing_completions"),
         ("units_under_construction", "units_under_construction"),
+        ("unabsorbed_units", "unabsorbed_units"),
         ("vacancy_rate", "vacancy_rate"),
     ]
     for seed_key, db_attr in check_fields:
@@ -177,6 +178,7 @@ def seed_cmhc_data(db: Session, force: bool = False) -> int:
             housing_starts_apartment=item.get("housing_starts_apartment"),
             housing_completions=item.get("housing_completions"),
             units_under_construction=item.get("units_under_construction"),
+            unabsorbed_units=item.get("unabsorbed_units"),
         )
         db.add(cmhc)
         row_count += 1
