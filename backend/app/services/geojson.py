@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from math import sqrt
 from typing import Any
 
 Coordinate = list[float]
@@ -103,36 +102,3 @@ def _radial_distance_simplify(points: Ring, tolerance: float) -> Ring:
     return simplified
 
 
-def _douglas_peucker(points: Ring, tolerance: float) -> Ring:
-    if len(points) <= 2:
-        return points
-
-    max_distance = 0.0
-    index = 0
-    start = points[0]
-    end = points[-1]
-
-    for current_index in range(1, len(points) - 1):
-        distance = _perpendicular_distance(points[current_index], start, end)
-        if distance > max_distance:
-            index = current_index
-            max_distance = distance
-
-    if max_distance > tolerance:
-        left = _douglas_peucker(points[: index + 1], tolerance)
-        right = _douglas_peucker(points[index:], tolerance)
-        return left[:-1] + right
-
-    return [start, end]
-
-
-def _perpendicular_distance(point: Coordinate, start: Coordinate, end: Coordinate) -> float:
-    if start == end:
-        return sqrt((point[0] - start[0]) ** 2 + (point[1] - start[1]) ** 2)
-
-    numerator = abs(
-        ((end[0] - start[0]) * (start[1] - point[1]))
-        - ((start[0] - point[0]) * (end[1] - start[1]))
-    )
-    denominator = sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
-    return numerator / denominator

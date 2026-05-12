@@ -729,6 +729,9 @@ def load_from_seed() -> int:
             count += 1
         db.commit()
         return count
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

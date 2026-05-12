@@ -59,7 +59,7 @@ def build_summary(
     )
     median_rent = weighted_average(
         [metric.median_rent for metric in metrics],
-        [metric.renter_households or metric.population for metric in metrics],
+        [metric.renter_households for metric in metrics],
     )
     rent_burden_pct = weighted_average(
         [metric.rent_burden_pct for metric in metrics],

@@ -22,13 +22,20 @@ def _normalize_database_url(url: str) -> str:
     return url
 
 
+def _resolve_database_url() -> str:
+    raw = os.getenv("DATABASE_URL")
+    if raw is None:
+        if os.getenv("APP_ENV", "development") != "development":
+            raise RuntimeError("DATABASE_URL must be set in non-development environments")
+        return _normalize_database_url("sqlite:///./civicscope.db")
+    return _normalize_database_url(raw)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "CivicScope")
     app_env: str = os.getenv("APP_ENV", "development")
-    database_url: str = _normalize_database_url(
-        os.getenv("DATABASE_URL", "sqlite:///./civicscope.db")
-    )
+    database_url: str = _resolve_database_url()
     seed_on_startup: bool = _env_bool("SEED_ON_STARTUP", True)
     force_reseed: bool = _env_bool("FORCE_RESEED", False)
     cors_origins: tuple[str, ...] = _env_tuple(

@@ -349,21 +349,23 @@ function colorExpression(data: MapData): unknown[] {
   ];
 }
 
+function safeJsonParse<T>(raw: unknown, fallback: T): T {
+  if (typeof raw !== "string") return (raw as T) ?? fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 function normalizeFeatureProperties(feature: {
   properties?: Record<string, unknown> | null;
   geometry: unknown;
 }): MapFeature["properties"] {
   const properties = feature.properties ?? {};
-  const metrics =
-    typeof properties.metrics === "string"
-      ? JSON.parse(properties.metrics)
-      : properties.metrics;
-  const bbox =
-    typeof properties.bbox === "string" ? JSON.parse(properties.bbox) : properties.bbox;
-  const cmhc_metrics =
-    typeof properties.cmhc_metrics === "string"
-      ? JSON.parse(properties.cmhc_metrics)
-      : properties.cmhc_metrics ?? undefined;
+  const metrics = safeJsonParse(properties.metrics, {} as MapFeature["properties"]["metrics"]);
+  const bbox = safeJsonParse(properties.bbox, null as [number, number, number, number] | null);
+  const cmhc_metrics = safeJsonParse(properties.cmhc_metrics, undefined as MapFeature["properties"]["cmhc_metrics"]);
 
   return {
     id: Number(properties.id),
@@ -374,7 +376,7 @@ function normalizeFeatureProperties(feature: {
     state: String(properties.state ?? "ON"),
     bbox: bbox as [number, number, number, number],
     geometry: feature.geometry as unknown as MapFeature["geometry"],
-    geometry_source: String(properties.geometry_source),
+    geometry_source: properties.geometry_source != null ? String(properties.geometry_source) : "",
     metric: String(properties.metric) as MetricKey,
     value: properties.value === null ? null : Number(properties.value),
     metrics: metrics as MapFeature["properties"]["metrics"],
@@ -388,7 +390,7 @@ function formatLegendValue(value: number | null): string {
     return "n/a";
   }
   return Math.abs(value) >= 1000
-    ? new Intl.NumberFormat("en-US", { notation: "compact" }).format(value)
+    ? new Intl.NumberFormat("en-CA", { notation: "compact" }).format(value)
     : value.toFixed(1);
 }
 

@@ -33,12 +33,9 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_id ON geographies (id)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_geoid ON geographies (geoid)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_name ON geographies (name)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_type ON geographies (type)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_county ON geographies (county)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_state ON geographies (state)")
 
     op.execute(
         """
@@ -57,7 +54,6 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS ix_metrics_id ON metrics (id)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_metrics_geoid ON metrics (geoid)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_metrics_year ON metrics (year)")
 
@@ -74,8 +70,6 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS ix_etl_runs_id ON etl_runs (id)")
-
     op.execute("ALTER TABLE geographies ADD COLUMN IF NOT EXISTS geom geometry(GEOMETRY, 4326)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_geographies_geom ON geographies USING GIST (geom)")
     op.execute(
@@ -90,3 +84,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_geographies_geom")
     op.execute("ALTER TABLE geographies DROP COLUMN IF EXISTS geom")
+    op.execute("DROP TABLE IF EXISTS etl_runs")
+    op.execute("DROP TABLE IF EXISTS metrics")
+    op.execute("DROP TABLE IF EXISTS geographies")

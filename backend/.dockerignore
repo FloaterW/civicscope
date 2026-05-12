@@ -4,3 +4,7 @@ __pycache__/
 *.db
 .coverage
 .venv/
+.env
+.env.*
+!.env.example
+tests/

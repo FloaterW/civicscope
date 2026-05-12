@@ -159,9 +159,13 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
         ])
         for m in metrics:
             writer.writerow([
-                m.geoid, m.year, m.median_income or "", m.median_rent or "",
-                m.population or "", m.previous_population or "",
-                m.renter_households or "", m.rent_burden_pct or "",
+                m.geoid, m.year,
+                m.median_income if m.median_income is not None else "",
+                m.median_rent if m.median_rent is not None else "",
+                m.population if m.population is not None else "",
+                m.previous_population if m.previous_population is not None else "",
+                m.renter_households if m.renter_households is not None else "",
+                m.rent_burden_pct if m.rent_burden_pct is not None else "",
             ])
 
 
