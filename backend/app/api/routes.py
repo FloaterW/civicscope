@@ -162,6 +162,7 @@ def serialize_cmhc_metric(cmhc: CmhcMetric, *, tract_inherited: bool = False) ->
         "housing_completions": None if tract_inherited else cmhc.housing_completions,
         "units_under_construction": None if tract_inherited else cmhc.units_under_construction,
         "unabsorbed_units": None if tract_inherited else cmhc.unabsorbed_units,
+        "rms_surveyed": cmhc.rms_surveyed,
     }
     return result
 
