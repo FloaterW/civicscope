@@ -24,6 +24,7 @@ def test_cmhc_metric_creation(db_session):
         housing_starts_apartment=2400,
         housing_completions=2900,
         units_under_construction=8500,
+        unabsorbed_units=350,
     )
     db_session.add(metric)
     db_session.flush()
@@ -50,6 +51,7 @@ def test_cmhc_metric_creation(db_session):
     assert loaded.housing_starts_apartment == 2400
     assert loaded.housing_completions == 2900
     assert loaded.units_under_construction == 8500
+    assert loaded.unabsorbed_units == 350
 
 
 def test_cmhc_metric_nullable_fields(db_session):
@@ -80,6 +82,7 @@ def test_cmhc_metric_nullable_fields(db_session):
     assert loaded.housing_starts_apartment is None
     assert loaded.housing_completions is None
     assert loaded.units_under_construction is None
+    assert loaded.unabsorbed_units is None
 
 
 def test_cmhc_metric_unique_constraint(db_session):

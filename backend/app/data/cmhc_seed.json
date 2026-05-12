@@ -20,7 +20,8 @@
       "Housing starts are annual totals (Jan-Dec YTD).",
       "Completions are annual sums of monthly completions.",
       "Under construction is December point-in-time inventory.",
-      "Municipalities without RMS zone coverage still get Scss data."
+      "Municipalities without RMS zone coverage still get Scss data.",
+      "Unabsorbed units is December point-in-time count of completed but unsold/unrented units (Table 1.2.4)."
     ]
   },
   "metrics": [
@@ -42,7 +43,8 @@
       "housing_starts_row": 249,
       "housing_starts_apartment": 715,
       "housing_completions": 642,
-      "units_under_construction": 1029
+      "units_under_construction": 1029,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518001",
@@ -62,7 +64,8 @@
       "housing_starts_row": 219,
       "housing_starts_apartment": 204,
       "housing_completions": 668,
-      "units_under_construction": 925
+      "units_under_construction": 925,
+      "unabsorbed_units": 24
     },
     {
       "geoid": "3518001",
@@ -82,7 +85,8 @@
       "housing_starts_row": 303,
       "housing_starts_apartment": 684,
       "housing_completions": 976,
-      "units_under_construction": 1028
+      "units_under_construction": 1028,
+      "unabsorbed_units": 15
     },
     {
       "geoid": "3518001",
@@ -102,7 +106,8 @@
       "housing_starts_row": 249,
       "housing_starts_apartment": 324,
       "housing_completions": 515,
-      "units_under_construction": 1417
+      "units_under_construction": 1417,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3518001",
@@ -122,7 +127,8 @@
       "housing_starts_row": 686,
       "housing_starts_apartment": 276,
       "housing_completions": 427,
-      "units_under_construction": 2456
+      "units_under_construction": 2456,
+      "unabsorbed_units": 12
     },
     {
       "geoid": "3518001",
@@ -142,7 +148,8 @@
       "housing_starts_row": 578,
       "housing_starts_apartment": 88,
       "housing_completions": 1799,
-      "units_under_construction": 1872
+      "units_under_construction": 1872,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3518001",
@@ -162,7 +169,8 @@
       "housing_starts_row": 353,
       "housing_starts_apartment": 820,
       "housing_completions": 2153,
-      "units_under_construction": 1538
+      "units_under_construction": 1538,
+      "unabsorbed_units": 12
     },
     {
       "geoid": "3518001",
@@ -182,7 +190,8 @@
       "housing_starts_row": 366,
       "housing_starts_apartment": 564,
       "housing_completions": 1487,
-      "units_under_construction": 1191
+      "units_under_construction": 1191,
+      "unabsorbed_units": 154
     },
     {
       "geoid": "3518005",
@@ -202,7 +211,8 @@
       "housing_starts_row": 233,
       "housing_starts_apartment": 308,
       "housing_completions": 574,
-      "units_under_construction": 619
+      "units_under_construction": 619,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518005",
@@ -222,7 +232,8 @@
       "housing_starts_row": 25,
       "housing_starts_apartment": 0,
       "housing_completions": 249,
-      "units_under_construction": 482
+      "units_under_construction": 482,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3518005",
@@ -242,7 +253,8 @@
       "housing_starts_row": 6,
       "housing_starts_apartment": 0,
       "housing_completions": 499,
-      "units_under_construction": 84
+      "units_under_construction": 84,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3518005",
@@ -262,7 +274,8 @@
       "housing_starts_row": 364,
       "housing_starts_apartment": 0,
       "housing_completions": 158,
-      "units_under_construction": 350
+      "units_under_construction": 350,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3518005",
@@ -282,7 +295,8 @@
       "housing_starts_row": 315,
       "housing_starts_apartment": 0,
       "housing_completions": 300,
-      "units_under_construction": 406
+      "units_under_construction": 406,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3518005",
@@ -302,7 +316,8 @@
       "housing_starts_row": 111,
       "housing_starts_apartment": 227,
       "housing_completions": 223,
-      "units_under_construction": 590
+      "units_under_construction": 590,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3518005",
@@ -322,7 +337,8 @@
       "housing_starts_row": 60,
       "housing_starts_apartment": 324,
       "housing_completions": 362,
-      "units_under_construction": 582
+      "units_under_construction": 582,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3518005",
@@ -342,7 +358,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 323,
       "housing_completions": 18,
-      "units_under_construction": 895
+      "units_under_construction": 895,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518009",
@@ -362,7 +379,8 @@
       "housing_starts_row": 88,
       "housing_starts_apartment": 0,
       "housing_completions": 314,
-      "units_under_construction": 698
+      "units_under_construction": 698,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518009",
@@ -382,7 +400,8 @@
       "housing_starts_row": 452,
       "housing_starts_apartment": 0,
       "housing_completions": 506,
-      "units_under_construction": 1344
+      "units_under_construction": 1344,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518009",
@@ -402,7 +421,8 @@
       "housing_starts_row": 418,
       "housing_starts_apartment": 69,
       "housing_completions": 1247,
-      "units_under_construction": 1067
+      "units_under_construction": 1067,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518009",
@@ -422,7 +442,8 @@
       "housing_starts_row": 591,
       "housing_starts_apartment": 342,
       "housing_completions": 1185,
-      "units_under_construction": 1866
+      "units_under_construction": 1866,
+      "unabsorbed_units": 9
     },
     {
       "geoid": "3518009",
@@ -442,7 +463,8 @@
       "housing_starts_row": 570,
       "housing_starts_apartment": 494,
       "housing_completions": 1248,
-      "units_under_construction": 1966
+      "units_under_construction": 1966,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518009",
@@ -462,7 +484,8 @@
       "housing_starts_row": 191,
       "housing_starts_apartment": 338,
       "housing_completions": 1026,
-      "units_under_construction": 1680
+      "units_under_construction": 1680,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3518009",
@@ -482,7 +505,8 @@
       "housing_starts_row": 128,
       "housing_starts_apartment": 251,
       "housing_completions": 811,
-      "units_under_construction": 1440
+      "units_under_construction": 1440,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518009",
@@ -502,7 +526,8 @@
       "housing_starts_row": 96,
       "housing_starts_apartment": 75,
       "housing_completions": 785,
-      "units_under_construction": 1005
+      "units_under_construction": 1005,
+      "unabsorbed_units": 66
     },
     {
       "geoid": "3518013",
@@ -522,7 +547,8 @@
       "housing_starts_row": 174,
       "housing_starts_apartment": 593,
       "housing_completions": 1221,
-      "units_under_construction": 1504
+      "units_under_construction": 1504,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3518013",
@@ -542,7 +568,8 @@
       "housing_starts_row": 62,
       "housing_starts_apartment": 74,
       "housing_completions": 919,
-      "units_under_construction": 819
+      "units_under_construction": 819,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3518013",
@@ -562,7 +589,8 @@
       "housing_starts_row": 185,
       "housing_starts_apartment": 526,
       "housing_completions": 603,
-      "units_under_construction": 1182
+      "units_under_construction": 1182,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3518013",
@@ -582,7 +610,8 @@
       "housing_starts_row": 569,
       "housing_starts_apartment": 536,
       "housing_completions": 544,
-      "units_under_construction": 2060
+      "units_under_construction": 2060,
+      "unabsorbed_units": 36
     },
     {
       "geoid": "3518013",
@@ -602,7 +631,8 @@
       "housing_starts_row": 574,
       "housing_starts_apartment": 708,
       "housing_completions": 1145,
-      "units_under_construction": 2741
+      "units_under_construction": 2741,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3518013",
@@ -622,7 +652,8 @@
       "housing_starts_row": 207,
       "housing_starts_apartment": 404,
       "housing_completions": 1370,
-      "units_under_construction": 2235
+      "units_under_construction": 2235,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3518013",
@@ -642,7 +673,8 @@
       "housing_starts_row": 281,
       "housing_starts_apartment": 71,
       "housing_completions": 1147,
-      "units_under_construction": 1638
+      "units_under_construction": 1638,
+      "unabsorbed_units": 63
     },
     {
       "geoid": "3518013",
@@ -662,7 +694,8 @@
       "housing_starts_row": 160,
       "housing_starts_apartment": 110,
       "housing_completions": 476,
-      "units_under_construction": 1539
+      "units_under_construction": 1539,
+      "unabsorbed_units": 26
     },
     {
       "geoid": "3518017",
@@ -682,7 +715,8 @@
       "housing_starts_row": 121,
       "housing_starts_apartment": 176,
       "housing_completions": 698,
-      "units_under_construction": 1309
+      "units_under_construction": 1309,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3518017",
@@ -702,7 +736,8 @@
       "housing_starts_row": 136,
       "housing_starts_apartment": 65,
       "housing_completions": 724,
-      "units_under_construction": 910
+      "units_under_construction": 910,
+      "unabsorbed_units": 13
     },
     {
       "geoid": "3518017",
@@ -722,7 +757,8 @@
       "housing_starts_row": 266,
       "housing_starts_apartment": 241,
       "housing_completions": 615,
-      "units_under_construction": 1143
+      "units_under_construction": 1143,
+      "unabsorbed_units": 7
     },
     {
       "geoid": "3518017",
@@ -742,7 +778,8 @@
       "housing_starts_row": 162,
       "housing_starts_apartment": 56,
       "housing_completions": 760,
-      "units_under_construction": 853
+      "units_under_construction": 853,
+      "unabsorbed_units": 12
     },
     {
       "geoid": "3518017",
@@ -762,7 +799,8 @@
       "housing_starts_row": 161,
       "housing_starts_apartment": 249,
       "housing_completions": 620,
-      "units_under_construction": 830
+      "units_under_construction": 830,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3518017",
@@ -782,7 +820,8 @@
       "housing_starts_row": 25,
       "housing_starts_apartment": 0,
       "housing_completions": 398,
-      "units_under_construction": 682
+      "units_under_construction": 682,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3518017",
@@ -802,7 +841,8 @@
       "housing_starts_row": 58,
       "housing_starts_apartment": 339,
       "housing_completions": 432,
-      "units_under_construction": 719
+      "units_under_construction": 719,
+      "unabsorbed_units": 22
     },
     {
       "geoid": "3518017",
@@ -822,7 +862,8 @@
       "housing_starts_row": 127,
       "housing_starts_apartment": 14,
       "housing_completions": 265,
-      "units_under_construction": 789
+      "units_under_construction": 789,
+      "unabsorbed_units": 38
     },
     {
       "geoid": "3518020",
@@ -842,7 +883,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -862,7 +904,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -882,7 +925,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -902,7 +946,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -922,7 +967,8 @@
       "housing_starts_row": 25,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -942,7 +988,8 @@
       "housing_starts_row": 35,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -962,7 +1009,8 @@
       "housing_starts_row": 14,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518020",
@@ -982,7 +1030,8 @@
       "housing_starts_row": 10,
       "housing_starts_apartment": 1,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518029",
@@ -1002,7 +1051,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 64,
-      "units_under_construction": 28
+      "units_under_construction": 28,
+      "unabsorbed_units": 4
     },
     {
       "geoid": "3518029",
@@ -1022,7 +1072,8 @@
       "housing_starts_row": 5,
       "housing_starts_apartment": 0,
       "housing_completions": 24,
-      "units_under_construction": 28
+      "units_under_construction": 28,
+      "unabsorbed_units": 9
     },
     {
       "geoid": "3518029",
@@ -1042,7 +1093,8 @@
       "housing_starts_row": 21,
       "housing_starts_apartment": 0,
       "housing_completions": 35,
-      "units_under_construction": 24
+      "units_under_construction": 24,
+      "unabsorbed_units": 7
     },
     {
       "geoid": "3518029",
@@ -1062,7 +1114,8 @@
       "housing_starts_row": 56,
       "housing_starts_apartment": 0,
       "housing_completions": 35,
-      "units_under_construction": 65
+      "units_under_construction": 65,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518029",
@@ -1082,7 +1135,8 @@
       "housing_starts_row": 12,
       "housing_starts_apartment": 0,
       "housing_completions": 71,
-      "units_under_construction": 55
+      "units_under_construction": 55,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518029",
@@ -1102,7 +1156,8 @@
       "housing_starts_row": 115,
       "housing_starts_apartment": 0,
       "housing_completions": 88,
-      "units_under_construction": 93
+      "units_under_construction": 93,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3518029",
@@ -1122,7 +1177,8 @@
       "housing_starts_row": 27,
       "housing_starts_apartment": 0,
       "housing_completions": 84,
-      "units_under_construction": 56
+      "units_under_construction": 56,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3518029",
@@ -1142,7 +1198,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 4,
       "housing_completions": 33,
-      "units_under_construction": 41
+      "units_under_construction": 41,
+      "unabsorbed_units": 16
     },
     {
       "geoid": "3518039",
@@ -1162,7 +1219,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1182,7 +1240,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 50,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1202,7 +1261,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1222,7 +1282,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1242,7 +1303,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 37,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1262,7 +1324,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1282,7 +1345,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3518039",
@@ -1302,7 +1366,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": null,
-      "units_under_construction": null
+      "units_under_construction": null,
+      "unabsorbed_units": null
     },
     {
       "geoid": "3519028",
@@ -1322,7 +1387,8 @@
       "housing_starts_row": 192,
       "housing_starts_apartment": 1615,
       "housing_completions": 2738,
-      "units_under_construction": 4612
+      "units_under_construction": 4612,
+      "unabsorbed_units": 17
     },
     {
       "geoid": "3519028",
@@ -1342,7 +1408,8 @@
       "housing_starts_row": 597,
       "housing_starts_apartment": 577,
       "housing_completions": 1072,
-      "units_under_construction": 4750
+      "units_under_construction": 4750,
+      "unabsorbed_units": 14
     },
     {
       "geoid": "3519028",
@@ -1362,7 +1429,8 @@
       "housing_starts_row": 223,
       "housing_starts_apartment": 1227,
       "housing_completions": 3114,
-      "units_under_construction": 3635
+      "units_under_construction": 3635,
+      "unabsorbed_units": 48
     },
     {
       "geoid": "3519028",
@@ -1382,7 +1450,8 @@
       "housing_starts_row": 257,
       "housing_starts_apartment": 4761,
       "housing_completions": 2542,
-      "units_under_construction": 6667
+      "units_under_construction": 6667,
+      "unabsorbed_units": 14
     },
     {
       "geoid": "3519028",
@@ -1402,7 +1471,8 @@
       "housing_starts_row": 341,
       "housing_starts_apartment": 3538,
       "housing_completions": 1161,
-      "units_under_construction": 9815
+      "units_under_construction": 9815,
+      "unabsorbed_units": 8
     },
     {
       "geoid": "3519028",
@@ -1422,7 +1492,8 @@
       "housing_starts_row": 493,
       "housing_starts_apartment": 1108,
       "housing_completions": 3828,
-      "units_under_construction": 7820
+      "units_under_construction": 7820,
+      "unabsorbed_units": 6
     },
     {
       "geoid": "3519028",
@@ -1442,7 +1513,8 @@
       "housing_starts_row": 467,
       "housing_starts_apartment": 1605,
       "housing_completions": 819,
-      "units_under_construction": 9197
+      "units_under_construction": 9197,
+      "unabsorbed_units": 6
     },
     {
       "geoid": "3519028",
@@ -1462,7 +1534,8 @@
       "housing_starts_row": 71,
       "housing_starts_apartment": 850,
       "housing_completions": 6368,
-      "units_under_construction": 3842
+      "units_under_construction": 3842,
+      "unabsorbed_units": 73
     },
     {
       "geoid": "3519036",
@@ -1482,7 +1555,8 @@
       "housing_starts_row": 833,
       "housing_starts_apartment": 1324,
       "housing_completions": 2465,
-      "units_under_construction": 3267
+      "units_under_construction": 3267,
+      "unabsorbed_units": 29
     },
     {
       "geoid": "3519036",
@@ -1502,7 +1576,8 @@
       "housing_starts_row": 189,
       "housing_starts_apartment": 52,
       "housing_completions": 1146,
-      "units_under_construction": 2361
+      "units_under_construction": 2361,
+      "unabsorbed_units": 189
     },
     {
       "geoid": "3519036",
@@ -1522,7 +1597,8 @@
       "housing_starts_row": 226,
       "housing_starts_apartment": 1165,
       "housing_completions": 1320,
-      "units_under_construction": 2616
+      "units_under_construction": 2616,
+      "unabsorbed_units": 56
     },
     {
       "geoid": "3519036",
@@ -1542,7 +1618,8 @@
       "housing_starts_row": 459,
       "housing_starts_apartment": 1053,
       "housing_completions": 1291,
-      "units_under_construction": 3447
+      "units_under_construction": 3447,
+      "unabsorbed_units": 36
     },
     {
       "geoid": "3519036",
@@ -1562,7 +1639,8 @@
       "housing_starts_row": 1209,
       "housing_starts_apartment": 1290,
       "housing_completions": 1028,
-      "units_under_construction": 5392
+      "units_under_construction": 5392,
+      "unabsorbed_units": 18
     },
     {
       "geoid": "3519036",
@@ -1582,7 +1660,8 @@
       "housing_starts_row": 313,
       "housing_starts_apartment": 661,
       "housing_completions": 3143,
-      "units_under_construction": 3369
+      "units_under_construction": 3369,
+      "unabsorbed_units": 19
     },
     {
       "geoid": "3519036",
@@ -1602,7 +1681,8 @@
       "housing_starts_row": 480,
       "housing_starts_apartment": 934,
       "housing_completions": 1955,
-      "units_under_construction": 3245
+      "units_under_construction": 3245,
+      "unabsorbed_units": 31
     },
     {
       "geoid": "3519036",
@@ -1622,7 +1702,8 @@
       "housing_starts_row": 771,
       "housing_starts_apartment": 1004,
       "housing_completions": 999,
-      "units_under_construction": 4248
+      "units_under_construction": 4248,
+      "unabsorbed_units": 49
     },
     {
       "geoid": "3519038",
@@ -1642,7 +1723,8 @@
       "housing_starts_row": 301,
       "housing_starts_apartment": 311,
       "housing_completions": 1764,
-      "units_under_construction": 1676
+      "units_under_construction": 1676,
+      "unabsorbed_units": 17
     },
     {
       "geoid": "3519038",
@@ -1662,7 +1744,8 @@
       "housing_starts_row": 466,
       "housing_starts_apartment": 202,
       "housing_completions": 1300,
-      "units_under_construction": 1119
+      "units_under_construction": 1119,
+      "unabsorbed_units": 30
     },
     {
       "geoid": "3519038",
@@ -1682,7 +1765,8 @@
       "housing_starts_row": 398,
       "housing_starts_apartment": 602,
       "housing_completions": 579,
-      "units_under_construction": 1868
+      "units_under_construction": 1868,
+      "unabsorbed_units": 46
     },
     {
       "geoid": "3519038",
@@ -1702,7 +1786,8 @@
       "housing_starts_row": 362,
       "housing_starts_apartment": 986,
       "housing_completions": 941,
-      "units_under_construction": 2635
+      "units_under_construction": 2635,
+      "unabsorbed_units": 60
     },
     {
       "geoid": "3519038",
@@ -1722,7 +1807,8 @@
       "housing_starts_row": 739,
       "housing_starts_apartment": 334,
       "housing_completions": 1117,
-      "units_under_construction": 2887
+      "units_under_construction": 2887,
+      "unabsorbed_units": 28
     },
     {
       "geoid": "3519038",
@@ -1742,7 +1828,8 @@
       "housing_starts_row": 290,
       "housing_starts_apartment": 13,
       "housing_completions": 1183,
-      "units_under_construction": 2399
+      "units_under_construction": 2399,
+      "unabsorbed_units": 20
     },
     {
       "geoid": "3519038",
@@ -1762,7 +1849,8 @@
       "housing_starts_row": 534,
       "housing_starts_apartment": 0,
       "housing_completions": 1422,
-      "units_under_construction": 1776
+      "units_under_construction": 1776,
+      "unabsorbed_units": 37
     },
     {
       "geoid": "3519038",
@@ -1782,7 +1870,8 @@
       "housing_starts_row": 770,
       "housing_starts_apartment": 455,
       "housing_completions": 1106,
-      "units_under_construction": 2173
+      "units_under_construction": 2173,
+      "unabsorbed_units": 91
     },
     {
       "geoid": "3519044",
@@ -1802,7 +1891,8 @@
       "housing_starts_row": 6,
       "housing_starts_apartment": 0,
       "housing_completions": 323,
-      "units_under_construction": 270
+      "units_under_construction": 270,
+      "unabsorbed_units": 7
     },
     {
       "geoid": "3519044",
@@ -1822,7 +1912,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 112,
       "housing_completions": 119,
-      "units_under_construction": 302
+      "units_under_construction": 302,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519044",
@@ -1842,7 +1933,8 @@
       "housing_starts_row": 163,
       "housing_starts_apartment": 506,
       "housing_completions": 388,
-      "units_under_construction": 825
+      "units_under_construction": 825,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519044",
@@ -1862,7 +1954,8 @@
       "housing_starts_row": 134,
       "housing_starts_apartment": 0,
       "housing_completions": 432,
-      "units_under_construction": 717
+      "units_under_construction": 717,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519044",
@@ -1882,7 +1975,8 @@
       "housing_starts_row": 127,
       "housing_starts_apartment": 0,
       "housing_completions": 753,
-      "units_under_construction": 399
+      "units_under_construction": 399,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519044",
@@ -1902,7 +1996,8 @@
       "housing_starts_row": 216,
       "housing_starts_apartment": 188,
       "housing_completions": 503,
-      "units_under_construction": 617
+      "units_under_construction": 617,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519044",
@@ -1922,7 +2017,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 511,
-      "units_under_construction": 141
+      "units_under_construction": 141,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519044",
@@ -1942,7 +2038,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 166,
       "housing_completions": 121,
-      "units_under_construction": 215
+      "units_under_construction": 215,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -1962,7 +2059,8 @@
       "housing_starts_row": 19,
       "housing_starts_apartment": 0,
       "housing_completions": 460,
-      "units_under_construction": 396
+      "units_under_construction": 396,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -1982,7 +2080,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 110,
       "housing_completions": 426,
-      "units_under_construction": 282
+      "units_under_construction": 282,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -2002,7 +2101,8 @@
       "housing_starts_row": 9,
       "housing_starts_apartment": 0,
       "housing_completions": 152,
-      "units_under_construction": 246
+      "units_under_construction": 246,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519046",
@@ -2022,7 +2122,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 278,
-      "units_under_construction": 164
+      "units_under_construction": 164,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -2042,7 +2143,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 125,
       "housing_completions": 186,
-      "units_under_construction": 220
+      "units_under_construction": 220,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -2062,7 +2164,8 @@
       "housing_starts_row": 129,
       "housing_starts_apartment": 0,
       "housing_completions": 93,
-      "units_under_construction": 359
+      "units_under_construction": 359,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -2082,7 +2185,8 @@
       "housing_starts_row": 32,
       "housing_starts_apartment": 57,
       "housing_completions": 267,
-      "units_under_construction": 247
+      "units_under_construction": 247,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519046",
@@ -2102,7 +2206,8 @@
       "housing_starts_row": 6,
       "housing_starts_apartment": 0,
       "housing_completions": 88,
-      "units_under_construction": 253
+      "units_under_construction": 253,
+      "unabsorbed_units": 7
     },
     {
       "geoid": "3519048",
@@ -2122,7 +2227,8 @@
       "housing_starts_row": 286,
       "housing_starts_apartment": 0,
       "housing_completions": 377,
-      "units_under_construction": 321
+      "units_under_construction": 321,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2142,7 +2248,8 @@
       "housing_starts_row": 98,
       "housing_starts_apartment": 0,
       "housing_completions": 352,
-      "units_under_construction": 103
+      "units_under_construction": 103,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2162,7 +2269,8 @@
       "housing_starts_row": 130,
       "housing_starts_apartment": 219,
       "housing_completions": 102,
-      "units_under_construction": 418
+      "units_under_construction": 418,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2182,7 +2290,8 @@
       "housing_starts_row": 175,
       "housing_starts_apartment": 0,
       "housing_completions": 242,
-      "units_under_construction": 449
+      "units_under_construction": 449,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2202,7 +2311,8 @@
       "housing_starts_row": 55,
       "housing_starts_apartment": 394,
       "housing_completions": 225,
-      "units_under_construction": 705
+      "units_under_construction": 705,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2222,7 +2332,8 @@
       "housing_starts_row": 43,
       "housing_starts_apartment": 208,
       "housing_completions": 284,
-      "units_under_construction": 688
+      "units_under_construction": 688,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2242,7 +2353,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 138,
       "housing_completions": 554,
-      "units_under_construction": 295
+      "units_under_construction": 295,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519048",
@@ -2262,7 +2374,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 615,
       "housing_completions": 232,
-      "units_under_construction": 676
+      "units_under_construction": 676,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519049",
@@ -2282,7 +2395,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 272,
-      "units_under_construction": 122
+      "units_under_construction": 122,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3519049",
@@ -2302,7 +2416,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 71,
-      "units_under_construction": 102
+      "units_under_construction": 102,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519049",
@@ -2322,7 +2437,8 @@
       "housing_starts_row": 32,
       "housing_starts_apartment": 0,
       "housing_completions": 42,
-      "units_under_construction": 164
+      "units_under_construction": 164,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519049",
@@ -2342,7 +2458,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 111,
-      "units_under_construction": 95
+      "units_under_construction": 95,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3519049",
@@ -2362,7 +2479,8 @@
       "housing_starts_row": 8,
       "housing_starts_apartment": 0,
       "housing_completions": 43,
-      "units_under_construction": 148
+      "units_under_construction": 148,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3519049",
@@ -2382,7 +2500,8 @@
       "housing_starts_row": 28,
       "housing_starts_apartment": 284,
       "housing_completions": 88,
-      "units_under_construction": 423
+      "units_under_construction": 423,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3519049",
@@ -2402,7 +2521,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 48,
-      "units_under_construction": 528
+      "units_under_construction": 528,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519049",
@@ -2422,7 +2542,8 @@
       "housing_starts_row": 45,
       "housing_starts_apartment": 129,
       "housing_completions": 51,
-      "units_under_construction": 727
+      "units_under_construction": 727,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3519054",
@@ -2442,7 +2563,8 @@
       "housing_starts_row": 23,
       "housing_starts_apartment": 0,
       "housing_completions": 1697,
-      "units_under_construction": 748
+      "units_under_construction": 748,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519054",
@@ -2462,7 +2584,8 @@
       "housing_starts_row": 122,
       "housing_starts_apartment": 0,
       "housing_completions": 724,
-      "units_under_construction": 404
+      "units_under_construction": 404,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519054",
@@ -2482,7 +2605,8 @@
       "housing_starts_row": 67,
       "housing_starts_apartment": 0,
       "housing_completions": 400,
-      "units_under_construction": 432
+      "units_under_construction": 432,
+      "unabsorbed_units": 8
     },
     {
       "geoid": "3519054",
@@ -2502,7 +2626,8 @@
       "housing_starts_row": 68,
       "housing_starts_apartment": 0,
       "housing_completions": 367,
-      "units_under_construction": 632
+      "units_under_construction": 632,
+      "unabsorbed_units": 8
     },
     {
       "geoid": "3519054",
@@ -2522,7 +2647,8 @@
       "housing_starts_row": 82,
       "housing_starts_apartment": 18,
       "housing_completions": 487,
-      "units_under_construction": 821
+      "units_under_construction": 821,
+      "unabsorbed_units": 8
     },
     {
       "geoid": "3519054",
@@ -2542,7 +2668,8 @@
       "housing_starts_row": 46,
       "housing_starts_apartment": 0,
       "housing_completions": 541,
-      "units_under_construction": 431
+      "units_under_construction": 431,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519054",
@@ -2562,7 +2689,8 @@
       "housing_starts_row": 32,
       "housing_starts_apartment": 0,
       "housing_completions": 370,
-      "units_under_construction": 142
+      "units_under_construction": 142,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519054",
@@ -2582,7 +2710,8 @@
       "housing_starts_row": 30,
       "housing_starts_apartment": 0,
       "housing_completions": 111,
-      "units_under_construction": 123
+      "units_under_construction": 123,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3519070",
@@ -2602,7 +2731,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 1,
       "housing_completions": 134,
-      "units_under_construction": 73
+      "units_under_construction": 73,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2622,7 +2752,8 @@
       "housing_starts_row": 24,
       "housing_starts_apartment": 0,
       "housing_completions": 84,
-      "units_under_construction": 190
+      "units_under_construction": 190,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2642,7 +2773,8 @@
       "housing_starts_row": 17,
       "housing_starts_apartment": 0,
       "housing_completions": 242,
-      "units_under_construction": 195
+      "units_under_construction": 195,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2662,7 +2794,8 @@
       "housing_starts_row": 37,
       "housing_starts_apartment": 0,
       "housing_completions": 195,
-      "units_under_construction": 393
+      "units_under_construction": 393,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2682,7 +2815,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 264,
-      "units_under_construction": 329
+      "units_under_construction": 329,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2702,7 +2836,8 @@
       "housing_starts_row": 13,
       "housing_starts_apartment": 33,
       "housing_completions": 282,
-      "units_under_construction": 455
+      "units_under_construction": 455,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2722,7 +2857,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 1,
       "housing_completions": 334,
-      "units_under_construction": 374
+      "units_under_construction": 374,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3519070",
@@ -2742,7 +2878,8 @@
       "housing_starts_row": 34,
       "housing_starts_apartment": 4,
       "housing_completions": 330,
-      "units_under_construction": 205
+      "units_under_construction": 205,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3520005",
@@ -2762,7 +2899,8 @@
       "housing_starts_row": 482,
       "housing_starts_apartment": 20955,
       "housing_completions": 16086,
-      "units_under_construction": 48354
+      "units_under_construction": 48354,
+      "unabsorbed_units": 289
     },
     {
       "geoid": "3520005",
@@ -2782,7 +2920,8 @@
       "housing_starts_row": 530,
       "housing_starts_apartment": 17248,
       "housing_completions": 14593,
-      "units_under_construction": 52317
+      "units_under_construction": 52317,
+      "unabsorbed_units": 499
     },
     {
       "geoid": "3520005",
@@ -2802,7 +2941,8 @@
       "housing_starts_row": 181,
       "housing_starts_apartment": 19906,
       "housing_completions": 17276,
-      "units_under_construction": 56005
+      "units_under_construction": 56005,
+      "unabsorbed_units": 577
     },
     {
       "geoid": "3520005",
@@ -2822,7 +2962,8 @@
       "housing_starts_row": 156,
       "housing_starts_apartment": 16912,
       "housing_completions": 20270,
-      "units_under_construction": 52634
+      "units_under_construction": 52634,
+      "unabsorbed_units": 363
     },
     {
       "geoid": "3520005",
@@ -2842,7 +2983,8 @@
       "housing_starts_row": 472,
       "housing_starts_apartment": 19428,
       "housing_completions": 16296,
-      "units_under_construction": 56384
+      "units_under_construction": 56384,
+      "unabsorbed_units": 310
     },
     {
       "geoid": "3520005",
@@ -2862,7 +3004,8 @@
       "housing_starts_row": 199,
       "housing_starts_apartment": 29325,
       "housing_completions": 20272,
-      "units_under_construction": 66141
+      "units_under_construction": 66141,
+      "unabsorbed_units": 275
     },
     {
       "geoid": "3520005",
@@ -2882,7 +3025,8 @@
       "housing_starts_row": 394,
       "housing_starts_apartment": 17497,
       "housing_completions": 24110,
-      "units_under_construction": 60467
+      "units_under_construction": 60467,
+      "unabsorbed_units": 195
     },
     {
       "geoid": "3520005",
@@ -2902,7 +3046,8 @@
       "housing_starts_row": 261,
       "housing_starts_apartment": 9712,
       "housing_completions": 14753,
-      "units_under_construction": 56964
+      "units_under_construction": 56964,
+      "unabsorbed_units": 489
     },
     {
       "geoid": "3521005",
@@ -2922,7 +3067,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 2584,
       "housing_completions": 494,
-      "units_under_construction": 4403
+      "units_under_construction": 4403,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3521005",
@@ -2942,7 +3088,8 @@
       "housing_starts_row": 199,
       "housing_starts_apartment": 2922,
       "housing_completions": 1525,
-      "units_under_construction": 6181
+      "units_under_construction": 6181,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3521005",
@@ -2962,7 +3109,8 @@
       "housing_starts_row": 137,
       "housing_starts_apartment": 1478,
       "housing_completions": 241,
-      "units_under_construction": 7716
+      "units_under_construction": 7716,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3521005",
@@ -2982,7 +3130,8 @@
       "housing_starts_row": 220,
       "housing_starts_apartment": 3761,
       "housing_completions": 3368,
-      "units_under_construction": 8449
+      "units_under_construction": 8449,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3521005",
@@ -3002,7 +3151,8 @@
       "housing_starts_row": 76,
       "housing_starts_apartment": 4235,
       "housing_completions": 1161,
-      "units_under_construction": 11743
+      "units_under_construction": 11743,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3521005",
@@ -3022,7 +3172,8 @@
       "housing_starts_row": 364,
       "housing_starts_apartment": 1891,
       "housing_completions": 3083,
-      "units_under_construction": 11061
+      "units_under_construction": 11061,
+      "unabsorbed_units": 5
     },
     {
       "geoid": "3521005",
@@ -3042,7 +3193,8 @@
       "housing_starts_row": 148,
       "housing_starts_apartment": 2687,
       "housing_completions": 2469,
-      "units_under_construction": 11627
+      "units_under_construction": 11627,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3521005",
@@ -3062,7 +3214,8 @@
       "housing_starts_row": 64,
       "housing_starts_apartment": 1938,
       "housing_completions": 3893,
-      "units_under_construction": 9899
+      "units_under_construction": 9899,
+      "unabsorbed_units": 205
     },
     {
       "geoid": "3521010",
@@ -3082,7 +3235,8 @@
       "housing_starts_row": 355,
       "housing_starts_apartment": 177,
       "housing_completions": 3622,
-      "units_under_construction": 906
+      "units_under_construction": 906,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3521010",
@@ -3102,7 +3256,8 @@
       "housing_starts_row": 566,
       "housing_starts_apartment": 0,
       "housing_completions": 1478,
-      "units_under_construction": 877
+      "units_under_construction": 877,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3521010",
@@ -3122,7 +3277,8 @@
       "housing_starts_row": 670,
       "housing_starts_apartment": 683,
       "housing_completions": 1599,
-      "units_under_construction": 1703
+      "units_under_construction": 1703,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3521010",
@@ -3142,7 +3298,8 @@
       "housing_starts_row": 654,
       "housing_starts_apartment": 607,
       "housing_completions": 1598,
-      "units_under_construction": 2383
+      "units_under_construction": 2383,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3521010",
@@ -3162,7 +3319,8 @@
       "housing_starts_row": 545,
       "housing_starts_apartment": 1050,
       "housing_completions": 2251,
-      "units_under_construction": 2546
+      "units_under_construction": 2546,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3521010",
@@ -3182,7 +3340,8 @@
       "housing_starts_row": 600,
       "housing_starts_apartment": 1811,
       "housing_completions": 3518,
-      "units_under_construction": 1929
+      "units_under_construction": 1929,
+      "unabsorbed_units": 73
     },
     {
       "geoid": "3521010",
@@ -3202,7 +3361,8 @@
       "housing_starts_row": 408,
       "housing_starts_apartment": 1096,
       "housing_completions": 1287,
-      "units_under_construction": 2184
+      "units_under_construction": 2184,
+      "unabsorbed_units": 55
     },
     {
       "geoid": "3521010",
@@ -3222,7 +3382,8 @@
       "housing_starts_row": 381,
       "housing_starts_apartment": 663,
       "housing_completions": 753,
-      "units_under_construction": 2801
+      "units_under_construction": 2801,
+      "unabsorbed_units": 56
     },
     {
       "geoid": "3521024",
@@ -3242,7 +3403,8 @@
       "housing_starts_row": 153,
       "housing_starts_apartment": 144,
       "housing_completions": 468,
-      "units_under_construction": 752
+      "units_under_construction": 752,
+      "unabsorbed_units": 11
     },
     {
       "geoid": "3521024",
@@ -3262,7 +3424,8 @@
       "housing_starts_row": 91,
       "housing_starts_apartment": 0,
       "housing_completions": 551,
-      "units_under_construction": 458
+      "units_under_construction": 458,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3521024",
@@ -3282,7 +3445,8 @@
       "housing_starts_row": 123,
       "housing_starts_apartment": 72,
       "housing_completions": 514,
-      "units_under_construction": 360
+      "units_under_construction": 360,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3521024",
@@ -3302,7 +3466,8 @@
       "housing_starts_row": 89,
       "housing_starts_apartment": 0,
       "housing_completions": 409,
-      "units_under_construction": 648
+      "units_under_construction": 648,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3521024",
@@ -3322,7 +3487,8 @@
       "housing_starts_row": 273,
       "housing_starts_apartment": 0,
       "housing_completions": 640,
-      "units_under_construction": 834
+      "units_under_construction": 834,
+      "unabsorbed_units": 5
     },
     {
       "geoid": "3521024",
@@ -3342,7 +3508,8 @@
       "housing_starts_row": 190,
       "housing_starts_apartment": 0,
       "housing_completions": 854,
-      "units_under_construction": 448
+      "units_under_construction": 448,
+      "unabsorbed_units": 57
     },
     {
       "geoid": "3521024",
@@ -3362,7 +3529,8 @@
       "housing_starts_row": 257,
       "housing_starts_apartment": 0,
       "housing_completions": 415,
-      "units_under_construction": 514
+      "units_under_construction": 514,
+      "unabsorbed_units": 52
     },
     {
       "geoid": "3521024",
@@ -3382,7 +3550,8 @@
       "housing_starts_row": 47,
       "housing_starts_apartment": 4,
       "housing_completions": 349,
-      "units_under_construction": 413
+      "units_under_construction": 413,
+      "unabsorbed_units": 52
     },
     {
       "geoid": "3524001",
@@ -3402,7 +3571,8 @@
       "housing_starts_row": 515,
       "housing_starts_apartment": 711,
       "housing_completions": 2468,
-      "units_under_construction": 1460
+      "units_under_construction": 1460,
+      "unabsorbed_units": 60
     },
     {
       "geoid": "3524001",
@@ -3422,7 +3592,8 @@
       "housing_starts_row": 252,
       "housing_starts_apartment": 283,
       "housing_completions": 692,
-      "units_under_construction": 1592
+      "units_under_construction": 1592,
+      "unabsorbed_units": 203
     },
     {
       "geoid": "3524001",
@@ -3442,7 +3613,8 @@
       "housing_starts_row": 558,
       "housing_starts_apartment": 1214,
       "housing_completions": 1898,
-      "units_under_construction": 2301
+      "units_under_construction": 2301,
+      "unabsorbed_units": 189
     },
     {
       "geoid": "3524001",
@@ -3462,7 +3634,8 @@
       "housing_starts_row": 183,
       "housing_starts_apartment": 1701,
       "housing_completions": 1824,
-      "units_under_construction": 3193
+      "units_under_construction": 3193,
+      "unabsorbed_units": 170
     },
     {
       "geoid": "3524001",
@@ -3482,7 +3655,8 @@
       "housing_starts_row": 85,
       "housing_starts_apartment": 1558,
       "housing_completions": 1038,
-      "units_under_construction": 4061
+      "units_under_construction": 4061,
+      "unabsorbed_units": 104
     },
     {
       "geoid": "3524001",
@@ -3502,7 +3676,8 @@
       "housing_starts_row": 446,
       "housing_starts_apartment": 878,
       "housing_completions": 1974,
-      "units_under_construction": 3829
+      "units_under_construction": 3829,
+      "unabsorbed_units": 112
     },
     {
       "geoid": "3524001",
@@ -3522,7 +3697,8 @@
       "housing_starts_row": 1030,
       "housing_starts_apartment": 2003,
       "housing_completions": 3472,
-      "units_under_construction": 3981
+      "units_under_construction": 3981,
+      "unabsorbed_units": 79
     },
     {
       "geoid": "3524001",
@@ -3542,7 +3718,8 @@
       "housing_starts_row": 306,
       "housing_starts_apartment": 968,
       "housing_completions": 3543,
-      "units_under_construction": 1994
+      "units_under_construction": 1994,
+      "unabsorbed_units": 138
     },
     {
       "geoid": "3524002",
@@ -3562,7 +3739,8 @@
       "housing_starts_row": 23,
       "housing_starts_apartment": 475,
       "housing_completions": 423,
-      "units_under_construction": 1481
+      "units_under_construction": 1481,
+      "unabsorbed_units": 2
     },
     {
       "geoid": "3524002",
@@ -3582,7 +3760,8 @@
       "housing_starts_row": 132,
       "housing_starts_apartment": 360,
       "housing_completions": 920,
-      "units_under_construction": 1117
+      "units_under_construction": 1117,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3524002",
@@ -3602,7 +3781,8 @@
       "housing_starts_row": 56,
       "housing_starts_apartment": 503,
       "housing_completions": 510,
-      "units_under_construction": 1288
+      "units_under_construction": 1288,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3524002",
@@ -3622,7 +3802,8 @@
       "housing_starts_row": 70,
       "housing_starts_apartment": 404,
       "housing_completions": 747,
-      "units_under_construction": 1088
+      "units_under_construction": 1088,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524002",
@@ -3642,7 +3823,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 96,
-      "units_under_construction": 1119
+      "units_under_construction": 1119,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3524002",
@@ -3662,7 +3844,8 @@
       "housing_starts_row": 213,
       "housing_starts_apartment": 0,
       "housing_completions": 801,
-      "units_under_construction": 613
+      "units_under_construction": 613,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3524002",
@@ -3682,7 +3865,8 @@
       "housing_starts_row": 44,
       "housing_starts_apartment": 1018,
       "housing_completions": 577,
-      "units_under_construction": 1165
+      "units_under_construction": 1165,
+      "unabsorbed_units": 7
     },
     {
       "geoid": "3524002",
@@ -3702,7 +3886,8 @@
       "housing_starts_row": 37,
       "housing_starts_apartment": 438,
       "housing_completions": 236,
-      "units_under_construction": 1467
+      "units_under_construction": 1467,
+      "unabsorbed_units": 12
     },
     {
       "geoid": "3524009",
@@ -3722,7 +3907,8 @@
       "housing_starts_row": 372,
       "housing_starts_apartment": 615,
       "housing_completions": 1441,
-      "units_under_construction": 2006
+      "units_under_construction": 2006,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524009",
@@ -3742,7 +3928,8 @@
       "housing_starts_row": 433,
       "housing_starts_apartment": 24,
       "housing_completions": 1432,
-      "units_under_construction": 1317
+      "units_under_construction": 1317,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524009",
@@ -3762,7 +3949,8 @@
       "housing_starts_row": 313,
       "housing_starts_apartment": 0,
       "housing_completions": 899,
-      "units_under_construction": 999
+      "units_under_construction": 999,
+      "unabsorbed_units": 1
     },
     {
       "geoid": "3524009",
@@ -3782,7 +3970,8 @@
       "housing_starts_row": 339,
       "housing_starts_apartment": 132,
       "housing_completions": 1229,
-      "units_under_construction": 843
+      "units_under_construction": 843,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524009",
@@ -3802,7 +3991,8 @@
       "housing_starts_row": 352,
       "housing_starts_apartment": 358,
       "housing_completions": 697,
-      "units_under_construction": 1221
+      "units_under_construction": 1221,
+      "unabsorbed_units": 10
     },
     {
       "geoid": "3524009",
@@ -3822,7 +4012,8 @@
       "housing_starts_row": 609,
       "housing_starts_apartment": 645,
       "housing_completions": 721,
-      "units_under_construction": 1898
+      "units_under_construction": 1898,
+      "unabsorbed_units": 8
     },
     {
       "geoid": "3524009",
@@ -3842,7 +4033,8 @@
       "housing_starts_row": 193,
       "housing_starts_apartment": 757,
       "housing_completions": 1301,
-      "units_under_construction": 2085
+      "units_under_construction": 2085,
+      "unabsorbed_units": 15
     },
     {
       "geoid": "3524009",
@@ -3862,7 +4054,8 @@
       "housing_starts_row": 334,
       "housing_starts_apartment": 1470,
       "housing_completions": 1387,
-      "units_under_construction": 3017
+      "units_under_construction": 3017,
+      "unabsorbed_units": 69
     },
     {
       "geoid": "3524015",
@@ -3882,7 +4075,8 @@
       "housing_starts_row": 8,
       "housing_starts_apartment": 0,
       "housing_completions": 160,
-      "units_under_construction": 199
+      "units_under_construction": 199,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524015",
@@ -3902,7 +4096,8 @@
       "housing_starts_row": 0,
       "housing_starts_apartment": 0,
       "housing_completions": 164,
-      "units_under_construction": 53
+      "units_under_construction": 53,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524015",
@@ -3922,7 +4117,8 @@
       "housing_starts_row": 15,
       "housing_starts_apartment": 185,
       "housing_completions": 31,
-      "units_under_construction": 353
+      "units_under_construction": 353,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524015",
@@ -3942,7 +4138,8 @@
       "housing_starts_row": 16,
       "housing_starts_apartment": 0,
       "housing_completions": 163,
-      "units_under_construction": 425
+      "units_under_construction": 425,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524015",
@@ -3962,7 +4159,8 @@
       "housing_starts_row": 117,
       "housing_starts_apartment": 0,
       "housing_completions": 284,
-      "units_under_construction": 291
+      "units_under_construction": 291,
+      "unabsorbed_units": 0
     },
     {
       "geoid": "3524015",
@@ -3982,7 +4180,8 @@
       "housing_starts_row": 38,
       "housing_starts_apartment": 0,
       "housing_completions": 247,
-      "units_under_construction": 105
+      "units_under_construction": 105,
+      "unabsorbed_units": 3
     },
     {
       "geoid": "3524015",
@@ -4002,7 +4201,8 @@
       "housing_starts_row": 3,
       "housing_starts_apartment": 169,
       "housing_completions": 73,
-      "units_under_construction": 220
+      "units_under_construction": 220,
+      "unabsorbed_units": 7
     },
     {
       "geoid": "3524015",
@@ -4022,7 +4222,8 @@
       "housing_starts_row": 151,
       "housing_starts_apartment": 116,
       "housing_completions": 28,
-      "units_under_construction": 499
+      "units_under_construction": 499,
+      "unabsorbed_units": 13
     }
   ]
 }

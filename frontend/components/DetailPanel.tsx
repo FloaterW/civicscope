@@ -40,7 +40,11 @@ const cmhcCopy: Record<GeographyLevel, string> = {
 export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
   const metrics = geography?.metrics;
   const hasAnyRentalData = cmhcMetrics ? rentalMarketMetrics.some((m) => cmhcMetrics[m.key] != null) : false;
-  const hasAnySupplyData = cmhcMetrics?.housing_starts_total != null;
+  const hasAnySupplyData =
+    cmhcMetrics?.housing_starts_total != null ||
+    cmhcMetrics?.housing_completions != null ||
+    cmhcMetrics?.units_under_construction != null ||
+    cmhcMetrics?.unabsorbed_units != null;
 
   return (
     <section
@@ -111,10 +115,11 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                     period={cmhcYear ? `${cmhcYear} YTD` : undefined}
                     note={geographyLevel === "census_tract" ? "municipal totals" : undefined}
                   />
-                  <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
                     <MetricLine label="Starts" value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)} />
                     <MetricLine label="Completions" value={formatMetric("housing_completions", cmhcMetrics.housing_completions)} />
                     <MetricLine label="Under const." value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} />
+                    <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} />
                   </div>
                 </div>
               )}

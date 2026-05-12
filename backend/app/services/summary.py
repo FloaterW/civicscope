@@ -43,6 +43,7 @@ def build_summary(
             "average_rent_total": None,
             "housing_starts_total": None,
             "housing_completions": None,
+            "unabsorbed_units": None,
             "selected_geographies": [],
             "notes": ["No matching geographies were found."],
         }
@@ -72,6 +73,7 @@ def build_summary(
         "average_rent_total": None,
         "housing_starts_total": None,
         "housing_completions": None,
+        "unabsorbed_units": None,
     }
     if cmhc_records:
         vacancy_values = [r.vacancy_rate for r in cmhc_records if r.vacancy_rate is not None]
@@ -86,6 +88,8 @@ def build_summary(
         cmhc_values["housing_starts_total"] = sum(starts_vals) if starts_vals else None
         completions_vals = [r.housing_completions for r in cmhc_records if r.housing_completions is not None]
         cmhc_values["housing_completions"] = sum(completions_vals) if completions_vals else None
+        ua_vals = [r.unabsorbed_units for r in cmhc_records if r.unabsorbed_units is not None]
+        cmhc_values["unabsorbed_units"] = sum(ua_vals) if ua_vals else None
 
     return {
         "year": year,

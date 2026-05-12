@@ -30,6 +30,7 @@ export const CMHC_METRIC_KEYS: Set<MetricKey> = new Set([
   "average_rent_2br", "average_rent_3br_plus", "turnover_rate", "availability_rate",
   "rental_universe", "housing_starts_total", "housing_starts_single", "housing_starts_semi",
   "housing_starts_row", "housing_starts_apartment", "housing_completions", "units_under_construction",
+  "unabsorbed_units",
 ]);
 
 export function isCmhcMetric(metric: MetricKey): boolean {
@@ -124,7 +125,8 @@ export function formatMetric(metric: MetricKey, value: number | null | undefined
     metric === "rental_universe" ||
     metric.startsWith("housing_starts") ||
     metric === "housing_completions" ||
-    metric === "units_under_construction"
+    metric === "units_under_construction" ||
+    metric === "unabsorbed_units"
   ) {
     return new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(value);
   }
