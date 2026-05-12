@@ -110,7 +110,7 @@ export function searchGeographies(search: string, geographyLevel: GeographyLevel
 
 export function formatMetric(metric: MetricKey, value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "No data";
+    return "Not available";
   }
   if (metric === "median_income" || metric === "median_rent" || metric.startsWith("average_rent")) {
     return new Intl.NumberFormat("en-CA", {
