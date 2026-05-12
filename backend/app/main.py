@@ -23,6 +23,9 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
                 try:
                     seed_demo_data(db, force=settings.force_reseed)
                     seed_cmhc_data(db, force=settings.force_reseed)
+                except Exception:
+                    db.rollback()
+                    raise
                 finally:
                     db.close()
         yield
@@ -37,9 +40,9 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=False,
+        allow_methods=["GET", "HEAD", "OPTIONS"],
+        allow_headers=["Accept", "Accept-Language", "Content-Type"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 

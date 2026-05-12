@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Database, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   CMHC_METRIC_KEYS,
@@ -64,8 +64,6 @@ export function CivicDashboard() {
   const [mapLoading, setMapLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [comparisonLoading, setComparisonLoading] = useState(true);
-  const mapRequestsRef = useRef<Partial<Record<GeographyLevel, Promise<MapData>>>>({});
-
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
   const mapData = mapDataByLevel[geographyLevel] ?? null;
@@ -93,7 +91,6 @@ export function CivicDashboard() {
     // Clear all cached map data and cancel in-flight prefetches so stale
     // responses from the previous metric don't re-pollute the cache.
     setMapDataByLevel({});
-    mapRequestsRef.current = {};
   }, [metric, selectedYear]);
 
   // Keep selected geography's CMHC data in sync with current map data.
@@ -111,24 +108,17 @@ export function CivicDashboard() {
   }, [selected, mapData]);
 
   useEffect(() => {
-    let cancelled = false;
     if (hasCachedMapData) {
       setMapLoading(false);
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
     setMapLoading(true);
     setError(null);
+    const controller = new AbortController();
 
-    if (!mapRequestsRef.current[geographyLevel]) {
-      mapRequestsRef.current[geographyLevel] = getMapData(metric, geographyLevel, undefined, isCmhc ? selectedYear : undefined).finally(() => {
-        delete mapRequestsRef.current[geographyLevel];
-      });
-    }
-
-    mapRequestsRef.current[geographyLevel]
+    getMapData(metric, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
       .then((mapPayload) => {
+        if (controller.signal.aborted) return;
         if (mapPayload.metadata.available_years) {
           setAvailableYears(mapPayload.metadata.available_years);
         }
@@ -142,20 +132,16 @@ export function CivicDashboard() {
         );
       })
       .catch((requestError: Error) => {
-        if (cancelled) {
-          return;
-        }
+        if (controller.signal.aborted) return;
         setError(requestError.message);
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setMapLoading(false);
         }
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [geographyLevel, hasCachedMapData, metric, selectedYear, isCmhc]);
 
   useEffect(() => {
@@ -164,14 +150,14 @@ export function CivicDashboard() {
     }
     const inactiveLevel: GeographyLevel =
       geographyLevel === "municipality" ? "census_tract" : "municipality";
-    if (mapDataByLevel[inactiveLevel] || mapRequestsRef.current[inactiveLevel]) {
+    if (mapDataByLevel[inactiveLevel]) {
       return;
     }
 
-    const prefetchRequest = getMapData(metric, inactiveLevel, undefined, isCmhc ? selectedYear : undefined);
-    mapRequestsRef.current[inactiveLevel] = prefetchRequest;
-    prefetchRequest
+    const controller = new AbortController();
+    getMapData(metric, inactiveLevel, controller.signal, isCmhc ? selectedYear : undefined)
       .then((mapPayload) => {
+        if (controller.signal.aborted) return;
         setMapDataByLevel((current) =>
           current[inactiveLevel]
             ? current
@@ -180,14 +166,10 @@ export function CivicDashboard() {
                 [inactiveLevel]: mapPayload
               }
         );
-        return mapPayload;
       })
-      .catch(() => {
-        // Prefetch is opportunistic; the active view will surface errors if a user switches levels.
-      })
-      .finally(() => {
-        delete mapRequestsRef.current[inactiveLevel];
-      });
+      .catch(() => {});
+
+    return () => controller.abort();
   }, [geographyLevel, mapData, mapDataByLevel, metric, selectedYear, isCmhc]);
 
   useEffect(() => {
@@ -237,6 +219,10 @@ export function CivicDashboard() {
   const visibleMapData = useMemo(() => applyMetricToMapData(mapData, metric), [mapData, metric]);
 
   useEffect(() => {
+    if (!search.trim()) {
+      setSearchResults([]);
+      return;
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       searchGeographies(search, geographyLevel, controller.signal)
@@ -291,14 +277,21 @@ export function CivicDashboard() {
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={geographyLabel.search}
                 data-testid="geography-search"
+                role="combobox"
+                aria-label="Search geographies"
+                aria-expanded={searchResults.length > 0 && Boolean(search.trim()) && search !== selected?.name}
+                aria-controls="geography-search-results"
+                aria-autocomplete="list"
                 className="h-10 w-full rounded-md border border-civic-line bg-white pl-9 pr-3 text-sm outline-none ring-civic-teal focus:ring-2"
               />
               {searchResults.length > 0 && search.trim() && search !== selected?.name && (
-                <div className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-white shadow-panel">
+                <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-white shadow-panel">
                   {searchResults.slice(0, 8).map((geography) => (
                     <button
                       key={geography.geoid}
                       type="button"
+                      role="option"
+                      aria-selected={selected?.geoid === geography.geoid}
                       onClick={() => {
                         setSelected(geography);
                         setSearch(geography.name);
@@ -430,8 +423,8 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
       ...data.metadata,
       metric,
       domain: {
-        min: values.length ? Math.min(...values) : null,
-        max: values.length ? Math.max(...values) : null
+        min: values.length ? values.reduce((a, b) => Math.min(a, b), Infinity) : null,
+        max: values.length ? values.reduce((a, b) => Math.max(a, b), -Infinity) : null
       }
     },
     features: data.features.map((feature) => {

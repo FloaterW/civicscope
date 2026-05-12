@@ -10,7 +10,7 @@ import {
   YAxis
 } from "recharts";
 
-import { formatMetric, getMetricLabel } from "@/lib/api";
+import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
 import type { CompareResponse, GeographyLevel, MetricKey } from "@/types";
 
 type Props = {
@@ -28,16 +28,20 @@ const comparisonNouns: Record<GeographyLevel, string> = {
 };
 
 export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear }: Props) {
+  const isCmhc = isCmhcMetric(metric);
   const chartData =
-    comparison?.items.map((item) => {
-      const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, number | null>;
-      return {
-        geoid: item.geoid,
-        name: chartLabel(item.name, item.type, item.geoid),
-        value: allMetrics[metric] ?? 0,
-        rawValue: allMetrics[metric]
-      };
-    }) ?? [];
+    comparison?.items
+      .map((item) => {
+        const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, number | null>;
+        const rawValue = allMetrics[metric];
+        return {
+          geoid: item.geoid,
+          name: chartLabel(item.name, item.type, item.geoid),
+          value: rawValue ?? null,
+          rawValue,
+        };
+      })
+      .filter((item) => item.value !== null) ?? [];
   const hasChartData = chartData.length > 0;
 
   return (
@@ -89,21 +93,23 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               <tr>
                 <th className="px-3 py-2 font-semibold">Area</th>
                 <th className="px-3 py-2 font-semibold">{getMetricLabel(metric)}</th>
-                <th className="px-3 py-2 font-semibold">Ratio</th>
+                {!isCmhc && <th className="px-3 py-2 font-semibold">Ratio</th>}
               </tr>
             </thead>
             <tbody>
-              {chartData.map((item, index) => {
-                const source = comparison?.items[index];
+              {chartData.map((item) => {
+                const source = comparison?.items.find((i) => i.geoid === item.geoid);
                 return (
                   <tr key={item.geoid} className="border-t border-civic-line">
                     <td className="px-3 py-2 font-medium text-civic-ink">{source?.name}</td>
                     <td className="px-3 py-2 text-civic-ink">
-                      {formatMetric(metric, ({ ...source?.metrics, ...source?.cmhc_metrics } as Record<string, number | null>)[metric])}
+                      {formatMetric(metric, item.rawValue)}
                     </td>
-                    <td className="px-3 py-2 text-civic-muted">
-                      {formatMetric("rent_to_income_ratio", source?.metrics.rent_to_income_ratio)}
-                    </td>
+                    {!isCmhc && (
+                      <td className="px-3 py-2 text-civic-muted">
+                        {formatMetric("rent_to_income_ratio", source?.metrics.rent_to_income_ratio)}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

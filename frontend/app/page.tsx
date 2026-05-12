@@ -1,5 +1,10 @@
 import { CivicDashboard } from "@/components/CivicDashboard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Home() {
-  return <CivicDashboard />;
+  return (
+    <ErrorBoundary>
+      <CivicDashboard />
+    </ErrorBoundary>
+  );
 }

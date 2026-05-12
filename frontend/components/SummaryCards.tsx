@@ -1,6 +1,7 @@
 "use client";
 
 import { Building2, Gauge, Home, KeyRound, Percent, TrendingUp, Users, WalletCards } from "lucide-react";
+import { useMemo } from "react";
 
 import { formatMetric } from "@/lib/api";
 import type { GeographyLevel, Summary } from "@/types";
@@ -18,7 +19,7 @@ const summaryNouns: Record<GeographyLevel, string> = {
 
 export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const regionCount = new Intl.NumberFormat("en-CA").format(summary?.region_count ?? 0);
-  const cards = [
+  const cards = useMemo(() => [
     {
       label: "Median income",
       value: formatMetric("median_income", summary?.median_income),
@@ -61,7 +62,7 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
     ...(summary?.housing_completions !== undefined && summary?.housing_completions !== null
       ? [{ label: "Completions", value: formatMetric("housing_completions", summary.housing_completions), icon: Building2 }]
       : [])
-  ];
+  ], [summary]);
 
   return (
     <section

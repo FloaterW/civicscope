@@ -63,7 +63,7 @@ def calculate_rent_to_income_ratio(
     median_rent: float | None,
     median_income: float | None,
 ) -> float | None:
-    if not median_rent or not median_income or median_income <= 0:
+    if median_rent is None or median_income is None or median_income <= 0:
         return None
     # Annualized rent divided by annual household income. 0.30 is the common burden threshold.
     return round((median_rent * 12) / median_income, 4)
@@ -95,7 +95,7 @@ def calculate_population_growth_pct(
     population: int | None,
     previous_population: int | None,
 ) -> float | None:
-    if not population or not previous_population or previous_population <= 0:
+    if population is None or previous_population is None or previous_population <= 0:
         return None
     return round(((population - previous_population) / previous_population) * 100, 1)
 

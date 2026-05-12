@@ -7,8 +7,18 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
+SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
+
+_GEOMETRY_EXPRS = {
+    "display": "ST_AsGeoJSON(ST_SimplifyPreserveTopology(g.geom, :tolerance), 5)",
+    "full": "ST_AsGeoJSON(g.geom, 8)",
+}
+
+
 def supports_postgis(db: Session) -> bool:
-    return db.bind is not None and db.bind.dialect.name == "postgresql"
+    from app.db.session import engine
+
+    return engine.dialect.name == "postgresql"
 
 
 def has_geom_column(db: Session) -> bool:
@@ -57,10 +67,12 @@ def load_postgis_map_geometries(
     if not has_geom_column(db):
         return {}
 
-    if detail == "display":
-        geometry_sql = "ST_AsGeoJSON(ST_SimplifyPreserveTopology(g.geom, :tolerance), 5)"
-    else:
-        geometry_sql = "ST_AsGeoJSON(g.geom, 8)"
+    if geography_type is not None and geography_type not in SUPPORTED_GEOGRAPHY_TYPES:
+        raise ValueError(f"Invalid geography_type: {geography_type!r}")
+
+    geometry_sql = _GEOMETRY_EXPRS.get(detail)
+    if geometry_sql is None:
+        raise ValueError(f"Invalid detail level: {detail!r}")
 
     geography_filter = "AND g.type = :geography_type" if geography_type else ""
 

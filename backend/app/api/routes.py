@@ -49,10 +49,16 @@ def resolve_year(db: Session, year: int | None) -> int:
     return int(latest_year)
 
 
+MAX_IDS = 500
+
+
 def parse_ids(ids: str | None) -> list[str]:
     if not ids:
         return []
-    return [item.strip() for item in ids.split(",") if item.strip()]
+    items = [item.strip() for item in ids.split(",") if item.strip()]
+    if len(items) > MAX_IDS:
+        raise HTTPException(status_code=400, detail=f"Too many IDs (max {MAX_IDS}).")
+    return items
 
 
 def normalize_geography_type(geography_type: str | None) -> str | None:
@@ -187,7 +193,7 @@ def list_geographies(
     search: str | None = Query(default=None, min_length=1),
     geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
     limit: int = Query(default=50, ge=1, le=200),
-    year: int | None = None,
+    year: int | None = Query(default=None, ge=1900, le=2100),
     db: Session = Depends(get_db),
 ):
     metric_year = resolve_year(db, year)
@@ -219,10 +225,13 @@ def list_geographies(
         )
     )
     geographies = query.order_by(Geography.name).limit(limit).all()
+    geoid_set = [g.geoid for g in geographies]
     metrics = {
-        metric.geoid: metric
-        for metric in db.query(Metric).filter(Metric.year == metric_year).all()
-    }
+        m.geoid: m
+        for m in db.query(Metric)
+        .filter(Metric.year == metric_year, Metric.geoid.in_(geoid_set))
+        .all()
+    } if geoid_set else {}
     return {
         "year": metric_year,
         "items": [
@@ -235,7 +244,7 @@ def list_geographies(
 @router.get("/geographies/{geography_id}")
 def get_geography(
     geography_id: str,
-    year: int | None = None,
+    year: int | None = Query(default=None, ge=1900, le=2100),
     db: Session = Depends(get_db),
 ):
     metric_year = resolve_year(db, year)
@@ -256,7 +265,7 @@ def get_geography(
 def list_metric_values(
     metric: str = Query(default="rent_burden_pct"),
     geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
-    year: int | None = None,
+    year: int | None = Query(default=None, ge=1900, le=2100),
     db: Session = Depends(get_db),
 ):
     metric_key = normalize_metric_name(metric)
@@ -290,7 +299,7 @@ def list_metric_values(
 def get_summary(
     ids: str | None = Query(default=None, description="Comma-separated GEOIDs."),
     geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
-    year: int | None = None,
+    year: int | None = Query(default=None, ge=1900, le=2100),
     db: Session = Depends(get_db),
 ):
     # Census data year is always latest (2021); the year param only affects CMHC.
@@ -336,7 +345,7 @@ def get_summary(
 def compare_geographies(
     ids: str | None = Query(default=None, description="Comma-separated GEOIDs."),
     geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
-    year: int | None = None,
+    year: int | None = Query(default=None, ge=1900, le=2100),
     db: Session = Depends(get_db),
 ):
     # Census data year is always latest (2021); the year param only affects CMHC.
@@ -406,7 +415,7 @@ def get_map_data(
         default="full",
         description="Use display for map-ready simplified geometry; full returns stored geometry.",
     ),
-    year: int | None = None,
+    year: int | None = Query(default=None, ge=1900, le=2100),
     db: Session = Depends(get_db),
 ):
     metric_key = normalize_metric_name(metric)

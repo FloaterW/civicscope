@@ -4,3 +4,8 @@ out/
 dist/
 build/
 npm-debug.log*
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/

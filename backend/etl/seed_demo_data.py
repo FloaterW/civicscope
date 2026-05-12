@@ -16,6 +16,9 @@ def main() -> None:
     try:
         row_count = seed_demo_data(db, force=True)
         print(f"Seeded {row_count} demo rows.")
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
