@@ -3,7 +3,7 @@
 import { MapPin, X } from "lucide-react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
-import type { CmhcMetricValues, Geography, GeographyLevel, MetricKey } from "@/types";
+import type { CmhcMetricValues, Geography, GeographyLevel, MetricKey, MetricValues } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
 
@@ -91,6 +91,11 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
               <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} />
             </div>
           </div>
+
+          {/* Dwelling Type & Tenure */}
+          {metrics?.dwellings_total != null && (
+            <HousingStockSection metrics={metrics} />
+          )}
 
           {/* CMHC Rental Market */}
           {cmhcMetrics && (hasAnyRentalData || hasAnySupplyData) ? (
@@ -190,6 +195,52 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function pct(part: number | null | undefined, total: number | null | undefined): string {
+  if (part == null || total == null || total === 0) return "—";
+  return `${((part / total) * 100).toFixed(1)}%`;
+}
+
+function HousingStockSection({ metrics }: { metrics: MetricValues }) {
+  const total = metrics.dwellings_total;
+  if (total == null) return null;
+
+  const groundOriented =
+    (metrics.dwellings_single_detached ?? 0) +
+    (metrics.dwellings_semi_detached ?? 0) +
+    (metrics.dwellings_row_house ?? 0);
+  const apartment =
+    (metrics.dwellings_apt_high_rise ?? 0) +
+    (metrics.dwellings_apt_low_rise ?? 0) +
+    (metrics.dwellings_apt_duplex ?? 0);
+
+  const occupied = (metrics.owner_households ?? 0) + (metrics.renter_households ?? 0);
+  const ownerPct = pct(metrics.owner_households, occupied || null);
+  const renterPct = pct(metrics.renter_households, occupied || null);
+
+  return (
+    <div className="mt-4">
+      <SectionHeader title="Housing Stock" period="2021 Census" />
+      <div className="grid grid-cols-3 gap-2 text-sm">
+        <MetricLine label="Total dwellings" value={total.toLocaleString("en-CA")} />
+        <MetricLine label="Owner" value={ownerPct} />
+        <MetricLine label="Renter" value={renterPct} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+        <MetricLine label="Single-detached" value={pct(metrics.dwellings_single_detached, total)} />
+        <MetricLine label="Semi-detached" value={pct(metrics.dwellings_semi_detached, total)} />
+        <MetricLine label="Row house" value={pct(metrics.dwellings_row_house, total)} />
+        <MetricLine label="Apt. 5+ storeys" value={pct(metrics.dwellings_apt_high_rise, total)} />
+        <MetricLine label="Apt. <5 storeys" value={pct(metrics.dwellings_apt_low_rise, total)} />
+        <MetricLine label="Apt. in duplex" value={pct(metrics.dwellings_apt_duplex, total)} />
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+        <MetricLine label="Ground-oriented" value={`${pct(groundOriented, total)} (${groundOriented.toLocaleString("en-CA")})`} />
+        <MetricLine label="Apartment" value={`${pct(apartment, total)} (${apartment.toLocaleString("en-CA")})`} />
+      </div>
     </div>
   );
 }

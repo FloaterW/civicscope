@@ -34,11 +34,22 @@ OFFICIAL_CHARACTERISTIC_IDS = {
     "renter_households": "1476",
     "rent_burden_pct": "1478",
     "median_rent": "1480",
+    "dwellings_total": "41",
+    "dwellings_single_detached": "42",
+    "dwellings_semi_detached": "43",
+    "dwellings_row_house": "44",
+    "dwellings_apt_duplex": "45",
+    "dwellings_apt_low_rise": "46",
+    "dwellings_apt_high_rise": "47",
+    "owner_households": "1406",
 }
 
 DEFAULT_CHARACTERISTIC_IDS = OFFICIAL_CHARACTERISTIC_IDS
 CHARACTERISTIC_TO_FIELD = {value: key for key, value in OFFICIAL_CHARACTERISTIC_IDS.items()}
-REQUIRED_OFFICIAL_FIELDS = tuple(OFFICIAL_CHARACTERISTIC_IDS)
+REQUIRED_OFFICIAL_FIELDS = (
+    "population", "previous_population", "median_income",
+    "renter_households", "rent_burden_pct", "median_rent",
+)
 
 FIELD_ALIASES = {
     "geoid": ("geoid", "csduid", "csd_uid", "CSDUID"),
@@ -49,6 +60,14 @@ FIELD_ALIASES = {
     "previous_population": ("previous_population", "population_2016", "PREVIOUS_POPULATION"),
     "renter_households": ("renter_households", "tenant_households", "RENTER_HOUSEHOLDS"),
     "rent_burden_pct": ("rent_burden_pct", "shelter_cost_burden_pct", "RENT_BURDEN_PCT"),
+    "dwellings_total": ("dwellings_total",),
+    "dwellings_single_detached": ("dwellings_single_detached",),
+    "dwellings_semi_detached": ("dwellings_semi_detached",),
+    "dwellings_row_house": ("dwellings_row_house",),
+    "dwellings_apt_duplex": ("dwellings_apt_duplex",),
+    "dwellings_apt_low_rise": ("dwellings_apt_low_rise",),
+    "dwellings_apt_high_rise": ("dwellings_apt_high_rise",),
+    "owner_households": ("owner_households",),
 }
 
 
@@ -62,6 +81,14 @@ class MetricInput:
     previous_population: int | None
     renter_households: int | None
     rent_burden_pct: float | None
+    dwellings_total: int | None = None
+    dwellings_single_detached: int | None = None
+    dwellings_semi_detached: int | None = None
+    dwellings_row_house: int | None = None
+    dwellings_apt_duplex: int | None = None
+    dwellings_apt_low_rise: int | None = None
+    dwellings_apt_high_rise: int | None = None
+    owner_households: int | None = None
 
 
 def csduid_to_dguid(geoid: str) -> str:
@@ -153,6 +180,14 @@ def parse_metric_row(row: dict[str, Any], default_year: int = 2021) -> MetricInp
         previous_population=_optional_int(_first_value(row, "previous_population")),
         renter_households=_optional_int(_first_value(row, "renter_households")),
         rent_burden_pct=_optional_float(_first_value(row, "rent_burden_pct")),
+        dwellings_total=_optional_int(_first_value(row, "dwellings_total")),
+        dwellings_single_detached=_optional_int(_first_value(row, "dwellings_single_detached")),
+        dwellings_semi_detached=_optional_int(_first_value(row, "dwellings_semi_detached")),
+        dwellings_row_house=_optional_int(_first_value(row, "dwellings_row_house")),
+        dwellings_apt_duplex=_optional_int(_first_value(row, "dwellings_apt_duplex")),
+        dwellings_apt_low_rise=_optional_int(_first_value(row, "dwellings_apt_low_rise")),
+        dwellings_apt_high_rise=_optional_int(_first_value(row, "dwellings_apt_high_rise")),
+        owner_households=_optional_int(_first_value(row, "owner_households")),
     )
 
 
@@ -179,6 +214,14 @@ def upsert_metrics(db, metrics: list[MetricInput]) -> int:
             if item.rent_burden_pct is not None
             else estimate_rent_burden_pct(item.median_rent, item.median_income),
             "affordability_index": calculate_affordability_index(item.median_rent, item.median_income),
+            "dwellings_total": item.dwellings_total,
+            "dwellings_single_detached": item.dwellings_single_detached,
+            "dwellings_semi_detached": item.dwellings_semi_detached,
+            "dwellings_row_house": item.dwellings_row_house,
+            "dwellings_apt_duplex": item.dwellings_apt_duplex,
+            "dwellings_apt_low_rise": item.dwellings_apt_low_rise,
+            "dwellings_apt_high_rise": item.dwellings_apt_high_rise,
+            "owner_households": item.owner_households,
         }
         if metric is None:
             db.add(Metric(**values))
@@ -279,6 +322,14 @@ def update_seed_metrics(seed_path: Path, metrics: list[MetricInput]) -> int:
                 "previous_population": metric.previous_population,
                 "renter_households": metric.renter_households,
                 "rent_burden_pct": metric.rent_burden_pct,
+                "dwellings_total": metric.dwellings_total,
+                "dwellings_single_detached": metric.dwellings_single_detached,
+                "dwellings_semi_detached": metric.dwellings_semi_detached,
+                "dwellings_row_house": metric.dwellings_row_house,
+                "dwellings_apt_duplex": metric.dwellings_apt_duplex,
+                "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
+                "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
+                "owner_households": metric.owner_households,
             }
         ]
         updated += 1

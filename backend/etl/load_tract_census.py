@@ -43,6 +43,14 @@ CHARACTERISTIC_IDS = {
     "renter_households": "1476",
     "rent_burden_pct": "1478",
     "median_rent": "1480",
+    "dwellings_total": "41",
+    "dwellings_single_detached": "42",
+    "dwellings_semi_detached": "43",
+    "dwellings_row_house": "44",
+    "dwellings_apt_duplex": "45",
+    "dwellings_apt_low_rise": "46",
+    "dwellings_apt_high_rise": "47",
+    "owner_households": "1406",
 }
 CHARACTERISTIC_TO_FIELD = {v: k for k, v in CHARACTERISTIC_IDS.items()}
 
@@ -72,6 +80,14 @@ class TractMetric:
     median_rent: float | None
     renter_households: int | None
     rent_burden_pct: float | None
+    dwellings_total: int | None = None
+    dwellings_single_detached: int | None = None
+    dwellings_semi_detached: int | None = None
+    dwellings_row_house: int | None = None
+    dwellings_apt_duplex: int | None = None
+    dwellings_apt_low_rise: int | None = None
+    dwellings_apt_high_rise: int | None = None
+    owner_households: int | None = None
 
 
 def load_tract_geoids(seed_path: Path | None = None) -> list[str]:
@@ -126,6 +142,14 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
                 median_rent=_optional_float(data.get("median_rent")),
                 renter_households=_optional_int(data.get("renter_households")),
                 rent_burden_pct=_optional_float(data.get("rent_burden_pct")),
+                dwellings_total=_optional_int(data.get("dwellings_total")),
+                dwellings_single_detached=_optional_int(data.get("dwellings_single_detached")),
+                dwellings_semi_detached=_optional_int(data.get("dwellings_semi_detached")),
+                dwellings_row_house=_optional_int(data.get("dwellings_row_house")),
+                dwellings_apt_duplex=_optional_int(data.get("dwellings_apt_duplex")),
+                dwellings_apt_low_rise=_optional_int(data.get("dwellings_apt_low_rise")),
+                dwellings_apt_high_rise=_optional_int(data.get("dwellings_apt_high_rise")),
+                owner_households=_optional_int(data.get("owner_households")),
             )
         )
     return results
@@ -156,6 +180,9 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
         writer.writerow([
             "geoid", "year", "median_income", "median_rent",
             "population", "previous_population", "renter_households", "rent_burden_pct",
+            "dwellings_total", "dwellings_single_detached", "dwellings_semi_detached",
+            "dwellings_row_house", "dwellings_apt_duplex", "dwellings_apt_low_rise",
+            "dwellings_apt_high_rise", "owner_households",
         ])
         for m in metrics:
             writer.writerow([
@@ -166,6 +193,14 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
                 m.previous_population if m.previous_population is not None else "",
                 m.renter_households if m.renter_households is not None else "",
                 m.rent_burden_pct if m.rent_burden_pct is not None else "",
+                m.dwellings_total if m.dwellings_total is not None else "",
+                m.dwellings_single_detached if m.dwellings_single_detached is not None else "",
+                m.dwellings_semi_detached if m.dwellings_semi_detached is not None else "",
+                m.dwellings_row_house if m.dwellings_row_house is not None else "",
+                m.dwellings_apt_duplex if m.dwellings_apt_duplex is not None else "",
+                m.dwellings_apt_low_rise if m.dwellings_apt_low_rise is not None else "",
+                m.dwellings_apt_high_rise if m.dwellings_apt_high_rise is not None else "",
+                m.owner_households if m.owner_households is not None else "",
             ])
 
 
@@ -192,6 +227,14 @@ def update_seed_with_official_metrics(
                 "previous_population": metric.previous_population,
                 "renter_households": metric.renter_households,
                 "rent_burden_pct": metric.rent_burden_pct,
+                "dwellings_total": metric.dwellings_total,
+                "dwellings_single_detached": metric.dwellings_single_detached,
+                "dwellings_semi_detached": metric.dwellings_semi_detached,
+                "dwellings_row_house": metric.dwellings_row_house,
+                "dwellings_apt_duplex": metric.dwellings_apt_duplex,
+                "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
+                "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
+                "owner_households": metric.owner_households,
             }
         ]
         updated += 1
