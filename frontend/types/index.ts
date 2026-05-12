@@ -93,6 +93,7 @@ export type MapData = {
   metadata: {
     metric: MetricKey;
     year: number;
+    cmhc_year?: number;
     domain: {
       min: number | null;
       max: number | null;
