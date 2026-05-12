@@ -52,10 +52,14 @@ jobs:
 
       - name: Lint frontend
         working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: npm run lint
 
       - name: Build frontend
         working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: npm run build
 
       - name: Start backend API
