@@ -39,6 +39,8 @@ const cmhcCopy: Record<GeographyLevel, string> = {
 
 export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
   const metrics = geography?.metrics;
+  const hasAnyRentalData = cmhcMetrics ? rentalMarketMetrics.some((m) => cmhcMetrics[m.key] != null) : false;
+  const hasAnySupplyData = cmhcMetrics?.housing_starts_total != null;
 
   return (
     <section
@@ -79,30 +81,31 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
         <>
           {/* Census Profile */}
           <div className="mt-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
-              Census Profile (2021)
-            </h3>
+            <SectionHeader title="Household & Housing Profile" period="2021 Census" />
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <MetricLine label="Income" value={formatMetric("median_income", metrics?.median_income)} />
-              <MetricLine label="Rent" value={formatMetric("median_rent", metrics?.median_rent)} />
-              <MetricLine label="Burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} />
-              <MetricLine label="Growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} />
+              <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} />
+              <MetricLine label="Median rent" value={formatMetric("median_rent", metrics?.median_rent)} />
+              <MetricLine label="Rent burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} />
+              <MetricLine label="Pop. growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} />
               <MetricLine label="Population" value={formatMetric("population", metrics?.population)} />
-              <MetricLine label="Index" value={formatMetric("affordability_index", metrics?.affordability_index)} />
+              <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} />
             </div>
           </div>
 
           {/* CMHC Rental Market */}
-          {cmhcMetrics ? (
+          {cmhcMetrics && (hasAnyRentalData || hasAnySupplyData) ? (
             <>
-              <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
+              {hasAnyRentalData && (
+                <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
+              )}
 
-              {/* CMHC Housing Supply — only for municipalities with count data */}
-              {cmhcMetrics.housing_starts_total !== null && (
+              {hasAnySupplyData && (
                 <div className="mt-4">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
-                    CMHC Housing Supply {cmhcYear ? `(${cmhcYear})` : ""}
-                  </h3>
+                  <SectionHeader
+                    title="Housing Construction"
+                    period={cmhcYear ? `${cmhcYear} YTD` : undefined}
+                    note={geographyLevel === "census_tract" ? "municipal totals" : undefined}
+                  />
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <MetricLine label="Starts" value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)} />
                     <MetricLine label="Completions" value={formatMetric("housing_completions", cmhcMetrics.housing_completions)} />
@@ -113,7 +116,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
             </>
           ) : (
             <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
-              No CMHC data available for this geography.
+              {geographyLevel === "census_tract"
+                ? "CMHC does not publish census tract-level data. Parent municipality data shown when available."
+                : "No CMHC survey coverage for this municipality."}
             </div>
           )}
 
@@ -130,37 +135,60 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
   );
 }
 
-const rentalMetrics: Array<{ key: keyof CmhcMetricValues; metricKey: MetricKey; label: string }> = [
-  { key: "vacancy_rate", metricKey: "vacancy_rate", label: "Vacancy" },
-  { key: "availability_rate", metricKey: "availability_rate", label: "Availability" },
-  { key: "average_rent_total", metricKey: "average_rent_total", label: "Avg rent" },
-  { key: "turnover_rate", metricKey: "turnover_rate", label: "Turnover" },
+function SectionHeader({ title, period, note }: { title: string; period?: string; note?: string }) {
+  return (
+    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
+      {title}
+      {period && <span className="ml-1 font-normal normal-case text-civic-muted">· {period}</span>}
+      {note && <span className="ml-1 font-normal normal-case text-civic-muted">· {note}</span>}
+    </h3>
+  );
+}
+
+const rentalMarketMetrics: Array<{ key: keyof CmhcMetricValues; metricKey: MetricKey; label: string }> = [
+  { key: "vacancy_rate", metricKey: "vacancy_rate", label: "Vacancy rate" },
+  { key: "availability_rate", metricKey: "availability_rate", label: "Availability rate" },
+  { key: "average_rent_total", metricKey: "average_rent_total", label: "Average rent" },
+  { key: "turnover_rate", metricKey: "turnover_rate", label: "Turnover rate" },
+];
+
+const rentByUnitMetrics: Array<{ key: keyof CmhcMetricValues; metricKey: MetricKey; label: string }> = [
   { key: "average_rent_bachelor", metricKey: "average_rent_bachelor", label: "Bachelor" },
-  { key: "average_rent_1br", metricKey: "average_rent_1br", label: "1BR" },
-  { key: "average_rent_2br", metricKey: "average_rent_2br", label: "2BR" },
-  { key: "average_rent_3br_plus", metricKey: "average_rent_3br_plus", label: "3BR+" },
-  { key: "rental_universe", metricKey: "rental_universe", label: "Universe" },
+  { key: "average_rent_1br", metricKey: "average_rent_1br", label: "1-bedroom" },
+  { key: "average_rent_2br", metricKey: "average_rent_2br", label: "2-bedroom" },
+  { key: "average_rent_3br_plus", metricKey: "average_rent_3br_plus", label: "3-bedroom+" },
 ];
 
 function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetrics: CmhcMetricValues; cmhcYear?: number; geographyLevel: GeographyLevel }) {
-  const available = rentalMetrics.filter((m) => cmhcMetrics[m.key] !== null && cmhcMetrics[m.key] !== undefined);
+  const marketFields = rentalMarketMetrics.filter((m) => cmhcMetrics[m.key] != null);
+  const unitFields = rentByUnitMetrics.filter((m) => cmhcMetrics[m.key] != null);
+  const hasUniverse = cmhcMetrics.rental_universe != null;
 
   return (
     <div className="mt-4">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
-        CMHC Rental Market {cmhcYear ? `(${cmhcYear})` : ""}
-        {geographyLevel === "census_tract" && (
-          <span className="ml-1 font-normal normal-case text-civic-muted">· municipal rates</span>
-        )}
-      </h3>
-      {available.length > 0 ? (
+      <SectionHeader
+        title="Rental Market"
+        period={cmhcYear ? `Oct ${cmhcYear} RMS` : undefined}
+        note={geographyLevel === "census_tract" ? "municipal rates" : undefined}
+      />
+      {marketFields.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 text-sm">
-          {available.map((m) => (
+          {marketFields.map((m) => (
+            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} />
+          ))}
+          {hasUniverse && (
+            <MetricLine label="Rental universe" value={formatMetric("rental_universe", cmhcMetrics.rental_universe)} />
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-civic-muted">Not surveyed by CMHC Rental Market Survey.</p>
+      )}
+      {unitFields.length > 0 && (
+        <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+          {unitFields.map((m) => (
             <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} />
           ))}
         </div>
-      ) : (
-        <p className="text-xs text-civic-muted">No rental market data for this year.</p>
       )}
     </div>
   );
