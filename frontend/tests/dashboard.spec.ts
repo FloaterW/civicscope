@@ -77,7 +77,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("detail-panel")).toContainText("official 2021 Census Profile");
 
     await page.getByTestId("geography-search").fill("5350001.00");
-    const tractResult = page.getByRole("button").filter({ hasText: "5350001.00" });
+    const tractResult = page.getByRole("option").filter({ hasText: "5350001.00" });
     await expect(tractResult).toHaveCount(1);
     await tractResult.click();
 
@@ -136,7 +136,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
 
     await page.getByTestId("geography-search").fill("Toronto");
-    const torontoResult = page.getByRole("button").filter({ hasText: "3520005" });
+    const torontoResult = page.getByRole("option").filter({ hasText: "3520005" });
     await expect(torontoResult).toHaveCount(1);
     await torontoResult.click();
 
