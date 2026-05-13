@@ -109,15 +109,6 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
     """
     if not seed_metrics:
         return False
-    sample = seed_metrics[0]
-    db_row = (
-        db.query(CmhcMetric)
-        .filter(CmhcMetric.geoid == sample["geoid"], CmhcMetric.year == sample["year"])
-        .first()
-    )
-    if db_row is None:
-        return True
-    # Check fields that may have been added or updated
     check_fields = [
         ("housing_starts_total", "housing_starts_total"),
         ("housing_completions", "housing_completions"),
@@ -127,11 +118,19 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
         ("vacancy_rate", "vacancy_rate"),
         ("average_rent_bachelor", "average_rent_bachelor"),
     ]
-    for seed_key, db_attr in check_fields:
-        seed_val = sample.get(seed_key)
-        db_val = getattr(db_row, db_attr, None)
-        if seed_val is not None and db_val is None:
+    for sample in seed_metrics[:20]:
+        db_row = (
+            db.query(CmhcMetric)
+            .filter(CmhcMetric.geoid == sample["geoid"], CmhcMetric.year == sample["year"])
+            .first()
+        )
+        if db_row is None:
             return True
+        for seed_key, db_attr in check_fields:
+            seed_val = sample.get(seed_key)
+            db_val = getattr(db_row, db_attr, None)
+            if seed_val is not None and db_val is None:
+                return True
     return False
 
 
