@@ -192,6 +192,10 @@ class ZoneData:
     median_rent: float | None = None
     rent_change_pct: float | None = None
     rental_universe: int | None = None
+    average_rent_bachelor: float | None = None
+    average_rent_1br: float | None = None
+    average_rent_2br: float | None = None
+    average_rent_3br_plus: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +330,82 @@ def _parse_csv_line(line: str) -> list[str]:
             current += char
     fields.append(current)
     return fields
+
+
+BEDROOM_TYPES: dict[str, str] = {
+    "Studio": "average_rent_bachelor",
+    "1 Bedroom": "average_rent_1br",
+    "2 Bedroom": "average_rent_2br",
+    "3 Bedroom +": "average_rent_3br_plus",
+}
+
+
+def fetch_rms_bedroom_csv(year: int, bedroom_type: str) -> str:
+    """Fetch RMS Summary CSV filtered by bedroom type."""
+    params = {
+        "TableId": TABLE_RMS_SUMMARY,
+        "GeographyId": str(TORONTO_CMA_GEO_ID),
+        "GeographyTypeId": str(GEO_TYPE_CMA),
+        "BreakdownGeographyTypeId": str(GEO_TYPE_ZONE),
+        "DisplayAs": "Table",
+        "Ytd": "False",
+        "DefaultDataField": "vacancy_rate_pct",
+        "Survey": "Rms",
+        "ForTimePeriod.Year": str(year),
+        "ForTimePeriod.Month": str(RMS_SURVEY_MONTH),
+        "ExportType": "csv",
+        "AppliedFilters[0].Key": "dwelling_type_desc_en",
+        "AppliedFilters[0].Value": "Row / Apartment",
+        "AppliedFilters[1].Key": "bedroom_count_type_desc_en",
+        "AppliedFilters[1].Value": bedroom_type,
+    }
+    data = urlencode(params).encode("utf-8")
+    try:
+        request = Request(
+            HMIP_EXPORT_URL,
+            data=data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://www03.cmhc-schl.gc.ca/hmip-pimh/en/TableMapChart/Table",
+            },
+        )
+        with urlopen(request, timeout=60) as response:
+            return response.read().decode("cp1252")
+    except Exception as exc:
+        print(f"  Warning: {exc} fetching RMS {bedroom_type} for {year}", file=sys.stderr)
+        return ""
+
+
+def fetch_bedroom_rents_for_year(year: int) -> dict[str, dict[str, float | None]]:
+    """Fetch average rent by bedroom type for all zones in a given year.
+
+    Returns: {zone_name: {average_rent_bachelor: ..., average_rent_1br: ..., ...}}
+    """
+    result: dict[str, dict[str, float | None]] = {}
+
+    for bedroom_label, field_name in BEDROOM_TYPES.items():
+        csv_text = fetch_rms_bedroom_csv(year, bedroom_label)
+        if not csv_text:
+            continue
+        zones = parse_rms_summary_csv(csv_text)
+        for zone in zones:
+            result.setdefault(zone.zone_name, {})[field_name] = zone.average_rent
+        time.sleep(REQUEST_DELAY)
+
+    return result
+
+
+def merge_bedroom_rents(
+    zones: list[ZoneData], bedroom_rents: dict[str, dict[str, float | None]]
+) -> None:
+    """Merge bedroom-specific rents into ZoneData objects in-place."""
+    for zone in zones:
+        rents = bedroom_rents.get(zone.zone_name, {})
+        zone.average_rent_bachelor = rents.get("average_rent_bachelor")
+        zone.average_rent_1br = rents.get("average_rent_1br")
+        zone.average_rent_2br = rents.get("average_rent_2br")
+        zone.average_rent_3br_plus = rents.get("average_rent_3br_plus")
 
 
 # ---------------------------------------------------------------------------
@@ -634,6 +714,10 @@ def aggregate_zones_to_municipalities(
                 year=year,
                 vacancy_rate=z.vacancy_rate,
                 average_rent_total=z.average_rent,
+                average_rent_bachelor=z.average_rent_bachelor,
+                average_rent_1br=z.average_rent_1br,
+                average_rent_2br=z.average_rent_2br,
+                average_rent_3br_plus=z.average_rent_3br_plus,
                 availability_rate=z.availability_rate,
                 rental_universe=z.rental_universe,
             )
@@ -653,6 +737,13 @@ def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
     availability_units = 0
     rent_units = 0
 
+    bedroom_accum: dict[str, tuple[float, int]] = {
+        "average_rent_bachelor": (0.0, 0),
+        "average_rent_1br": (0.0, 0),
+        "average_rent_2br": (0.0, 0),
+        "average_rent_3br_plus": (0.0, 0),
+    }
+
     for z in zones:
         units = z.rental_universe or 0
         total_units += units
@@ -665,12 +756,25 @@ def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
         if z.average_rent is not None and units > 0:
             weighted_rent += z.average_rent * units
             rent_units += units
+        for field in bedroom_accum:
+            val = getattr(z, field, None)
+            if val is not None and units > 0:
+                w, u = bedroom_accum[field]
+                bedroom_accum[field] = (w + val * units, u + units)
+
+    def _weighted_rent(field: str) -> float | None:
+        w, u = bedroom_accum[field]
+        return round(w / u) if u > 0 else None
 
     return CmhcRow(
         geoid=geoid,
         year=year,
         vacancy_rate=round(weighted_vacancy / vacancy_units, 1) if vacancy_units > 0 else None,
         average_rent_total=round(weighted_rent / rent_units) if rent_units > 0 else None,
+        average_rent_bachelor=_weighted_rent("average_rent_bachelor"),
+        average_rent_1br=_weighted_rent("average_rent_1br"),
+        average_rent_2br=_weighted_rent("average_rent_2br"),
+        average_rent_3br_plus=_weighted_rent("average_rent_3br_plus"),
         availability_rate=(
             round(weighted_availability / availability_units, 1)
             if availability_units > 0
@@ -775,6 +879,11 @@ def update_seed(years: list[int] | None = None) -> int:
 
         zones = parse_rms_summary_csv(csv_text)
         print(f"    Parsed {len(zones)} survey zones.")
+
+        print(f"    Fetching bedroom-specific rents for {year}...")
+        bedroom_rents = fetch_bedroom_rents_for_year(year)
+        merge_bedroom_rents(zones, bedroom_rents)
+        print(f"    Merged bedroom rents for {len(bedroom_rents)} zones.")
 
         rows = aggregate_zones_to_municipalities(zones, year)
         rows = [r for r in rows if r.geoid in known_geoids]
