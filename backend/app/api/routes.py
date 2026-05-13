@@ -132,17 +132,29 @@ def available_cmhc_years(db: Session) -> list[int]:
     return years
 
 
-def serialize_cmhc_metric(cmhc: CmhcMetric, *, tract_inherited: bool = False) -> dict[str, Any]:
+def serialize_cmhc_metric(
+    cmhc: CmhcMetric,
+    *,
+    tract_inherited: bool = False,
+    tract_share: float | None = None,
+) -> dict[str, Any]:
     """Serialize a CmhcMetric row to a dict.
 
     When ``tract_inherited`` is True the row is a municipality-level record
-    being attached to a census tract.  Count-based metrics (housing starts,
-    completions, units under construction, rental universe) are municipal
-    *totals* and have no meaning at the tract level, so they are nulled out.
-    Rate-based metrics (vacancy, rents, turnover, availability) describe
-    market conditions and are reasonable proxies for a tract within that
-    municipality.
+    being attached to a census tract.  If ``tract_share`` (0–1) is provided,
+    count-based metrics are proportionally allocated to the tract based on its
+    share of the municipality's dwelling stock.  Rate-based metrics (vacancy,
+    rents, turnover, availability) are inherited unchanged.
     """
+
+    def _alloc(val: int | None) -> int | None:
+        if not tract_inherited or val is None:
+            return val
+        if tract_share is None:
+            return None
+        return round(val * tract_share)
+
+    allocated = tract_inherited and tract_share is not None
     result: dict[str, Any] = {
         "year": cmhc.year,
         "vacancy_rate": cmhc.vacancy_rate,
@@ -153,18 +165,41 @@ def serialize_cmhc_metric(cmhc: CmhcMetric, *, tract_inherited: bool = False) ->
         "average_rent_3br_plus": cmhc.average_rent_3br_plus,
         "turnover_rate": cmhc.turnover_rate,
         "availability_rate": cmhc.availability_rate,
-        "rental_universe": None if tract_inherited else cmhc.rental_universe,
-        "housing_starts_total": None if tract_inherited else cmhc.housing_starts_total,
-        "housing_starts_single": None if tract_inherited else cmhc.housing_starts_single,
-        "housing_starts_semi": None if tract_inherited else cmhc.housing_starts_semi,
-        "housing_starts_row": None if tract_inherited else cmhc.housing_starts_row,
-        "housing_starts_apartment": None if tract_inherited else cmhc.housing_starts_apartment,
-        "housing_completions": None if tract_inherited else cmhc.housing_completions,
-        "units_under_construction": None if tract_inherited else cmhc.units_under_construction,
-        "unabsorbed_units": None if tract_inherited else cmhc.unabsorbed_units,
+        "rental_universe": _alloc(cmhc.rental_universe),
+        "housing_starts_total": _alloc(cmhc.housing_starts_total),
+        "housing_starts_single": _alloc(cmhc.housing_starts_single),
+        "housing_starts_semi": _alloc(cmhc.housing_starts_semi),
+        "housing_starts_row": _alloc(cmhc.housing_starts_row),
+        "housing_starts_apartment": _alloc(cmhc.housing_starts_apartment),
+        "housing_completions": _alloc(cmhc.housing_completions),
+        "units_under_construction": _alloc(cmhc.units_under_construction),
+        "unabsorbed_units": _alloc(cmhc.unabsorbed_units),
         "rms_surveyed": cmhc.rms_surveyed,
+        "allocated": allocated,
     }
     return result
+
+
+def _compute_tract_shares(records: list) -> dict[str, float]:
+    """Compute each census tract's share of its municipality's renter households.
+
+    Returns a dict mapping tract geoid → fraction (0–1) used to
+    proportionally allocate municipal CMHC count metrics to tracts.
+    """
+    muni_renters: dict[str, int] = {}
+    tract_renters: dict[str, int] = {}
+    for geography, metric in records:
+        if geography.county:
+            r = metric.renter_households or 0
+            muni_renters[geography.county] = muni_renters.get(geography.county, 0) + r
+            tract_renters[geography.geoid] = r
+    shares: dict[str, float] = {}
+    for geography, _ in records:
+        if geography.county:
+            total = muni_renters.get(geography.county, 0)
+            if total > 0:
+                shares[geography.geoid] = tract_renters.get(geography.geoid, 0) / total
+    return shares
 
 
 def joined_records(
@@ -378,6 +413,7 @@ def compare_geographies(
     }
     # Build name→geoid lookup for census tract CMHC inheritance
     municipality_name_to_geoid: dict[str, str] = {}
+    tract_shares: dict[str, float] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
             name: geoid
@@ -385,6 +421,7 @@ def compare_geographies(
             .filter(Geography.type == "municipality")
             .all()
         }
+        tract_shares = _compute_tract_shares(records)
 
     items = []
     for geography, metric in ordered_records:
@@ -403,8 +440,11 @@ def compare_geographies(
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
+        share = tract_shares.get(geography.geoid) if is_tract_inherited else None
         if cmhc_row:
-            item["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row, tract_inherited=is_tract_inherited)
+            item["cmhc_metrics"] = serialize_cmhc_metric(
+                cmhc_row, tract_inherited=is_tract_inherited, tract_share=share,
+            )
         else:
             item["cmhc_metrics"] = None
         items.append(item)
@@ -468,6 +508,7 @@ def get_map_data(
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
     }
     municipality_name_to_geoid: dict[str, str] = {}
+    tract_shares: dict[str, float] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
             name: geoid
@@ -475,12 +516,22 @@ def get_map_data(
             .filter(Geography.type == "municipality")
             .all()
         }
+        tract_shares = _compute_tract_shares(records)
 
     if cmhc:
-        # Count metrics are nulled out for census tracts, so the domain
-        # would be meaningless (all features have value=None).
         if normalized_type == "census_tract" and metric_key in CMHC_COUNT_METRICS:
+            # Estimate tract-level values via proportional allocation
             values = []
+            for geography, _ in records:
+                if not geography.county:
+                    continue
+                parent_geoid = municipality_name_to_geoid.get(geography.county)
+                cr = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
+                share = tract_shares.get(geography.geoid)
+                if cr and share is not None:
+                    raw = metric_value(metric_key, cr)
+                    if raw is not None:
+                        values.append(round(raw * share))
         else:
             values = [
                 v
@@ -531,15 +582,19 @@ def get_map_data(
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
+        share = tract_shares.get(geography.geoid) if is_tract_inherited else None
         if cmhc:
             if is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
-                props["value"] = None
+                raw = metric_value(metric_key, cmhc_row) if cmhc_row else None
+                props["value"] = round(raw * share) if raw is not None and share is not None else None
             else:
                 props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
         else:
             props["value"] = metric_value(metric_key, row)
         if cmhc_row:
-            props["cmhc_metrics"] = serialize_cmhc_metric(cmhc_row, tract_inherited=is_tract_inherited)
+            props["cmhc_metrics"] = serialize_cmhc_metric(
+                cmhc_row, tract_inherited=is_tract_inherited, tract_share=share,
+            )
         props["cmhc_year"] = cmhc_year
         features.append(
             {
@@ -587,10 +642,11 @@ def data_quality(geography_type: str | None, cmhc: bool = False) -> dict[str, st
     if cmhc and geography_type == "census_tract":
         return {
             "metric_status": "estimated",
-            "label": "CMHC Rental Market Survey (municipal)",
+            "label": "CMHC (estimated allocation)",
             "description": (
-                "Census tracts inherit CMHC data from their parent municipality. "
-                "Values shown are municipal-level CMHC Rental Market Survey data."
+                "Rate metrics (vacancy, rents) are inherited from the parent municipality. "
+                "Count metrics (starts, completions) are estimated by proportional allocation "
+                "based on each tract's share of municipal dwellings."
             ),
         }
     if cmhc:

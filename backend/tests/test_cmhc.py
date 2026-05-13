@@ -246,6 +246,53 @@ def test_compare_includes_cmhc_metrics(client):
     assert items[0]["cmhc_metrics"]["vacancy_rate"] is not None
 
 
+def test_census_tract_cmhc_allocation(client):
+    """Census tracts get proportionally allocated CMHC count metrics."""
+    response = client.get("/api/map-data?metric=housing_starts_total&type=census_tract")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["metadata"]["metric"] == "housing_starts_total"
+    assert payload["metadata"]["data_quality"]["metric_status"] == "estimated"
+    features_with_value = [f for f in payload["features"] if f["properties"]["value"] is not None]
+    assert len(features_with_value) >= 1
+    sample = features_with_value[0]["properties"]
+    cmhc = sample["cmhc_metrics"]
+    assert cmhc["allocated"] is True
+    assert cmhc["housing_starts_total"] is not None
+
+
+def test_census_tract_compare_allocation(client):
+    """Compare endpoint allocates CMHC count metrics for census tracts."""
+    # Use a Toronto tract (geoid starts with 535) — Toronto has RMS coverage
+    response = client.get("/api/map-data?metric=vacancy_rate&type=census_tract")
+    assert response.status_code == 200
+    toronto_tracts = [
+        f for f in response.json()["features"]
+        if f["properties"].get("county") == "Toronto"
+    ]
+    assert len(toronto_tracts) >= 1
+    tract_geoid = toronto_tracts[0]["properties"]["geoid"]
+    response = client.get(f"/api/compare?ids={tract_geoid}&type=census_tract")
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    cmhc = items[0]["cmhc_metrics"]
+    assert cmhc is not None
+    assert cmhc["allocated"] is True
+    assert cmhc["vacancy_rate"] is not None
+    assert cmhc["housing_starts_total"] is not None
+
+
+def test_municipality_cmhc_not_allocated(client):
+    """Municipality-level CMHC metrics should not have the allocated flag."""
+    response = client.get("/api/compare?ids=3520005")
+    assert response.status_code == 200
+    items = response.json()["items"]
+    cmhc = items[0]["cmhc_metrics"]
+    assert cmhc["allocated"] is False
+    assert cmhc["housing_starts_total"] is not None
+
+
 def test_metrics_endpoint_rejects_cmhc_metric(client):
     response = client.get("/api/metrics?metric=vacancy_rate")
     assert response.status_code == 400
