@@ -72,6 +72,7 @@ export type CmhcMetricValues = {
   units_under_construction: number | null;
   unabsorbed_units: number | null;
   rms_surveyed: boolean;
+  allocated?: boolean;
 };
 
 export type Geography = {

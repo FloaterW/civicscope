@@ -119,7 +119,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                   <SectionHeader
                     title="Housing Construction"
                     period={cmhcYear ? `${cmhcYear} YTD` : undefined}
-                    note={geographyLevel === "census_tract" ? "municipal totals" : undefined}
+                    note={cmhcMetrics?.allocated ? "est. from municipal data" : undefined}
                   />
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <MetricLine label="Starts" value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)} />
@@ -133,7 +133,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           ) : (
             <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
               {geographyLevel === "census_tract"
-                ? "CMHC does not publish census tract-level data. Parent municipality data shown when available."
+                ? "CMHC does not publish census tract-level data. Estimated values allocated from parent municipality."
                 : "No CMHC survey coverage for this municipality."}
             </div>
           )}
@@ -185,7 +185,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       <SectionHeader
         title="Rental Market"
         period={cmhcYear ? `Oct ${cmhcYear} RMS` : undefined}
-        note={geographyLevel === "census_tract" ? "municipal rates" : undefined}
+        note={cmhcMetrics.allocated ? "municipal rates" : undefined}
       />
       {marketFields.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -193,7 +193,10 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
             <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} />
           ))}
           {hasUniverse && (
-            <MetricLine label="Rental universe" value={formatMetric("rental_universe", cmhcMetrics.rental_universe)} />
+            <MetricLine
+              label={cmhcMetrics.allocated ? "Rental universe (est.)" : "Rental universe"}
+              value={formatMetric("rental_universe", cmhcMetrics.rental_universe)}
+            />
           )}
         </div>
       ) : (
