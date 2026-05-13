@@ -32,12 +32,13 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   const chartData =
     comparison?.items
       .map((item) => {
-        const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, number | null>;
-        const rawValue = allMetrics[metric];
+        const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, number | boolean | null>;
+        const raw = allMetrics[metric];
+        const rawValue = typeof raw === "number" ? raw : null;
         return {
           geoid: item.geoid,
           name: chartLabel(item.name, item.type, item.geoid),
-          value: rawValue ?? null,
+          value: rawValue,
           rawValue,
         };
       })
