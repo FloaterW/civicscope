@@ -63,10 +63,6 @@ export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<
   return response.json() as Promise<T>;
 }
 
-function levelQuery(geographyLevel: GeographyLevel) {
-  return `type=${encodeURIComponent(geographyLevel)}`;
-}
-
 export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
   const params = new URLSearchParams({
     metric,

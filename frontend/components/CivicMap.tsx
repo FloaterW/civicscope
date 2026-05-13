@@ -225,6 +225,7 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
         mapRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- map initializes once when data first arrives; subsequent data/selection updates are handled by separate effects below
   }, [isReady]);
 
   useEffect(() => {

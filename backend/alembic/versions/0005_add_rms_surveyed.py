@@ -17,7 +17,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "ALTER TABLE cmhc_metrics ADD COLUMN IF NOT EXISTS rms_surveyed BOOLEAN NOT NULL DEFAULT 0"
+        "ALTER TABLE cmhc_metrics ADD COLUMN IF NOT EXISTS rms_surveyed BOOLEAN NOT NULL DEFAULT FALSE"
     )
 
 

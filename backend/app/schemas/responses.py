@@ -14,6 +14,14 @@ class MetricResponse(BaseModel):
     rent_burden_pct: float | None
     rent_to_income_ratio: float | None
     affordability_index: float | None
+    dwellings_total: int | None = None
+    dwellings_single_detached: int | None = None
+    dwellings_semi_detached: int | None = None
+    dwellings_row_house: int | None = None
+    dwellings_apt_duplex: int | None = None
+    dwellings_apt_low_rise: int | None = None
+    dwellings_apt_high_rise: int | None = None
+    owner_households: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

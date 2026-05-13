@@ -13,6 +13,11 @@ from app.db.session import engine
 
 def init_db() -> None:
     if engine.dialect.name == "postgresql":
+        config = alembic_config()
+        head = ScriptDirectory.from_config(config).get_current_head()
+        if head is None:
+            Base.metadata.create_all(bind=engine)
+            return
         verify_migrations_current()
         return
 
