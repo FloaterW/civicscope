@@ -125,6 +125,7 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
         ("unabsorbed_units", "unabsorbed_units"),
         ("rms_surveyed", "rms_surveyed"),
         ("vacancy_rate", "vacancy_rate"),
+        ("average_rent_bachelor", "average_rent_bachelor"),
     ]
     for seed_key, db_attr in check_fields:
         seed_val = sample.get(seed_key)
