@@ -330,7 +330,7 @@ export function CivicDashboard() {
       <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.45fr)_430px] lg:px-6">
         <section
           data-testid="map-panel"
-          className="min-h-[560px] overflow-hidden rounded-lg border border-civic-line bg-white shadow-panel"
+          className="flex min-h-[560px] flex-col overflow-hidden rounded-lg border border-civic-line bg-white shadow-panel"
         >
           <div className="flex flex-col gap-2 border-b border-civic-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -350,7 +350,7 @@ export function CivicDashboard() {
               </div>
             </div>
           </div>
-          <div className="h-[520px]">
+          <div className="min-h-[520px] flex-1">
             <CivicMap
               key={geographyLevel}
               data={visibleMapData}
