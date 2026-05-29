@@ -356,6 +356,23 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(panel).toContainText("Not available");
   });
 
+  test("population growth map scale excludes tiny-base outliers in tract mode", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    await page.getByLabel("Map metric").selectOption("population_growth_pct");
+    await expect(map).toHaveAttribute("data-metric", "population_growth_pct");
+
+    // A handful of near-empty 2016-base tracts reach ~29,580% growth; they must
+    // not define the color scale (they are still shown, flagged, on click).
+    const domainMax = Number(await map.getAttribute("data-domain-max"));
+    expect(domainMax).toBeGreaterThan(0);
+    expect(domainMax).toBeLessThan(5000);
+  });
+
   test("CMHC metric in census tract mode is labeled estimated/allocated", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
