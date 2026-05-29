@@ -415,6 +415,15 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
 
   const values = data.features
     .map((feature) => {
+      // Low-confidence growth (a tiny 2016 base) would blow out the color
+      // scale, so exclude it from the domain. The tract is still rendered and
+      // its real value is shown, flagged, in the detail panel.
+      if (
+        metric === "population_growth_pct" &&
+        feature.properties.metrics.data_quality?.population_growth_pct === "low_confidence"
+      ) {
+        return null;
+      }
       const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, unknown>;
       return allMetrics[metric];
     })

@@ -100,6 +100,53 @@ def test_tract_low_denominator_growth_is_flagged(client):
         assert m["previous_population"] is not None and m["previous_population"] < 100
 
 
+def test_compare_tract_cmhc_count_matches_map_data_allocation(client):
+    # CMHC count metrics must be allocated by each tract's share of ALL its
+    # municipality's tracts. The comparison endpoint must not hand a single
+    # selected tract the full municipal total (regression: shares were computed
+    # over only the selected subset, so one tract got share == 1.0).
+    map_payload = client.get(
+        "/api/map-data?metric=housing_starts_total&type=census_tract&detail=display"
+    ).json()
+    target = next(
+        f
+        for f in map_payload["features"]
+        if (f["properties"].get("cmhc_metrics") or {}).get("housing_starts_total")
+    )
+    geoid = target["properties"]["geoid"]
+    map_value = target["properties"]["cmhc_metrics"]["housing_starts_total"]
+
+    compare_payload = client.get(f"/api/compare?type=census_tract&ids={geoid}").json()
+    compare_value = compare_payload["items"][0]["cmhc_metrics"]["housing_starts_total"]
+
+    assert compare_value == map_value
+
+
+def test_growth_map_domain_excludes_low_denominator_outliers(client):
+    # Tracts with a tiny 2016 base produce absurd growth percentages; they must
+    # not define the map's color scale (they are still shown, flagged, on click).
+    payload = client.get(
+        "/api/map-data?metric=population_growth_pct&type=census_tract&detail=display"
+    ).json()
+    domain = payload["metadata"]["domain"]
+    features = payload["features"]
+
+    reliable = [
+        f["properties"]["metrics"]["population_growth_pct"]
+        for f in features
+        if f["properties"]["metrics"]["data_quality"]["population_growth_pct"] != "low_confidence"
+        and f["properties"]["metrics"]["population_growth_pct"] is not None
+    ]
+    outliers = [
+        f["properties"]["metrics"]["population_growth_pct"]
+        for f in features
+        if f["properties"]["metrics"]["data_quality"]["population_growth_pct"] == "low_confidence"
+    ]
+    assert domain["max"] == max(reliable)
+    # The outliers still carry their real (larger) value for the detail panel.
+    assert outliers and max(outliers) > domain["max"]
+
+
 def test_cmhc_metric_on_tracts_labeled_estimated_and_allocated(client):
     response = client.get("/api/map-data?metric=housing_starts_total&type=census_tract&detail=display")
     payload = response.json()

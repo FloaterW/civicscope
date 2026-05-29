@@ -15,6 +15,7 @@ from app.services.metric_calculations import (
     VALID_METRICS,
     build_metric_quality,
     is_cmhc_metric,
+    is_low_denominator_growth,
     metric_value,
     normalize_metric_name,
     resolve_rent_burden,
@@ -439,7 +440,14 @@ def compare_geographies(
             .filter(Geography.type == "municipality")
             .all()
         }
-        tract_shares = _compute_tract_shares(records)
+        # Shares must be computed over ALL tracts (the full municipal renter
+        # denominator), not just the selected `records` -- otherwise a single
+        # selected tract gets share == 1.0 and is handed the whole municipal
+        # total instead of its proportional allocation.
+        all_tract_records = joined_records(
+            db, metric_year, geography_type="census_tract", include_geometry=False
+        )
+        tract_shares = _compute_tract_shares(all_tract_records)
 
     items = []
     for geography, metric in ordered_records:
@@ -556,6 +564,18 @@ def get_map_data(
                 for cmhc_row in cmhc_by_geoid.values()
                 if (v := metric_value(metric_key, cmhc_row)) is not None
             ]
+    elif metric_key == "population_growth_pct":
+        # Exclude growth computed off a tiny 2016 base from the color scale:
+        # a handful of near-empty tracts produce absurd percentages that would
+        # otherwise flatten the gradient for every other tract. The real value
+        # is still returned per-feature (and flagged low_confidence) for the
+        # detail panel.
+        values = [
+            value
+            for _, row in records
+            if not is_low_denominator_growth(row.previous_population)
+            and (value := metric_value(metric_key, row)) is not None
+        ]
     else:
         values = [
             value
