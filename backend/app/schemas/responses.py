@@ -22,6 +22,7 @@ class MetricResponse(BaseModel):
     dwellings_apt_low_rise: int | None = None
     dwellings_apt_high_rise: int | None = None
     owner_households: int | None = None
+    data_quality: dict[str, str] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,3 +40,22 @@ class GeographyResponse(BaseModel):
     metrics: MetricResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GeographySummaryResponse(BaseModel):
+    id: int
+    geoid: str
+    name: str
+    type: str
+    county: str | None
+    state: str
+    bbox: list[float]
+    geometry_source: str
+    metrics: MetricResponse | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GeographiesListResponse(BaseModel):
+    year: int
+    items: list[GeographySummaryResponse]

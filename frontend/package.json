@@ -5,12 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "clean:next": "node scripts/clean-next-cache.mjs",
     "demo:video": "node scripts/capture-demo-video.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "start": "next start",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit",
-    "lint": "next lint"
+    "typecheck": "next typegen && tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

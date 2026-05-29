@@ -8,10 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import CmhcMetric, ETLRun, Geography, Metric
-from app.services.metric_calculations import (
-    calculate_affordability_index,
-    estimate_rent_burden_pct,
-)
+from app.services.metric_calculations import calculate_affordability_index
 from app.services.postgis import sync_geography_geoms
 
 
@@ -25,18 +22,64 @@ def load_cmhc_seed() -> dict[str, Any]:
     return json.loads(seed_path.read_text(encoding="utf-8"))
 
 
+def _value_differs(seed_value: Any, db_value: Any) -> bool:
+    if seed_value is None and db_value is None:
+        return False
+    if seed_value is None or db_value is None:
+        return True
+    return abs(float(seed_value) - float(db_value)) > 0.5
+
+
+def _demo_seed_content_changed(db: Session, seed: dict[str, Any]) -> bool:
+    """Detect a database whose census metrics no longer match the packaged seed.
+
+    Guards against the stale-volume bug where an old Docker volume keeps
+    superseded (e.g. estimated) tract metrics even though the packaged seed has
+    been updated to official values.  We compare verbatim official fields
+    (income, rent, population) for a deterministic spread of geographies; rent
+    burden is intentionally excluded because it has a serialization-time
+    estimate fallback.
+    """
+    geographies = seed["geographies"]
+    if not geographies:
+        return False
+    step = max(1, len(geographies) // 40)
+    # First few rows plus an even spread across the file, de-duplicated so a
+    # geography is never checked twice (index 0 appears in both slices).
+    sample = list({id(g): g for g in geographies[:5] + geographies[::step]}.values())
+    compared_fields = ("median_income", "median_rent", "population", "previous_population")
+    for item in sample:
+        metrics = item.get("metrics")
+        if not metrics:
+            continue
+        seed_metric = metrics[0]
+        db_row = (
+            db.query(Metric)
+            .filter(Metric.geoid == item["geoid"], Metric.year == seed_metric["year"])
+            .first()
+        )
+        if db_row is None:
+            return True
+        for field in compared_fields:
+            if _value_differs(seed_metric.get(field), getattr(db_row, field, None)):
+                return True
+    return False
+
+
 def seed_demo_data(db: Session, force: bool = False) -> int:
     existing = db.query(Geography).count()
-    if existing and not force:
-        return 0
+    seed = load_demo_seed()
 
-    if force:
+    if existing and not force:
+        if not _demo_seed_content_changed(db, seed):
+            return 0
+
+    if existing:
         db.query(CmhcMetric).delete()
         db.query(Metric).delete()
         db.query(Geography).delete()
         db.flush()
 
-    seed = load_demo_seed()
     row_count = 0
     started_at = datetime.now(UTC)
 
@@ -57,9 +100,10 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
         for metric_item in item["metrics"]:
             median_rent = metric_item.get("median_rent")
             median_income = metric_item.get("median_income")
+            # Store the official value only (null when Statistics Canada
+            # suppressed it).  A clearly-labeled estimate is provided at
+            # serialization time instead of being silently persisted.
             rent_burden_pct = metric_item.get("rent_burden_pct")
-            if rent_burden_pct is None:
-                rent_burden_pct = estimate_rent_burden_pct(median_rent, median_income)
 
             metric = Metric(
                 geoid=item["geoid"],

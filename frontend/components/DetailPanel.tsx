@@ -3,7 +3,14 @@
 import { MapPin, X } from "lucide-react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
-import type { CmhcMetricValues, Geography, GeographyLevel, MetricKey, MetricValues } from "@/types";
+import type {
+  CmhcMetricValues,
+  Geography,
+  GeographyLevel,
+  MetricFieldStatus,
+  MetricKey,
+  MetricValues
+} from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
 
@@ -14,7 +21,7 @@ type Props = {
   cmhcMetrics?: CmhcMetricValues | null;
   cmhcYear?: number;
   dataQualityLabel?: string;
-  metricStatus?: "official" | "estimated";
+  metricStatus?: "official" | "estimated" | "mixed";
   onClear: () => void;
 };
 
@@ -39,6 +46,7 @@ const cmhcCopy: Record<GeographyLevel, string> = {
 
 export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
   const metrics = geography?.metrics;
+  const quality = metrics?.data_quality;
   const hasAnyRentalData = cmhcMetrics ? rentalMarketMetrics.some((m) => cmhcMetrics[m.key] != null) : false;
   const hasAnySupplyData =
     cmhcMetrics?.housing_starts_total != null ||
@@ -62,7 +70,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           </h2>
           <p className="text-xs text-civic-muted">
             {geography
-              ? `${geography.type === "census_tract" ? "Census tract" : "Municipality"} · ${geography.geoid}`
+              ? `${geography.type === "census_tract" ? "Census tract" : "Municipality"} - ${geography.geoid}`
               : emptyCopy[geographyLevel]}
           </p>
           <div className="mt-2">
@@ -87,13 +95,23 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           <div className="mt-4">
             <SectionHeader title="Household & Housing Profile" period="2021 Census" />
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} />
-              <MetricLine label="Median rent" value={formatMetric("median_rent", metrics?.median_rent)} />
-              <MetricLine label="Rent burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} />
-              <MetricLine label="Pop. growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} />
-              <MetricLine label="Population" value={formatMetric("population", metrics?.population)} />
-              <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} />
+              <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} status={quality?.median_income} />
+              <MetricLine label="Median rent" value={formatMetric("median_rent", metrics?.median_rent)} status={quality?.median_rent} />
+              <MetricLine label="Rent burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} status={quality?.rent_burden_pct} />
+              <MetricLine label="Pop. growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} status={quality?.population_growth_pct} />
+              <MetricLine label="Population" value={formatMetric("population", metrics?.population)} status={quality?.population} />
+              <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} status={quality?.affordability_index} />
             </div>
+            {quality?.rent_burden_pct === "estimated" && (
+              <p className="mt-2 text-xs leading-5 text-amber-700">
+                Rent burden estimated from median rent and income (Statistics Canada value suppressed for this tract).
+              </p>
+            )}
+            {quality?.population_growth_pct === "low_confidence" && (
+              <p className="mt-2 text-xs leading-5 text-amber-700">
+                Population growth computed off a very small 2016 base; treat the percentage with caution.
+              </p>
+            )}
           </div>
 
           {/* Dwelling Type & Tenure */}
@@ -155,8 +173,8 @@ function SectionHeader({ title, period, note }: { title: string; period?: string
   return (
     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
       {title}
-      {period && <span className="ml-1 font-normal normal-case text-civic-muted">· {period}</span>}
-      {note && <span className="ml-1 font-normal normal-case text-civic-muted">· {note}</span>}
+      {period && <span className="ml-1 font-normal normal-case text-civic-muted">- {period}</span>}
+      {note && <span className="ml-1 font-normal normal-case text-civic-muted">- {note}</span>}
     </h3>
   );
 }
@@ -214,7 +232,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
 }
 
 function pct(part: number | null | undefined, total: number | null | undefined): string {
-  if (part == null || total == null || total === 0) return "—";
+  if (part == null || total == null || total === 0) return "--";
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
@@ -259,11 +277,39 @@ function HousingStockSection({ metrics }: { metrics: MetricValues }) {
   );
 }
 
-function MetricLine({ label, value }: { label: string; value: string }) {
+function MetricLine({
+  label,
+  value,
+  status
+}: {
+  label: string;
+  value: string;
+  status?: MetricFieldStatus;
+}) {
   return (
     <div className="rounded-md border border-civic-line bg-white px-3 py-2">
       <span className="block text-xs text-civic-muted">{label}</span>
-      <span className="mt-1 block text-base font-semibold text-civic-ink">{value}</span>
+      <span className="mt-1 block text-base font-semibold text-civic-ink">
+        {value}
+        {status === "estimated" && (
+          <span
+            data-testid="estimated-flag"
+            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            title="Estimated fallback; Statistics Canada value suppressed."
+          >
+            est.
+          </span>
+        )}
+        {status === "low_confidence" && (
+          <span
+            data-testid="low-confidence-flag"
+            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            title="Derived off a very small base population; low confidence."
+          >
+            ⚠
+          </span>
+        )}
+      </span>
     </div>
   );
 }

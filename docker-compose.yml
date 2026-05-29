@@ -5,14 +5,14 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-civicscope}
       POSTGRES_USER: ${POSTGRES_USER:-civicscope}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-civicscope}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U civicscope -d civicscope"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,9 +23,9 @@ services:
     container_name: civicscope-backend
     environment:
       APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-civicscope}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-civicscope}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-civicscope}:${POSTGRES_PASSWORD:-civicscope}@db:5432/${POSTGRES_DB:-civicscope}
       SEED_ON_STARTUP: "true"
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3101,http://127.0.0.1:3101
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002,http://localhost:3101,http://127.0.0.1:3101,http://localhost:3102,http://127.0.0.1:3102}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -38,9 +38,11 @@ services:
   frontend:
     build:
       context: ./frontend
+      target: builder
     container_name: civicscope-frontend
+    user: "0:0"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:8000}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
