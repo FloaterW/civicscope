@@ -86,11 +86,20 @@ export function CivicDashboard() {
     return [selectedGeoid, ...defaultCompareIds.filter((geoid) => geoid !== selectedGeoid)];
   }, [geographyLevel, selectedGeoid]);
 
-  useEffect(() => {
+  function handleGeographyLevelChange(level: GeographyLevel) {
+    if (level === geographyLevel) {
+      return;
+    }
+    setGeographyLevel(level);
+    // Clear any active selection synchronously (in the same update as the level
+    // change) so the summary/comparison effects never fire a stale request for
+    // a geoid that belongs to the other geography type (which would 404).
     setSelected(null);
     setSearch("");
     setSearchResults([]);
-  }, [geographyLevel]);
+    setSelectedCmhcMetrics(null);
+    setSelectedCmhcYear(undefined);
+  }
 
   // Keep selected geography's CMHC data in sync with current map data.
   // Handles: search selection, metric switch, year switch — all paths
@@ -315,7 +324,7 @@ export function CivicDashboard() {
                 </div>
               )}
             </div>
-            <GeographyLevelSelector value={geographyLevel} onChange={setGeographyLevel} />
+            <GeographyLevelSelector value={geographyLevel} onChange={handleGeographyLevelChange} />
             <MetricSelector value={metric} onChange={setMetric} />
             <YearSelector
               value={displayYear}
