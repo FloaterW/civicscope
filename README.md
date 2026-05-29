@@ -17,7 +17,7 @@ CivicScope is a portfolio-grade full-stack project for public-sector analytics. 
 
 Municipal geometries use Statistics Canada 2021 cartographic census subdivision boundaries. Metric values use official Statistics Canada 2021 Census Profile characteristics for the selected GTA municipalities.
 
-Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Tract-level metrics are official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow.
+Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Tract-level metrics are official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow. CivicScope is deliberate about honesty here: source-suppressed values are shown as "Not available" rather than filled, the few tracts with a tiny 2016 base population have their growth rate flagged as low-confidence, and where the official rent-burden value is suppressed the app shows a clearly-labeled estimate derived from rent and income. Every metric carries field-level provenance (`official` / `estimated` / `unavailable` / `low_confidence`) so the UI never presents an estimate as if it were official. CMHC metrics are municipality-level; in census tract mode rate metrics are inherited and count metrics are allocated by renter-household share, both labeled as estimated.
 
 ## Screenshots
 
@@ -59,11 +59,11 @@ npm run demo:video
 
 CivicScope answers a practical planning question: where are GTA housing affordability conditions most strained relative to local incomes, and how do those conditions differ between nearby municipalities and census tracts?
 
-The core workflow is designed for a policy analyst or planner: scan the regional overview, switch metrics, search or click a geography, inspect local affordability indicators, and compare selected areas. The app intentionally separates official municipal metrics from estimated tract metrics with visible data-quality labels.
+The core workflow is designed for a policy analyst or planner: scan the regional overview, switch metrics, search or click a geography, inspect local affordability indicators, and compare selected areas. The app intentionally separates official Census Profile metrics from CMHC metrics that are estimated when allocated from municipalities to census tracts.
 
 See [docs/case-study.md](docs/case-study.md) for the full project narrative.
 
-See [docs/tract-metric-upgrade.md](docs/tract-metric-upgrade.md) for the official tract-metric upgrade path.
+See [docs/tract-metric-upgrade.md](docs/tract-metric-upgrade.md) for the completed tract-metric upgrade notes and remaining follow-ups.
 
 ## Architecture
 
@@ -108,7 +108,7 @@ civicscope/
 
 ## Setup
 
-Copy the example environment file if you want local overrides:
+Copy the example environment file if you want local overrides. Docker Compose also has safe local defaults, so this step is optional for a first run:
 
 ```bash
 cp .env.example .env
@@ -122,11 +122,11 @@ Run the full stack with Docker:
 docker compose up --build
 ```
 
-If port `3000` is already in use, set `FRONTEND_PORT=3001` in `.env` and run the same command.
+If port `3000` is already in use, set `FRONTEND_PORT=3102` in `.env` or run PowerShell with `$env:FRONTEND_PORT='3102'` before starting Docker.
 
 Local URLs:
 
-- Frontend: http://localhost:3000 or http://localhost:3001 when `FRONTEND_PORT=3001`
+- Frontend: http://localhost:3000, or your configured `FRONTEND_PORT` such as http://localhost:3102
 - Backend API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/health
@@ -169,6 +169,12 @@ Supported metrics:
 - `population_growth_pct`
 - `affordability_index`
 - `rent_to_income_ratio`
+- `vacancy_rate`
+- `average_rent_total`
+- `housing_starts_total`
+- `housing_completions`
+- `turnover_rate`
+- `availability_rate`
 
 Aliases such as `rent_burden`, `income`, `rent`, and `growth` are accepted by the backend.
 
@@ -182,7 +188,7 @@ The packaged seed covers GTA lower/single-tier municipalities:
 - Durham municipalities: Pickering, Ajax, Whitby, Oshawa, Clarington, Uxbridge, Scugog, Brock
 - Halton municipalities: Oakville, Burlington, Milton, Halton Hills
 
-It also includes 1,334 packaged census tract features assigned to those municipalities by tract centroid. Tract boundaries are official 2021 Statistics Canada cartographic census tract polygons; tract metric values are estimated for demo use and should be replaced before publication-grade tract analysis.
+It also includes 1,334 packaged census tract features assigned to those municipalities by tract centroid. Tract boundaries are official 2021 Statistics Canada cartographic census tract polygons, and tract Census Profile metrics are official 2021 Statistics Canada values loaded from the normalized DF_CT extract. Some tract values are suppressed or unavailable in the source and are handled as missing data. CMHC metrics are municipality-level; when shown in census tract mode, count metrics are estimated by proportional allocation and rate metrics are inherited from the parent municipality.
 
 Current and planned sources:
 
@@ -296,6 +302,7 @@ Frontend:
 ```bash
 cd frontend
 npm run typecheck
+npm run lint
 npm run build
 ```
 

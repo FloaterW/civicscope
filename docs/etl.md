@@ -22,7 +22,7 @@ Source:
 
 ## Census Tract Loader
 
-`backend/etl/load_tracts.py` loads Statistics Canada 2021 cartographic census tract boundaries and filters them to the current GTA municipality set by tract representative point. Packaged tract metrics are estimated from parent municipality values for offline demo use.
+`backend/etl/load_tracts.py` loads Statistics Canada 2021 cartographic census tract boundaries and filters them to the current GTA municipality set by tract representative point. Packaged tract Census Profile metrics are official 2021 Statistics Canada values from the normalized DF_CT extract; source-suppressed values remain null.
 
 Useful commands:
 
@@ -39,7 +39,7 @@ Source:
 
 - Statistics Canada 2021 Cartographic Boundary Files census tract service: `https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer/11`
 
-See `tract-metric-upgrade.md` for the recommended path to replace packaged tract estimates with official tract-level Census Profile metrics.
+See `tract-metric-upgrade.md` for the completed official tract metric upgrade notes and remaining follow-ups.
 
 ## Census Metric Loader
 

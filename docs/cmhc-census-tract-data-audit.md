@@ -44,8 +44,8 @@ These municipalities appear in `ALL_GTA_GEOIDS` for Scss queries but are not map
 
 - Census tracts **do not have their own CMHC records** in the database.
 - At query time, each census tract inherits its parent municipality's CMHC row via the `county` field on the Geography model (county stores the parent municipality name).
-- **Count metrics** (starts, completions, under construction, rental universe) are nulled out for census tracts via `serialize_cmhc_metric(tract_inherited=True)` because municipal totals are meaningless at the tract level.
-- **Rate metrics** (vacancy, rents, turnover, availability) pass through as reasonable proxies for the local market.
+- **Count metrics** (starts, completions, under construction, rental universe) are proportionally allocated to census tracts using each tract's share of municipal renter households. The UI labels these allocated values as estimated.
+- **Rate metrics** (vacancy, rents, turnover, availability) pass through as reasonable proxies for the local market and are inherited from the parent municipality.
 
 ### Why Clarington Shows "No Data" for Rental Market
 

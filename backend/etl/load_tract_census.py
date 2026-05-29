@@ -264,6 +264,65 @@ def update_seed_with_official_metrics(
     return updated
 
 
+TRACT_METRIC_FIELDS = (
+    "median_income",
+    "median_rent",
+    "population",
+    "previous_population",
+    "renter_households",
+    "rent_burden_pct",
+)
+_INT_FIELDS = {"population", "previous_population", "renter_households"}
+
+
+def apply_csv_metrics_to_seed(seed: dict[str, Any], rows: list[dict[str, Any]]) -> int:
+    """Replace census-tract metrics in ``seed`` with values from CSV ``rows``.
+
+    The statcan_ct_metrics.csv is the canonical official source.  Values are
+    copied verbatim and suppressed/blank values are preserved as ``None`` so
+    that downstream provenance can distinguish official from estimated and
+    unavailable.  No estimation is performed here.  Returns the number of
+    census tracts updated.
+    """
+    by_geoid = {str(row["geoid"]).strip(): row for row in rows if row.get("geoid")}
+    updated = 0
+    for item in seed["geographies"]:
+        if item.get("type") != "census_tract":
+            continue
+        row = by_geoid.get(item["geoid"])
+        if row is None:
+            continue
+        metric: dict[str, Any] = {
+            "year": _optional_int(row.get("year")) or 2021,
+        }
+        for field in TRACT_METRIC_FIELDS:
+            raw = row.get(field)
+            metric[field] = _optional_int(raw) if field in _INT_FIELDS else _optional_float(raw)
+        item["metrics"] = [metric]
+        updated += 1
+    return updated
+
+
+def sync_seed_from_csv(seed_path: Path, csv_path: Path) -> int:
+    seed = json.loads(seed_path.read_text(encoding="utf-8"))
+    with csv_path.open(newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+    updated = apply_csv_metrics_to_seed(seed, rows)
+    seed["metadata"]["source"] = "statistics_canada_2021_census_profile_csd_and_ct_seed"
+    seed["metadata"]["notes"] = [
+        "Municipal geometries are Statistics Canada 2021 cartographic census subdivision boundaries.",
+        "Municipal metrics are official Statistics Canada 2021 Census Profile values.",
+        "Census tract geometries are official Statistics Canada 2021 cartographic tract "
+        "boundaries filtered by centroid to the current GTA municipalities.",
+        "Census tract metrics are official Statistics Canada 2021 Census Profile values "
+        "from the SDMX DF_CT dataflow (app/data/statcan_ct_metrics.csv). Suppressed or "
+        "unavailable values are stored as null; rent burden is estimated from rent and "
+        "income only as a clearly labeled fallback at serialization time.",
+    ]
+    seed_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    return updated
+
+
 def _optional_float(value: Any) -> float | None:
     if value in (None, "", "..", "x", "F"):
         return None
@@ -290,6 +349,12 @@ def main() -> None:
         help="Update seed file with official tract metrics.",
     )
     parser.add_argument(
+        "--from-csv",
+        type=Path,
+        help="Sync seed tract metrics from an existing CSV instead of fetching "
+        "from Statistics Canada (preserves nulls; performs no estimation).",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=PROJECT_ROOT / "app" / "data" / "statcan_ct_metrics.csv",
@@ -297,8 +362,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.from_csv:
+        seed_path = PROJECT_ROOT / "app" / "data" / "demo_seed.json"
+        updated = sync_seed_from_csv(seed_path, args.from_csv)
+        print(f"Synced {updated} seed tract rows from {args.from_csv} (nulls preserved).")
+        return
+
     if not args.generate_csv and not args.update_seed:
-        parser.error("--generate-csv or --update-seed is required.")
+        parser.error("--generate-csv, --update-seed, or --from-csv is required.")
 
     print("Loading tract geoids from seed...")
     geoids = load_tract_geoids()

@@ -101,10 +101,79 @@ def calculate_population_growth_pct(
     return round(((population - previous_population) / previous_population) * 100, 1)
 
 
+# Census tracts can have a tiny 2016 base population (e.g. a tract that was
+# largely undeveloped), which turns ordinary growth into an absurd percentage.
+# Growth computed off a base below this threshold is flagged low-confidence so
+# the UI never presents it as a stable trend.
+LOW_POPULATION_DENOMINATOR = 100
+
+
+def is_low_denominator_growth(previous_population: int | None) -> bool:
+    return previous_population is not None and 0 < previous_population < LOW_POPULATION_DENOMINATOR
+
+
+def resolve_rent_burden(
+    median_rent: float | None,
+    median_income: float | None,
+    official_value: float | None,
+) -> tuple[float | None, str]:
+    """Return the effective rent-burden value and its provenance.
+
+    Official Statistics Canada values are used verbatim.  When the official
+    value is suppressed/missing we fall back to an estimate derived from rent
+    and income, clearly labeled ``estimated``.  When even that is impossible
+    the value is ``unavailable`` (rendered as "Not available").
+    """
+    if official_value is not None:
+        return official_value, "official"
+    estimate = estimate_rent_burden_pct(median_rent, median_income)
+    if estimate is not None:
+        return estimate, "estimated"
+    return None, "unavailable"
+
+
+def build_metric_quality(row: Any) -> dict[str, str]:
+    """Per-field provenance for a census metric row.
+
+    Statuses: ``official`` (published or reliably derived), ``estimated``
+    (fallback formula), ``unavailable`` (suppressed/missing), and
+    ``low_confidence`` (derived off a tiny denominator).
+    """
+    _, rent_burden_status = resolve_rent_burden(
+        row.median_rent, row.median_income, row.rent_burden_pct
+    )
+    growth = calculate_population_growth_pct(row.population, row.previous_population)
+    if growth is None:
+        growth_status = "unavailable"
+    elif is_low_denominator_growth(row.previous_population):
+        growth_status = "low_confidence"
+    else:
+        growth_status = "official"
+
+    def present(value: Any) -> str:
+        return "official" if value is not None else "unavailable"
+
+    return {
+        "median_income": present(row.median_income),
+        "median_rent": present(row.median_rent),
+        "population": present(row.population),
+        "previous_population": present(row.previous_population),
+        "renter_households": present(row.renter_households),
+        "rent_burden_pct": rent_burden_status,
+        "population_growth_pct": growth_status,
+        "affordability_index": present(row.affordability_index),
+    }
+
+
 def metric_value(metric: str, row: Any) -> float | int | None:
     metric_key = normalize_metric_name(metric)
     if metric_key == "rent_to_income_ratio":
         return calculate_rent_to_income_ratio(row.median_rent, row.median_income)
     if metric_key == "population_growth_pct":
         return calculate_population_growth_pct(row.population, row.previous_population)
+    if metric_key == "rent_burden_pct":
+        # Use the effective value (official, else labeled estimate) so the map
+        # and the detail panel agree on what they display.
+        value, _ = resolve_rent_burden(row.median_rent, row.median_income, row.rent_burden_pct)
+        return value
     return getattr(row, metric_key, None)

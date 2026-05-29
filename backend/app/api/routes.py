@@ -8,13 +8,16 @@ from sqlalchemy.orm import Session, load_only
 
 from app.db.session import get_db
 from app.models import CmhcMetric, Geography, Metric
+from app.schemas.responses import GeographiesListResponse, GeographyResponse
 from app.services.geojson import compact_geometry
 from app.services.metric_calculations import (
     CMHC_METRICS,
     VALID_METRICS,
+    build_metric_quality,
     is_cmhc_metric,
     metric_value,
     normalize_metric_name,
+    resolve_rent_burden,
 )
 from app.services.postgis import load_postgis_map_geometries
 from app.services.summary import build_summary
@@ -24,10 +27,9 @@ router = APIRouter(prefix="/api", tags=["civic data"])
 DEFAULT_GEOGRAPHY_TYPE = "municipality"
 SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
 
-# Count-based CMHC metrics that represent municipal *totals* and must NOT be
-# inherited by census tracts (they would misleadingly appear as tract-level
-# values).  Rate/average metrics like vacancy and rents are kept because they
-# describe market conditions applicable within the municipality.
+# Count-based CMHC metrics are municipality-level totals. In census tract views
+# they are proportionally allocated by renter-household share and labeled as
+# estimated; rate/average metrics such as vacancy and rents are inherited.
 CMHC_COUNT_METRICS = frozenset({
     "rental_universe",
     "housing_starts_total",
@@ -72,6 +74,9 @@ def normalize_geography_type(geography_type: str | None) -> str | None:
 
 
 def serialize_metric(metric: Metric) -> dict[str, Any]:
+    rent_burden_value, _ = resolve_rent_burden(
+        metric.median_rent, metric.median_income, metric.rent_burden_pct
+    )
     return {
         "year": metric.year,
         "median_income": metric.median_income,
@@ -80,7 +85,9 @@ def serialize_metric(metric: Metric) -> dict[str, Any]:
         "previous_population": metric.previous_population,
         "population_growth_pct": metric_value("population_growth_pct", metric),
         "renter_households": metric.renter_households,
-        "rent_burden_pct": metric.rent_burden_pct,
+        # Effective value: official when published, otherwise a labeled estimate.
+        # Provenance is exposed per-field in ``data_quality`` below.
+        "rent_burden_pct": rent_burden_value,
         "rent_to_income_ratio": metric_value("rent_to_income_ratio", metric),
         "affordability_index": metric.affordability_index,
         "dwellings_total": metric.dwellings_total,
@@ -91,10 +98,16 @@ def serialize_metric(metric: Metric) -> dict[str, Any]:
         "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
         "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
         "owner_households": metric.owner_households,
+        "data_quality": build_metric_quality(metric),
     }
 
 
-def serialize_geography(geography: Geography, metric: Metric | None = None) -> dict[str, Any]:
+def serialize_geography(
+    geography: Geography,
+    metric: Metric | None = None,
+    *,
+    include_geometry: bool = True,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": geography.id,
         "geoid": geography.geoid,
@@ -103,9 +116,10 @@ def serialize_geography(geography: Geography, metric: Metric | None = None) -> d
         "county": geography.county,
         "state": geography.state,
         "bbox": geography.bbox,
-        "geometry": geography.geometry,
         "geometry_source": geography.geometry_source,
     }
+    if include_geometry:
+        payload["geometry"] = geography.geometry
     if metric is not None:
         payload["metrics"] = serialize_metric(metric)
     return payload
@@ -141,10 +155,10 @@ def serialize_cmhc_metric(
     """Serialize a CmhcMetric row to a dict.
 
     When ``tract_inherited`` is True the row is a municipality-level record
-    being attached to a census tract.  If ``tract_share`` (0–1) is provided,
+    being attached to a census tract.  If ``tract_share`` (0-1) is provided,
     count-based metrics are proportionally allocated to the tract based on its
-    share of the municipality's dwelling stock.  Rate-based metrics (vacancy,
-    rents, turnover, availability) are inherited unchanged.
+    share of the municipality's renter households. Rate-based metrics
+    (vacancy, rents, turnover, availability) are inherited unchanged.
     """
 
     def _alloc(val: int | None) -> int | None:
@@ -183,7 +197,7 @@ def serialize_cmhc_metric(
 def _compute_tract_shares(records: list) -> dict[str, float]:
     """Compute each census tract's share of its municipality's renter households.
 
-    Returns a dict mapping tract geoid → fraction (0–1) used to
+    Returns a dict mapping tract geoid to fraction (0-1) used to
     proportionally allocate municipal CMHC count metrics to tracts.
     """
     muni_renters: dict[str, int] = {}
@@ -234,7 +248,7 @@ def joined_records(
     return query.all()
 
 
-@router.get("/geographies")
+@router.get("/geographies", response_model=GeographiesListResponse)
 def list_geographies(
     search: str | None = Query(default=None, min_length=1),
     geography_type: str | None = Query(default=DEFAULT_GEOGRAPHY_TYPE, alias="type"),
@@ -281,13 +295,17 @@ def list_geographies(
     return {
         "year": metric_year,
         "items": [
-            serialize_geography(geography, metrics.get(geography.geoid))
+            serialize_geography(
+                geography,
+                metrics.get(geography.geoid),
+                include_geometry=False,
+            )
             for geography in geographies
         ],
     }
 
 
-@router.get("/geographies/{geography_id}")
+@router.get("/geographies/{geography_id}", response_model=GeographyResponse)
 def get_geography(
     geography_id: str,
     year: int | None = Query(default=None, ge=1900, le=2100),
@@ -411,7 +429,7 @@ def compare_geographies(
         row.geoid: row
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
     }
-    # Build name→geoid lookup for census tract CMHC inheritance
+    # Build name-to-geoid lookup for census tract CMHC inheritance.
     municipality_name_to_geoid: dict[str, str] = {}
     tract_shares: dict[str, float] = {}
     if normalized_type == "census_tract":
@@ -555,7 +573,7 @@ def get_map_data(
         "cmhc_year": cmhc_year,
         "domain": domain,
         "geography_type": normalized_type,
-        "data_quality": data_quality(normalized_type, cmhc=cmhc),
+        "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "source": map_data_source(normalized_type, cmhc=cmhc),
         "available_years": available_cmhc_years(db),
     }
@@ -596,13 +614,14 @@ def get_map_data(
                 cmhc_row, tract_inherited=is_tract_inherited, tract_share=share,
             )
         props["cmhc_year"] = cmhc_year
+        geometry = postgis_geometries.get(geography.geoid)
+        if geometry is None:
+            geometry = map_geometry(geography.geometry, detail, normalized_type)
+
         features.append(
             {
                 "type": "Feature",
-                "geometry": postgis_geometries.get(
-                    geography.geoid,
-                    map_geometry(geography.geometry, detail, normalized_type),
-                ),
+                "geometry": geometry,
                 "properties": props,
             }
         )
@@ -638,7 +657,11 @@ def map_data_source(geography_type: str | None, cmhc: bool = False) -> str:
     )
 
 
-def data_quality(geography_type: str | None, cmhc: bool = False) -> dict[str, str]:
+def data_quality(
+    geography_type: str | None,
+    cmhc: bool = False,
+    metric_key: str | None = None,
+) -> dict[str, str]:
     if cmhc and geography_type == "census_tract":
         return {
             "metric_status": "estimated",
@@ -646,7 +669,7 @@ def data_quality(geography_type: str | None, cmhc: bool = False) -> dict[str, st
             "description": (
                 "Rate metrics (vacancy, rents) are inherited from the parent municipality. "
                 "Count metrics (starts, completions) are estimated by proportional allocation "
-                "based on each tract's share of municipal dwellings."
+                "based on each tract's share of municipal renter households."
             ),
         }
     if cmhc:
@@ -659,12 +682,24 @@ def data_quality(geography_type: str | None, cmhc: bool = False) -> dict[str, st
             ),
         }
     if geography_type == "census_tract":
+        if metric_key == "rent_burden_pct":
+            return {
+                "metric_status": "mixed",
+                "label": "Official + estimated tract metrics",
+                "description": (
+                    "Census tract geometries and metrics are official Statistics Canada 2021 "
+                    "Census Profile values (SDMX DF_CT). Where Statistics Canada suppressed the "
+                    "rent-burden value it is estimated from median rent and income and clearly "
+                    "labeled; tracts without enough data show \"Not available\"."
+                ),
+            }
         return {
             "metric_status": "official",
             "label": "Official tract metrics",
             "description": (
                 "Census tract geometries and metrics are official Statistics Canada 2021 "
-                "Census Profile values fetched via the SDMX DF_CT dataflow."
+                "Census Profile values fetched via the SDMX DF_CT dataflow. Suppressed values "
+                "show as \"Not available\"; growth computed off a very small base is flagged."
             ),
         }
     return {

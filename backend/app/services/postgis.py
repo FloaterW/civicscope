@@ -16,9 +16,7 @@ _GEOMETRY_EXPRS = {
 
 
 def supports_postgis(db: Session) -> bool:
-    from app.db.session import engine
-
-    return engine.dialect.name == "postgresql"
+    return db.get_bind().dialect.name == "postgresql"
 
 
 def has_geom_column(db: Session) -> bool:
