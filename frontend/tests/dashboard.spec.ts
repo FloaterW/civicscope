@@ -179,6 +179,35 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(apiErrors).toEqual([]);
   });
 
+  test("switching geography level with a selection active fires no stale cross-type requests", async ({ page }) => {
+    const apiErrors: string[] = [];
+    page.on("response", (response) => {
+      if (response.url().includes("/api/") && response.status() >= 400) {
+        apiErrors.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    await blockExternalMapAssets(page);
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    // Select a census tract, then switch back to municipalities. The stale
+    // tract geoid must not be requested under type=municipality (would 404).
+    await page.getByTestId("geography-search").fill("5350001.00");
+    const result = page.getByRole("option").filter({ hasText: "5350001.00" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
+
+    await page.getByRole("button", { name: "Municipalities" }).click();
+    await expect(map).toHaveAttribute("data-geography-type", "municipality", { timeout: 30000 });
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    expect(apiErrors).toEqual([]);
+  });
+
   test("metric selector repaints map state and polygon clicks select a municipality", async ({ page }) => {
     await blockExternalMapAssets(page);
 
