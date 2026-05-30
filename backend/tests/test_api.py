@@ -122,6 +122,19 @@ def test_compare_tract_cmhc_count_matches_map_data_allocation(client):
     assert compare_value == map_value
 
 
+def test_census_map_data_ignores_year_param(client):
+    # Census data is a single 2021 vintage. Passing a non-2021 year to a census
+    # metric must NOT return an empty map; it should fall back to the latest
+    # census year so direct API callers always get data.
+    base = client.get("/api/map-data?metric=median_income&type=census_tract&detail=display")
+    future = client.get(
+        "/api/map-data?metric=median_income&type=census_tract&detail=display&year=2025"
+    )
+    assert base.status_code == 200 and future.status_code == 200
+    assert len(future.json()["features"]) == len(base.json()["features"]) > 1000
+    assert future.json()["metadata"]["year"] == base.json()["metadata"]["year"]
+
+
 def test_growth_map_domain_excludes_low_denominator_outliers(client):
     # Tracts with a tiny 2016 base produce absurd growth percentages; they must
     # not define the map's color scale (they are still shown, flagged, on click).
