@@ -42,13 +42,20 @@ the Python ingestion path:
   R package), fetches a CT-breakdown table for the Toronto CMA, parses it (marking
   `**`/blank cells as suppressed), and reports per-metric tract coverage.
 
-**Environment note:** `www03.cmhc-schl.gc.ca` *is* reachable from this environment
-(HTTP 200 to the HMIP help page), but a live **table pull was not performed** in this
-spike. HMIP's `TableMapChart` data API is multi-step and undocumented, so a single
-naive GET with guessed params is not a reliable way to pull it — the authoritative
-interface is the `cmhc` R package. The dry-run validates the parse/coverage logic
-offline; verify the raw CSV-export contract against live HMIP (or just use the `cmhc`
-package) before building the loader.
+**Empirical finding (2026-05-30): a plain HTTP pull does NOT work.** The host is
+reachable (HTTP 200), and the Toronto CMA "Vacancy Rate by Census Tract" page was
+fetched directly (~100 KB). The returned HTML is a **JavaScript single-page-app
+shell**: it carries `<script>` tags but **zero** `<table>`/`<svg>` elements and
+**zero** occurrences of "Census Tract", "Vacancy", "Toronto", or any CT id / data
+value — the table/chart is rendered client-side via AJAX after load. So a naive
+`requests.get(...)` cannot retrieve real values; only the spike's offline `--dry-run`
+path runs here. Real ingestion needs one of: (1) the **`cmhc` R package** run as an
+**offline ETL step** that emits a committed CSV (mirroring how
+`app/data/statcan_ct_metrics.csv` is produced today); (2) reverse-engineering HMIP's
+undocumented internal AJAX/JSON endpoint; or (3) headless-browser automation. Any
+ingested values must be **validated against known-good CMHC figures before being
+labeled "real"** — shipping unvalidated data would violate the project's honesty
+principle — so Phase A is left as a documented, validated plan rather than rushed.
 
 To run where network is available:
 
