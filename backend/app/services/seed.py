@@ -145,11 +145,13 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
 
 
 def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bool:
-    """Spot-check whether seed content has changed beyond just row count.
+    """Detect whether stored CMHC content no longer matches the packaged seed.
 
-    Compares a sample of fields from the seed file against the DB to detect
-    updates where the row count stays the same but values changed (e.g.
-    housing_starts_total going from NULL to a real value).
+    Catches both null->value (a newly populated field) and value->value drift
+    (e.g. a corrected vacancy rate) where the row count is unchanged, so a stale
+    Docker volume holding superseded CMHC values is re-seeded without a manual
+    FORCE_RESEED. All seed metrics are compared (one bulk DB read); seed fields
+    that are null/absent are skipped so the loader's defaults never false-trigger.
     """
     if not seed_metrics:
         return False
@@ -160,20 +162,20 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
         ("unabsorbed_units", "unabsorbed_units"),
         ("rms_surveyed", "rms_surveyed"),
         ("vacancy_rate", "vacancy_rate"),
+        ("average_rent_total", "average_rent_total"),
         ("average_rent_bachelor", "average_rent_bachelor"),
     ]
-    for sample in seed_metrics[:20]:
-        db_row = (
-            db.query(CmhcMetric)
-            .filter(CmhcMetric.geoid == sample["geoid"], CmhcMetric.year == sample["year"])
-            .first()
-        )
+    db_rows = {(row.geoid, row.year): row for row in db.query(CmhcMetric).all()}
+    for sample in seed_metrics:
+        db_row = db_rows.get((sample["geoid"], sample["year"]))
         if db_row is None:
             return True
         for seed_key, db_attr in check_fields:
             seed_val = sample.get(seed_key)
+            if seed_val is None:
+                continue
             db_val = getattr(db_row, db_attr, None)
-            if seed_val is not None and db_val is None:
+            if db_val is None or abs(float(seed_val) - float(db_val)) > 0.5:
                 return True
     return False
 

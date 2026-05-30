@@ -2,6 +2,33 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.models import CmhcMetric, Geography
+from app.services.seed import load_cmhc_seed, seed_cmhc_data
+
+
+def test_seed_cmhc_data_reseeds_when_a_value_changed(db_session):
+    # The CMHC freshness check must catch value-to-value drift, not only
+    # null-to-value. Otherwise a stale Docker volume keeps superseded CMHC
+    # values (e.g. an old vacancy rate) until a manual FORCE_RESEED.
+    seed = load_cmhc_seed()
+    target = next(m for m in seed["metrics"] if m.get("vacancy_rate") is not None)
+    row = (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == target["geoid"], CmhcMetric.year == target["year"])
+        .one()
+    )
+    official = row.vacancy_rate
+    row.vacancy_rate = official + 5.0
+    db_session.commit()
+
+    reseeded = seed_cmhc_data(db_session)  # no force
+    assert reseeded > 0
+
+    restored = (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == target["geoid"], CmhcMetric.year == target["year"])
+        .one()
+    )
+    assert restored.vacancy_rate == official
 
 
 def test_cmhc_metric_creation(db_session):
