@@ -6,6 +6,7 @@ from app.services.metric_calculations import (
     calculate_affordability_index,
     calculate_population_growth_pct,
     calculate_rent_to_income_ratio,
+    resolve_rent_burden,
 )
 
 
@@ -62,8 +63,14 @@ def build_summary(
         [metric.median_rent for metric in metrics],
         [metric.renter_households for metric in metrics],
     )
+    # Use the effective rent burden (official, else a labeled estimate) so the
+    # summary stays consistent with the map and detail panel, which also show
+    # estimated values for tracts whose official rent burden was suppressed.
     rent_burden_pct = weighted_average(
-        [metric.rent_burden_pct for metric in metrics],
+        [
+            resolve_rent_burden(metric.median_rent, metric.median_income, metric.rent_burden_pct)[0]
+            for metric in metrics
+        ],
         [metric.renter_households for metric in metrics],
     )
 
@@ -115,6 +122,6 @@ def build_summary(
         ],
         "notes": [
             "Summary uses weighted averages of local median values; use official regional aggregates for publication-grade reporting.",
-            "Rent burden uses Statistics Canada tenant shelter-cost burden values when official profile metrics are loaded.",
+            "Rent burden uses official Statistics Canada tenant shelter-cost burden values, falling back to a rent-and-income estimate where the official value is suppressed (consistent with the map).",
         ],
     }

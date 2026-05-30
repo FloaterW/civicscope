@@ -31,6 +31,20 @@ export type GeoJsonGeometry = {
   coordinates: unknown;
 };
 
+/** Per-field provenance for a census metric value. */
+export type MetricFieldStatus = "official" | "estimated" | "unavailable" | "low_confidence";
+
+export type MetricQuality = {
+  median_income?: MetricFieldStatus;
+  median_rent?: MetricFieldStatus;
+  population?: MetricFieldStatus;
+  previous_population?: MetricFieldStatus;
+  renter_households?: MetricFieldStatus;
+  rent_burden_pct?: MetricFieldStatus;
+  population_growth_pct?: MetricFieldStatus;
+  affordability_index?: MetricFieldStatus;
+};
+
 export type MetricValues = {
   year: number;
   median_income: number | null;
@@ -50,6 +64,8 @@ export type MetricValues = {
   dwellings_apt_low_rise: number | null;
   dwellings_apt_high_rise: number | null;
   owner_households: number | null;
+  /** Field-level provenance flags (official / estimated / unavailable / low_confidence). */
+  data_quality?: MetricQuality;
 };
 
 export type CmhcMetricValues = {
@@ -83,7 +99,7 @@ export type Geography = {
   county: string | null;
   state: string;
   bbox: [number, number, number, number];
-  geometry: GeoJsonGeometry;
+  geometry?: GeoJsonGeometry;
   geometry_source: string;
   metrics?: MetricValues;
 };
@@ -95,7 +111,7 @@ export type MapFeature = {
     metric: MetricKey;
     value: number | null;
     metrics: MetricValues;
-    cmhc_metrics?: CmhcMetricValues;
+    cmhc_metrics?: CmhcMetricValues | null;
     cmhc_year?: number;
   };
 };
@@ -113,7 +129,7 @@ export type MapData = {
     geography_type: GeographyLevel;
     available_years?: number[];
     data_quality: {
-      metric_status: "official" | "estimated";
+      metric_status: "official" | "estimated" | "mixed";
       label: string;
       description: string;
     };
@@ -150,13 +166,14 @@ export type Summary = {
 
 export type CompareResponse = {
   year: number;
+  cmhc_year?: number;
   items: Array<{
     geoid: string;
     name: string;
     type: string;
     county: string | null;
     metrics: MetricValues;
-    cmhc_metrics?: CmhcMetricValues;
+    cmhc_metrics?: CmhcMetricValues | null;
   }>;
 };
 

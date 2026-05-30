@@ -16,7 +16,7 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
+COPY --from=builder /app/public ./public
 
 USER appuser
 

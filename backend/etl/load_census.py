@@ -18,10 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
 from app.models import ETLRun, Geography, Metric
-from app.services.metric_calculations import (
-    calculate_affordability_index,
-    estimate_rent_burden_pct,
-)
+from app.services.metric_calculations import calculate_affordability_index
 from etl.load_geo import GTA_MUNICIPALITIES
 
 PROFILE_BASE_URL = "https://api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_CSD"
@@ -210,9 +207,9 @@ def upsert_metrics(db, metrics: list[MetricInput]) -> int:
             "population": item.population,
             "previous_population": item.previous_population,
             "renter_households": item.renter_households,
-            "rent_burden_pct": item.rent_burden_pct
-            if item.rent_burden_pct is not None
-            else estimate_rent_burden_pct(item.median_rent, item.median_income),
+            # Persist the official value only (null when suppressed); rent
+            # burden is estimated as a labeled fallback at serialization time.
+            "rent_burden_pct": item.rent_burden_pct,
             "affordability_index": calculate_affordability_index(item.median_rent, item.median_income),
             "dwellings_total": item.dwellings_total,
             "dwellings_single_detached": item.dwellings_single_detached,

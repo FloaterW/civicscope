@@ -8,8 +8,8 @@ type Props = {
   geographyLevel: GeographyLevel;
   /** When supplied (from API metadata), overrides the default label. */
   dataQualityLabel?: string;
-  /** When "estimated", badge uses amber tones instead of green. */
-  metricStatus?: "official" | "estimated";
+  /** "estimated"/"mixed" use amber tones instead of green to flag non-official values. */
+  metricStatus?: "official" | "estimated" | "mixed";
 };
 
 const qualityCopy: Record<
@@ -34,7 +34,8 @@ export function DataQualityBadge({ geographyLevel, dataQualityLabel, metricStatu
   const quality = qualityCopy[geographyLevel];
   const Icon = quality.icon;
   const label = dataQualityLabel ?? quality.label;
-  const tone = metricStatus === "estimated" ? estimatedTone : quality.tone;
+  const tone =
+    metricStatus === "estimated" || metricStatus === "mixed" ? estimatedTone : quality.tone;
 
   return (
     <div

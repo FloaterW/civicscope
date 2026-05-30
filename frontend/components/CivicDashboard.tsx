@@ -4,7 +4,6 @@ import { AlertCircle, Database, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  CMHC_METRIC_KEYS,
   getComparison,
   getMapData,
   getMetricLabel,
@@ -34,6 +33,10 @@ import { YearSelector } from "./YearSelector";
 
 const defaultCompareIds = ["3520005", "3521005", "3521010", "3519036", "3519028"];
 
+function mapCacheKey(level: GeographyLevel, metric: MetricKey, year?: number) {
+  return `${level}:${metric}:${year ?? "latest"}`;
+}
+
 const geographyLabels: Record<GeographyLevel, { singular: string; plural: string; search: string }> = {
   municipality: {
     singular: "municipality",
@@ -50,7 +53,7 @@ const geographyLabels: Record<GeographyLevel, { singular: string; plural: string
 export function CivicDashboard() {
   const [metric, setMetric] = useState<MetricKey>("rent_burden_pct");
   const [geographyLevel, setGeographyLevel] = useState<GeographyLevel>("municipality");
-  const [mapDataByLevel, setMapDataByLevel] = useState<Partial<Record<GeographyLevel, MapData>>>({});
+  const [mapDataByKey, setMapDataByKey] = useState<Record<string, MapData>>({});
   const [summary, setSummary] = useState<Summary | null>(null);
   const [comparison, setComparison] = useState<CompareResponse | null>(null);
   const [selected, setSelected] = useState<Geography | null>(null);
@@ -66,9 +69,11 @@ export function CivicDashboard() {
   const [comparisonLoading, setComparisonLoading] = useState(true);
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
-  const mapData = mapDataByLevel[geographyLevel] ?? null;
-  const hasCachedMapData = Boolean(mapData);
   const isCmhc = isCmhcMetric(metric);
+  const requestedMapYear = isCmhc ? selectedYear : undefined;
+  const activeMapKey = mapCacheKey(geographyLevel, metric, requestedMapYear);
+  const mapData = mapDataByKey[activeMapKey] ?? null;
+  const hasCachedMapData = Boolean(mapData);
   const displayYear = isCmhc ? (selectedYear ?? availableYears[availableYears.length - 1]) : 2021;
 
   const comparisonIds = useMemo(() => {
@@ -81,17 +86,20 @@ export function CivicDashboard() {
     return [selectedGeoid, ...defaultCompareIds.filter((geoid) => geoid !== selectedGeoid)];
   }, [geographyLevel, selectedGeoid]);
 
-  useEffect(() => {
+  function handleGeographyLevelChange(level: GeographyLevel) {
+    if (level === geographyLevel) {
+      return;
+    }
+    setGeographyLevel(level);
+    // Clear any active selection synchronously (in the same update as the level
+    // change) so the summary/comparison effects never fire a stale request for
+    // a geoid that belongs to the other geography type (which would 404).
     setSelected(null);
     setSearch("");
     setSearchResults([]);
-  }, [geographyLevel]);
-
-  useEffect(() => {
-    // Clear all cached map data and cancel in-flight prefetches so stale
-    // responses from the previous metric don't re-pollute the cache.
-    setMapDataByLevel({});
-  }, [metric, selectedYear]);
+    setSelectedCmhcMetrics(null);
+    setSelectedCmhcYear(undefined);
+  }
 
   // Keep selected geography's CMHC data in sync with current map data.
   // Handles: search selection, metric switch, year switch — all paths
@@ -116,7 +124,7 @@ export function CivicDashboard() {
     setError(null);
     const controller = new AbortController();
 
-    getMapData(metric, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
+    getMapData(metric, geographyLevel, controller.signal, requestedMapYear)
       .then((mapPayload) => {
         if (controller.signal.aborted) return;
         if (mapPayload.metadata.available_years?.length) {
@@ -125,12 +133,12 @@ export function CivicDashboard() {
         if (mapPayload.metadata.cmhc_year !== undefined) {
           setSelectedCmhcYear(mapPayload.metadata.cmhc_year);
         }
-        setMapDataByLevel((current) =>
-          current[geographyLevel]
+        setMapDataByKey((current) =>
+          current[activeMapKey]
             ? current
             : {
                 ...current,
-                [geographyLevel]: mapPayload
+                [activeMapKey]: mapPayload
               }
         );
       })
@@ -145,7 +153,7 @@ export function CivicDashboard() {
       });
 
     return () => controller.abort();
-  }, [geographyLevel, hasCachedMapData, metric, selectedYear, isCmhc]);
+  }, [activeMapKey, geographyLevel, hasCachedMapData, metric, requestedMapYear]);
 
   useEffect(() => {
     if (!mapData) {
@@ -153,27 +161,28 @@ export function CivicDashboard() {
     }
     const inactiveLevel: GeographyLevel =
       geographyLevel === "municipality" ? "census_tract" : "municipality";
-    if (mapDataByLevel[inactiveLevel]) {
+    const inactiveMapKey = mapCacheKey(inactiveLevel, metric, requestedMapYear);
+    if (mapDataByKey[inactiveMapKey]) {
       return;
     }
 
     const controller = new AbortController();
-    getMapData(metric, inactiveLevel, controller.signal, isCmhc ? selectedYear : undefined)
+    getMapData(metric, inactiveLevel, controller.signal, requestedMapYear)
       .then((mapPayload) => {
         if (controller.signal.aborted) return;
-        setMapDataByLevel((current) =>
-          current[inactiveLevel]
+        setMapDataByKey((current) =>
+          current[inactiveMapKey]
             ? current
             : {
                 ...current,
-                [inactiveLevel]: mapPayload
+                [inactiveMapKey]: mapPayload
               }
         );
       })
       .catch(() => {});
 
     return () => controller.abort();
-  }, [geographyLevel, mapData, mapDataByLevel, metric, selectedYear, isCmhc]);
+  }, [geographyLevel, mapData, mapDataByKey, metric, requestedMapYear]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -315,7 +324,7 @@ export function CivicDashboard() {
                 </div>
               )}
             </div>
-            <GeographyLevelSelector value={geographyLevel} onChange={setGeographyLevel} />
+            <GeographyLevelSelector value={geographyLevel} onChange={handleGeographyLevelChange} />
             <MetricSelector value={metric} onChange={setMetric} />
             <YearSelector
               value={displayYear}
@@ -415,7 +424,16 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
 
   const values = data.features
     .map((feature) => {
-      const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, number | boolean | null>;
+      // Low-confidence growth (a tiny 2016 base) would blow out the color
+      // scale, so exclude it from the domain. The tract is still rendered and
+      // its real value is shown, flagged, in the detail panel.
+      if (
+        metric === "population_growth_pct" &&
+        feature.properties.metrics.data_quality?.population_growth_pct === "low_confidence"
+      ) {
+        return null;
+      }
+      const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, unknown>;
       return allMetrics[metric];
     })
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
@@ -431,13 +449,14 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
       }
     },
     features: data.features.map((feature) => {
-      const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, number | boolean | null>;
+      const allMetrics = { ...feature.properties.metrics, ...feature.properties.cmhc_metrics } as Record<string, unknown>;
+      const rawValue = allMetrics[metric];
       return {
         ...feature,
         properties: {
           ...feature.properties,
           metric,
-          value: typeof allMetrics[metric] === "number" ? allMetrics[metric] : null
+          value: typeof rawValue === "number" ? rawValue : null
         }
       };
     })
