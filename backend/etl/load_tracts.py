@@ -276,10 +276,7 @@ def point_in_ring(point: tuple[float, float], ring: list[list[float]]) -> bool:
 
 def upsert_tracts(db, tract_rows: list[dict[str, Any]]) -> int:
     from app.models import Geography, Metric
-    from app.services.metric_calculations import (
-        calculate_affordability_index,
-        estimate_rent_burden_pct,
-    )
+    from app.services.metric_calculations import calculate_affordability_index
 
     count = 0
     for item in tract_rows:
@@ -308,8 +305,13 @@ def upsert_tracts(db, tract_rows: list[dict[str, Any]]) -> int:
             "population": metric_item.get("population"),
             "previous_population": metric_item.get("previous_population"),
             "renter_households": metric_item.get("renter_households"),
-            "rent_burden_pct": metric_item.get("rent_burden_pct")
-            or estimate_rent_burden_pct(median_rent, median_income),
+            # Passed through verbatim from the caller. The seed path provides
+            # official values (null when suppressed). The legacy geometry-refresh
+            # path (build_parent_tract_rows) provides disclosed placeholder
+            # estimates that are meant to be overwritten by official values from
+            # load_tract_census.py; its geometry_source states the metrics are
+            # estimated. No estimation is introduced here.
+            "rent_burden_pct": metric_item.get("rent_burden_pct"),
             "affordability_index": calculate_affordability_index(median_rent, median_income),
         }
         if metric is None:

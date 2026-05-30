@@ -16,6 +16,7 @@ type MapFeaturePayload = {
       median_rent: number | null;
       rent_burden_pct: number | null;
       affordability_index: number | null;
+      data_quality?: Record<string, string>;
     };
   };
 };
@@ -29,7 +30,8 @@ type MapPayload = {
     };
     geography_type: "municipality" | "census_tract";
     data_quality: {
-      metric_status: "official" | "estimated";
+      metric_status: "official" | "estimated" | "mixed";
+      label: string;
     };
   };
   features: MapFeaturePayload[];
@@ -69,11 +71,13 @@ test.describe("CivicScope dashboard regressions", () => {
     const map = page.getByTestId("civic-map");
     await expect(page.getByText("Rent burden by census tract")).toBeVisible();
     await expect(page.getByTestId("summary-panel")).toContainText("1,334 GTA census tracts");
+    // Rent burden is the default metric and has an estimated fallback, so the
+    // badge must disclose that — not claim every value is official.
     await expect(
-      page.getByTestId("data-quality-badge").filter({ hasText: "Official tract metrics" })
+      page.getByTestId("data-quality-badge").filter({ hasText: "Official + estimated tract metrics" })
     ).toHaveCount(2);
-    await expect(map).toHaveAttribute("data-geography-type", "census_tract");
-    await expect(map).toHaveAttribute("data-feature-count", "1334");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+    await expect(map).toHaveAttribute("data-feature-count", "1334", { timeout: 30000 });
     await expect(page.getByTestId("detail-panel")).toContainText("official 2021 Census Profile");
 
     await page.getByTestId("geography-search").fill("5350001.00");
@@ -175,6 +179,35 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(apiErrors).toEqual([]);
   });
 
+  test("switching geography level with a selection active fires no stale cross-type requests", async ({ page }) => {
+    const apiErrors: string[] = [];
+    page.on("response", (response) => {
+      if (response.url().includes("/api/") && response.status() >= 400) {
+        apiErrors.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    await blockExternalMapAssets(page);
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    // Select a census tract, then switch back to municipalities. The stale
+    // tract geoid must not be requested under type=municipality (would 404).
+    await page.getByTestId("geography-search").fill("5350001.00");
+    const result = page.getByRole("option").filter({ hasText: "5350001.00" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
+
+    await page.getByRole("button", { name: "Municipalities" }).click();
+    await expect(map).toHaveAttribute("data-geography-type", "municipality", { timeout: 30000 });
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    expect(apiErrors).toEqual([]);
+  });
+
   test("metric selector repaints map state and polygon clicks select a municipality", async ({ page }) => {
     await blockExternalMapAssets(page);
 
@@ -262,6 +295,141 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "housing_starts_total");
 
     expect(apiErrors).toEqual([]);
+  });
+
+  test("census tract map-data exposes field-level provenance for tract metrics", async ({ request }) => {
+    const response = await request.get(
+      `${API_BASE}/api/map-data?metric=rent_burden&type=census_tract&detail=display`
+    );
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const payload = (await response.json()) as MapPayload;
+
+    // The badge must not flatly claim every tract rent-burden value is official.
+    expect(payload.metadata.data_quality.metric_status).toBe("mixed");
+    expect(payload.metadata.data_quality.label).toContain("estimated");
+
+    const withQuality = payload.features.filter((f) => f.properties.metrics.data_quality);
+    expect(withQuality.length).toBe(payload.features.length);
+
+    const statuses = new Set(
+      payload.features.map((f) => f.properties.metrics.data_quality?.rent_burden_pct)
+    );
+    // Official, estimated, and unavailable rent burden all coexist among tracts.
+    expect(statuses.has("official")).toBe(true);
+    expect(statuses.has("estimated")).toBe(true);
+    expect(statuses.has("unavailable")).toBe(true);
+  });
+
+  test("estimated tract rent burden is visibly flagged, not presented as official", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "census_tract",
+      { timeout: 30000 }
+    );
+
+    // Whitby tract 0105.17 has a suppressed official rent burden but usable
+    // rent + income, so it is estimated and must say so.
+    await page.getByTestId("geography-search").fill("5320105.17");
+    const result = page.getByRole("option").filter({ hasText: "5320105.17" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+
+    const panel = page.getByTestId("detail-panel");
+    await expect(panel).toContainText("Whitby census tract 0105.17");
+    await expect(panel.getByTestId("estimated-flag").first()).toBeVisible();
+    await expect(panel).toContainText("Rent burden estimated from median rent and income");
+  });
+
+  test("tract with a tiny previous population flags low-confidence growth", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "census_tract",
+      { timeout: 30000 }
+    );
+
+    // Whitby tract 0105.22: 2016 base population of 5 produces an absurd growth %.
+    await page.getByTestId("geography-search").fill("5320105.22");
+    const result = page.getByRole("option").filter({ hasText: "5320105.22" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+
+    const panel = page.getByTestId("detail-panel");
+    await expect(panel.getByTestId("low-confidence-flag").first()).toBeVisible();
+    await expect(panel).toContainText("very small 2016 base");
+  });
+
+  test("tract with a suppressed value renders Not available without crashing", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "census_tract",
+      { timeout: 30000 }
+    );
+
+    // Whitby tract 0105.24 has a suppressed median rent.
+    await page.getByTestId("geography-search").fill("5320105.24");
+    const result = page.getByRole("option").filter({ hasText: "5320105.24" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+
+    const panel = page.getByTestId("detail-panel");
+    await expect(panel).toContainText("Whitby census tract 0105.24");
+    await expect(panel).toContainText("Not available");
+  });
+
+  test("population growth map scale excludes tiny-base outliers in tract mode", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    await page.getByLabel("Map metric").selectOption("population_growth_pct");
+    await expect(map).toHaveAttribute("data-metric", "population_growth_pct");
+
+    // A handful of near-empty 2016-base tracts reach ~29,580% growth; they must
+    // not define the color scale (they are still shown, flagged, on click).
+    const domainMax = Number(await map.getAttribute("data-domain-max"));
+    expect(domainMax).toBeGreaterThan(0);
+    expect(domainMax).toBeLessThan(5000);
+  });
+
+  test("CMHC metric in census tract mode is labeled estimated/allocated", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "census_tract",
+      { timeout: 30000 }
+    );
+
+    await page.getByLabel("Map metric").selectOption("housing_starts_total");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "housing_starts_total");
+
+    // Badge must mark CMHC tract values as an estimated allocation.
+    await expect(
+      page.getByTestId("data-quality-badge").filter({ hasText: "estimated allocation" }).first()
+    ).toBeVisible();
+
+    // Toronto's tracts inherit/allocate from a fully-surveyed parent municipality.
+    await page.getByTestId("geography-search").fill("5350001.00");
+    const result = page.getByRole("option").filter({ hasText: "5350001.00" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+
+    const panel = page.getByTestId("detail-panel");
+    await expect(panel).toContainText("Toronto census tract 0001.00");
+    // Inherited rate metrics are labeled as municipal rates (not tract-native).
+    await expect(panel).toContainText("municipal rates");
   });
 });
 

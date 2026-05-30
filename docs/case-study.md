@@ -14,7 +14,7 @@ CivicScope is designed for a policy analyst, housing researcher, municipal plann
 2. Change the active metric to repaint the map immediately without waiting for another map request.
 3. Search for a municipality or census tract and inspect its local metrics in the detail panel.
 4. Compare selected places in the chart/table area to understand nearby variation.
-5. Use data-quality badges to distinguish official municipal metrics from estimated tract metrics.
+5. Use data-quality badges to distinguish official Census Profile metrics from CMHC metrics that are estimated when allocated to tracts.
 
 ## Technical Decisions
 
@@ -26,7 +26,7 @@ CivicScope is designed for a policy analyst, housing researcher, municipal plann
 
 ## Current Data Quality
 
-Municipality metrics use official Statistics Canada 2021 Census Profile values. Census tract geometries are official Statistics Canada 2021 cartographic tract boundaries, but packaged tract metric values are estimated from parent municipalities for offline demo use. The app labels this in the UI and docs to avoid misleading precision.
+Municipality and census tract metrics use official Statistics Canada 2021 Census Profile values. Census tract geometries are official Statistics Canada 2021 cartographic tract boundaries filtered to the GTA. CMHC rental-market metrics are official at the municipality level; in census tract mode, rate metrics are inherited from the parent municipality and count metrics are proportionally allocated, so the UI labels those tract-level CMHC values as estimated.
 
 ## What This Demonstrates
 

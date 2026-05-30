@@ -1,7 +1,3 @@
-if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_API_URL) {
-  throw new Error("NEXT_PUBLIC_API_URL must be set for production builds");
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
