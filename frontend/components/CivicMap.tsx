@@ -1,14 +1,16 @@
 "use client";
 
-import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap } from "maplibre-gl";
-import { useEffect, useRef } from "react";
+import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
+import { useEffect, useMemo, useRef } from "react";
 
-import type { MapData, MapFeature, MetricKey } from "@/types";
+import { formatMetric, getMetricLabel } from "@/lib/api";
+import type { GeographyLevel, MapData, MapFeature, MetricFieldStatus, MetricKey, MetricQuality, MetricValues } from "@/types";
 
 type Props = {
   data: MapData | null;
   loading: boolean;
   metric: MetricKey;
+  geographyLevel: GeographyLevel;
   selectedGeoid?: string;
   onSelect: (feature: MapFeature["properties"]) => void;
 };
@@ -36,17 +38,34 @@ const referencePlaces = {
   ]
 };
 
-export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Props) {
+export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const mapReadyRef = useRef(false);
   const onSelectRef = useRef(onSelect);
+  const popupRef = useRef<Popup | null>(null);
+  // The hover handler is registered once at init; read the live metric from a
+  // ref so the tooltip always reflects the currently selected metric.
+  const metricRef = useRef<MetricKey>(metric);
   const isReady = Boolean(data);
   const loadedMetric = data?.metadata.metric ?? null;
+
+  // Same quantile computation the map paints by, so the legend always agrees.
+  const legend = useMemo(() => (data ? computeColorStops(data) : null), [data]);
+  // Data loaded, but every geography is null for this metric (e.g. turnover /
+  // availability — not collected in this dataset). Surface an explicit empty
+  // state instead of a silently blank map.
+  const dataIsEmpty = Boolean(
+    data && data.metadata.domain.min === null && data.metadata.domain.max === null
+  );
 
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
+
+  useEffect(() => {
+    metricRef.current = metric;
+  }, [metric]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current || !data) {
@@ -204,12 +223,32 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
         onSelectRef.current(normalizeFeatureProperties(feature));
       });
 
-      map.on("mousemove", fillLayerId, () => {
+      const popup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 8,
+        className: "civic-map-popup"
+      });
+      popupRef.current = popup;
+
+      map.on("mousemove", fillLayerId, (event) => {
         map.getCanvas().style.cursor = "pointer";
+        const feature = event.features?.[0];
+        if (!feature) {
+          popup.remove();
+          return;
+        }
+        const html = buildTooltipHtml(feature.properties ?? {}, metricRef.current);
+        if (!html) {
+          popup.remove();
+          return;
+        }
+        popup.setLngLat(event.lngLat).setHTML(html).addTo(map);
       });
 
       map.on("mouseleave", fillLayerId, () => {
         map.getCanvas().style.cursor = "";
+        popup.remove();
       });
 
       mapRef.current = map;
@@ -220,6 +259,10 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
     return () => {
       cancelled = true;
       mapReadyRef.current = false;
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -288,6 +331,13 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
       data-geography-type={data?.metadata.geography_type ?? ""}
       data-domain-min={data?.metadata.domain.min ?? ""}
       data-domain-max={data?.metadata.domain.max ?? ""}
+      data-empty={dataIsEmpty ? "true" : "false"}
+      role="region"
+      aria-label={`Map of ${getMetricLabel(metric)} by ${
+        (data?.metadata.geography_type ?? geographyLevel) === "census_tract"
+          ? "census tract"
+          : "municipality"
+      }. Use the search box to inspect a specific geography.`}
       className="relative h-full w-full"
     >
       {!data && (
@@ -300,53 +350,180 @@ export function CivicMap({ data, loading, metric, selectedGeoid, onSelect }: Pro
           Updating map...
         </div>
       )}
+      {dataIsEmpty && (
+        <div
+          data-testid="map-empty-state"
+          role="status"
+          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-white/95 px-3 py-2 text-center text-xs text-civic-muted shadow-panel"
+        >
+          No data available for {getMetricLabel(metric)} in this dataset.
+        </div>
+      )}
       <div ref={containerRef} data-testid="map-canvas-host" className="h-full w-full" />
-      {data && (
-        <div className="absolute bottom-3 left-3 rounded-md border border-civic-line bg-white/95 px-3 py-2 text-xs shadow-panel">
-          <div className="mb-1 font-semibold text-civic-ink">Value range</div>
-          <div className="flex items-center gap-2 text-civic-muted">
-            <span>{formatLegendValue(data.metadata.domain.min)}</span>
-            <span className="h-2 w-28 rounded-full bg-gradient-to-r from-[#f1f7f0] via-[#68b7aa] to-[#a64822]" />
-            <span>{formatLegendValue(data.metadata.domain.max)}</span>
-          </div>
+      {data && legend && (
+        <div
+          data-testid="map-legend"
+          className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-white/95 px-3 py-2 text-xs shadow-panel"
+        >
+          <div className="mb-1.5 font-semibold text-civic-ink">{getMetricLabel(metric)}</div>
+          {legend.flat || legend.stops.length < 2 ? (
+            <div data-legend-class className="flex items-center gap-2 text-civic-muted">
+              <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: FLAT_COLOR }} />
+              <span className="tabular-nums">{formatMetric(metric, legend.min)}</span>
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {legend.stops.map((stop, index) => {
+                const isLast = index === legend.stops.length - 1;
+                const upper = isLast ? legend.max : legend.stops[index + 1].value;
+                return (
+                  <li
+                    key={`${stop.value}-${index}`}
+                    data-legend-class
+                    className="flex items-center gap-2 text-civic-muted"
+                  >
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-sm"
+                      style={{ backgroundColor: stop.color }}
+                    />
+                    <span className="tabular-nums">
+                      {isLast
+                        ? `${formatMetric(metric, stop.value)}+`
+                        : `${formatMetric(metric, stop.value)} – ${formatMetric(metric, upper)}`}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// Null geographies (no value for the active metric) render in this neutral grey.
+const NULL_COLOR = "#d8dee6";
+// Flat fill used when every geography shares one value (e.g. CMA-level CMHC data).
+const FLAT_COLOR = "#68b7aa";
+// 3-stop civic ramp, interpolated across the quantile breaks below.
+const RAMP = ["#f1f7f0", "#68b7aa", "#a64822"];
+
+/**
+ * Linearly sample the 3-colour civic ramp at fraction t in [0, 1].
+ * Used to spread the ramp evenly across N quantile breaks so the legend and
+ * map agree on which colour each class gets.
+ */
+function rampColorAt(t: number): string {
+  const clamped = Math.min(1, Math.max(0, t));
+  const scaled = clamped * (RAMP.length - 1);
+  const lower = Math.floor(scaled);
+  const upper = Math.min(RAMP.length - 1, lower + 1);
+  const frac = scaled - lower;
+  return mixHex(RAMP[lower], RAMP[upper], frac);
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const parse = (hex: string): [number, number, number] => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16)
+  ];
+  const [ar, ag, ab] = parse(a);
+  const [br, bg, bb] = parse(b);
+  const channel = (x: number, y: number) => Math.round(x + (y - x) * t);
+  const toHex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${toHex(channel(ar, br))}${toHex(channel(ag, bg))}${toHex(channel(ab, bb))}`;
+}
+
+/**
+ * Compute quantile boundaries from a sorted ascending array of values.
+ * Returns `count` interior break points at evenly-spaced percentiles
+ * (e.g. count=4 -> 20/40/60/80 for 5 classes). Uses linear interpolation
+ * between sorted samples.
+ */
+function quantileBreaks(sorted: number[], count: number): number[] {
+  const breaks: number[] = [];
+  for (let i = 1; i <= count; i += 1) {
+    const q = i / (count + 1);
+    const pos = q * (sorted.length - 1);
+    const lower = Math.floor(pos);
+    const upper = Math.min(sorted.length - 1, lower + 1);
+    const frac = pos - lower;
+    breaks.push(sorted[lower] + (sorted[upper] - sorted[lower]) * frac);
+  }
+  return breaks;
+}
+
+/**
+ * Quantile (data-driven) colour stops computed from the actual distribution of
+ * the active metric's non-null feature values. This differentiates right-skewed
+ * metrics far better than linear min/mid/max interpolation, which washes most
+ * areas into the palest band. Returns the stop boundaries (ascending, deduped)
+ * paired with the ramp colour for each, plus the domain min/max — shared by the
+ * map paint expression and the legend so the two always agree.
+ */
+function computeColorStops(data: MapData): {
+  stops: Array<{ value: number; color: string }>;
+  min: number;
+  max: number;
+  flat: boolean;
+} {
+  const values = data.features
+    .map((feature) => feature.properties.value)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+    .sort((a, b) => a - b);
+
+  const min = values.length ? values[0] : (data.metadata.domain.min ?? 0);
+  const max = values.length ? values[values.length - 1] : (data.metadata.domain.max ?? 1);
+
+  // All equal (or no data): flat fill — interpolate needs ascending stops.
+  if (!values.length || min === max) {
+    return { stops: [], min, max, flat: true };
+  }
+
+  // 5 classes -> 4 interior quantile breaks at the 20/40/60/80 percentiles.
+  // Anchor with the domain min so the first stop maps to the palest colour.
+  const interior = quantileBreaks(values, 4);
+  const candidate = [min, ...interior];
+
+  // Dedupe equal boundaries (heavily-tied distributions collapse quantiles)
+  // to keep stops strictly ascending — MapLibre throws otherwise.
+  const ascending: number[] = [];
+  for (const value of candidate) {
+    if (ascending.length === 0 || value > ascending[ascending.length - 1]) {
+      ascending.push(value);
+    }
+  }
+
+  // Need >=2 distinct stops to interpolate; otherwise fall back to flat.
+  if (ascending.length < 2) {
+    return { stops: [], min, max, flat: true };
+  }
+
+  const stops = ascending.map((value, index) => ({
+    value,
+    color: rampColorAt(index / (ascending.length - 1))
+  }));
+  return { stops, min, max, flat: false };
+}
+
 function colorExpression(data: MapData): unknown[] {
-  const min = data.metadata.domain.min ?? 0;
-  const max = data.metadata.domain.max ?? 1;
+  const { stops, flat } = computeColorStops(data);
 
   // When all features have the same value (e.g. CMA-level CMHC data),
   // min === max makes interpolate stops non-monotonic which silently
-  // kills MapLibre rendering.  Use a flat color instead.
-  if (min === max) {
-    return [
-      "case",
-      ["==", ["get", "value"], null],
-      "#d8dee6",
-      "#68b7aa"
-    ];
+  // kills MapLibre rendering. Use a flat color instead.
+  if (flat) {
+    return ["case", ["==", ["get", "value"], null], NULL_COLOR, FLAT_COLOR];
   }
 
-  const mid = min + (max - min) / 2;
+  const interpolateStops = stops.flatMap((stop) => [stop.value, stop.color]);
   return [
     "case",
     ["==", ["get", "value"], null],
-    "#d8dee6",
-    [
-      "interpolate",
-      ["linear"],
-      ["to-number", ["get", "value"]],
-      min,
-      "#f1f7f0",
-      mid,
-      "#68b7aa",
-      max,
-      "#a64822"
-    ]
+    NULL_COLOR,
+    ["interpolate", ["linear"], ["to-number", ["get", "value"]], ...interpolateStops]
   ];
 }
 
@@ -386,13 +563,49 @@ function normalizeFeatureProperties(feature: {
   };
 }
 
-function formatLegendValue(value: number | null): string {
-  if (value === null || value === undefined) {
-    return "n/a";
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// (formatLegendValue removed — the legend now renders quantile classes via formatMetric.)
+
+/**
+ * Build the hover-tooltip markup for a geography feature. Properties arrive
+ * JSON-stringified from the vector source, so `value`/`metrics` may be strings
+ * — parse them defensively. Appends a provenance note when the census metric is
+ * flagged estimated / low confidence for this feature.
+ */
+function buildTooltipHtml(rawProperties: Record<string, unknown>, metric: MetricKey): string | null {
+  const name = typeof rawProperties.name === "string" ? rawProperties.name : null;
+  if (!name) {
+    return null;
   }
-  return Math.abs(value) >= 1000
-    ? new Intl.NumberFormat("en-CA", { notation: "compact" }).format(value)
-    : value.toFixed(1);
+
+  const rawValue = rawProperties.value;
+  const parsed =
+    rawValue === null || rawValue === undefined || rawValue === "" ? null : Number(rawValue);
+  const value = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+
+  const metrics = safeJsonParse<MetricValues | null>(rawProperties.metrics, null);
+  const fieldStatus = metrics?.data_quality?.[metric as keyof MetricQuality] as
+    | MetricFieldStatus
+    | undefined;
+  const note =
+    fieldStatus === "estimated"
+      ? " (estimated)"
+      : fieldStatus === "low_confidence"
+        ? " (low confidence)"
+        : "";
+
+  return [
+    `<div class="civic-map-popup__name">${escapeHtml(name)}</div>`,
+    `<div class="civic-map-popup__metric">${escapeHtml(getMetricLabel(metric))}</div>`,
+    `<div class="civic-map-popup__value">${escapeHtml(formatMetric(metric, value))}${escapeHtml(note)}</div>`
+  ].join("");
 }
 
 function getDataBounds(data?: MapData | null): LngLatBoundsLike | null {

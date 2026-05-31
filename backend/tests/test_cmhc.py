@@ -320,6 +320,26 @@ def test_municipality_cmhc_not_allocated(client):
     assert cmhc["housing_starts_total"] is not None
 
 
+def test_summary_no_cmhc_blend_for_unresolvable_tract_parent(client, db_session):
+    # If a selected tract's parent municipality cannot be resolved (null county),
+    # the summary must NOT silently fall back to ALL-municipality CMHC aggregates
+    # (GTA-wide data attributed to one tract). Regression for code-review #7.
+    from app.models import Geography
+
+    tract = (
+        db_session.query(Geography)
+        .filter(Geography.type == "census_tract", Geography.geoid == "5350001.00")
+        .one()
+    )
+    tract.county = None
+    db_session.commit()
+
+    payload = client.get("/api/summary?type=census_tract&ids=5350001.00").json()
+    assert payload["region_count"] == 1
+    assert payload["vacancy_rate"] is None
+    assert payload["average_rent_total"] is None
+
+
 def test_metrics_endpoint_rejects_cmhc_metric(client):
     response = client.get("/api/metrics?metric=vacancy_rate")
     assert response.status_code == 400
