@@ -42,20 +42,44 @@ the Python ingestion path:
   R package), fetches a CT-breakdown table for the Toronto CMA, parses it (marking
   `**`/blank cells as suppressed), and reports per-metric tract coverage.
 
-**Empirical finding (2026-05-30): a plain HTTP pull does NOT work.** The host is
-reachable (HTTP 200), and the Toronto CMA "Vacancy Rate by Census Tract" page was
-fetched directly (~100 KB). The returned HTML is a **JavaScript single-page-app
-shell**: it carries `<script>` tags but **zero** `<table>`/`<svg>` elements and
-**zero** occurrences of "Census Tract", "Vacancy", "Toronto", or any CT id / data
-value — the table/chart is rendered client-side via AJAX after load. So a naive
-`requests.get(...)` cannot retrieve real values; only the spike's offline `--dry-run`
-path runs here. Real ingestion needs one of: (1) the **`cmhc` R package** run as an
-**offline ETL step** that emits a committed CSV (mirroring how
-`app/data/statcan_ct_metrics.csv` is produced today); (2) reverse-engineering HMIP's
-undocumented internal AJAX/JSON endpoint; or (3) headless-browser automation. Any
-ingested values must be **validated against known-good CMHC figures before being
-labeled "real"** — shipping unvalidated data would violate the project's honesty
-principle — so Phase A is left as a documented, validated plan rather than rushed.
+**Empirical finding (2026-05-30, updated): the CSV data endpoint IS reachable.**
+An earlier draft of this note said a plain HTTP pull fails. That is true only for the
+*interactive* `TableMapChart` page (a JavaScript SPA that returns no data to a `GET`),
+but that is not the real data path. CMHC's **`ExportTable` endpoint works from this
+environment**, verified directly:
+
+- `POST https://www03.cmhc-schl.gc.ca/hmip-pimh/en/TableMapChart/ExportTable`
+  with form fields `TableId`, `GeographyId`, `GeographyTypeId`, `exportType=csv`
+  returned **HTTP 200 + real CSV** (Toronto CMA `GeographyId=2270`,
+  `GeographyTypeId=3`, `TableId=1.9.3` → real "Under Construction Inventory by
+  Intended Market" monthly series, 1990–2026). **No auth cookie was required.**
+- Geography type codes (from the `cmhc` package's `cmhc_region_params_from_census`):
+  Canada=1, Province=2, Metropolitan(CMA)=3, Census Subdivision=4, Survey Zone=5,
+  Neighbourhood=6, **Census Tract=7**.
+
+**The catch (why Phase A is still a milestone, not a one-liner):** the census-tract
+breakdown is **encoded in the table code**, not a free parameter. Adding
+`BreakdownGeographyTypeId=7` to table `1.9.3` was **ignored** — it returned the
+identical CMA-total series. Real CT rows require:
+
+1. mining the `cmhc` package's bundled table list for the **CT-specific TableCode**
+   per SCSS/RMS series (the package maps survey/series/breakdown → a specific code);
+2. covering **all CMAs that contain GTA tracts** (the 1,334 tracts span CTUID prefixes
+   535/532/537 — multiple CMAs, not just Toronto 2270);
+3. parsing CMHC's **multi-section, latin1, quality-coded** CSV (the `cmhc` package
+   spends ~150 lines on this: `$1,234` comma handling, "- Quality" columns, header
+   detection);
+4. mapping CMHC's returned CT **GeoUIDs to our CTUIDs**; and
+5. **validating** the result against known-good CMHC figures before labeling anything
+   "real."
+
+**Decision: Phase A remains a scoped follow-up milestone, not shipped now.**
+Feasibility is now *confirmed* (real data is reachable here), which removes the biggest
+unknown — but doing it correctly is a real data-pipeline effort, and shipping
+reverse-engineered values without the validation step (item 5) would violate the
+project's honesty principle. The labeled inheritance/allocation fallback stays in the
+meantime. A follow-up can start from the verified `ExportTable` contract above instead
+of from zero.
 
 To run where network is available:
 

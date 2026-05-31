@@ -59,6 +59,7 @@ export function CivicDashboard() {
   const [selected, setSelected] = useState<Geography | null>(null);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Geography[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [selectedCmhcMetrics, setSelectedCmhcMetrics] = useState<CmhcMetricValues | null>(null);
   const [selectedCmhcYear, setSelectedCmhcYear] = useState<number | undefined>(undefined);
   const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
@@ -233,13 +234,28 @@ export function CivicDashboard() {
   useEffect(() => {
     if (!search.trim()) {
       setSearchResults([]);
+      setSearchLoading(false);
       return;
     }
     const controller = new AbortController();
+    setSearchLoading(true);
     const timer = window.setTimeout(() => {
       searchGeographies(search, geographyLevel, controller.signal)
-        .then((payload) => setSearchResults(payload.items))
-        .catch(() => setSearchResults([]));
+        .then((payload) => {
+          setSearchResults(payload.items);
+          setSearchLoading(false);
+        })
+        .catch((err: unknown) => {
+          // An aborted request (stale keystroke / unmount) is expected — leave
+          // the loading state for the next effect run to manage. For a real
+          // failure, clear results and stop the spinner so the empty-state
+          // message can render instead of hanging on "Searching…".
+          if (err instanceof DOMException && err.name === "AbortError") {
+            return;
+          }
+          setSearchResults([]);
+          setSearchLoading(false);
+        });
     }, 180);
 
     return () => {
@@ -286,7 +302,16 @@ export function CivicDashboard() {
               />
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setSearch(next);
+                  // Enter the loading state synchronously so the dropdown shows
+                  // "Searching…" on the first keystroke instead of flashing a
+                  // premature "No matches" before the debounced request fires.
+                  if (next.trim()) {
+                    setSearchLoading(true);
+                  }
+                }}
                 placeholder={geographyLabel.search}
                 data-testid="geography-search"
                 role="combobox"
@@ -321,6 +346,17 @@ export function CivicDashboard() {
                       <span className="text-xs text-civic-muted">{geography.geoid}</span>
                     </button>
                   ))}
+                </div>
+              )}
+              {searchResults.length === 0 && search.trim() && search !== selected?.name && (
+                <div
+                  data-testid="search-empty"
+                  role="status"
+                  className="pointer-events-none absolute right-0 z-20 mt-2 w-full rounded-md border border-civic-line bg-white px-3 py-2 text-sm text-civic-muted shadow-panel"
+                >
+                  {searchLoading
+                    ? "Searching…"
+                    : `No ${geographyLabel.plural} match “${search.trim()}”.`}
                 </div>
               )}
             </div>
@@ -365,6 +401,7 @@ export function CivicDashboard() {
               data={visibleMapData}
               loading={mapLoading}
               metric={metric}
+              geographyLevel={geographyLevel}
               selectedGeoid={selectedGeoid}
               onSelect={handleFeatureSelect}
             />
@@ -413,6 +450,23 @@ export function CivicDashboard() {
           />
         </section>
       </div>
+
+      <footer className="border-t border-civic-line bg-white">
+        <div className="mx-auto max-w-[1600px] space-y-1 px-4 py-4 text-xs text-civic-muted lg:px-6">
+          <p>
+            Boundaries &amp; census metrics: Statistics Canada 2021 Census (cartographic boundary
+            files, Census Profile).
+          </p>
+          <p>
+            Rental &amp; housing-supply metrics: CMHC Housing Market Information Portal (Rental
+            Market Survey, Starts &amp; Completions Survey).
+          </p>
+          <p>
+            Census-tract CMHC values are inherited/allocated from the parent municipality and
+            labeled as estimated.
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }

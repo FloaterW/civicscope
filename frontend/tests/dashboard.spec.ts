@@ -112,9 +112,10 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const map = page.getByTestId("civic-map");
     await expect(map).toHaveAttribute("data-feature-count", "25");
-    await expect(map).toContainText("Value range");
-    await expect(map).toContainText("31.6");
-    await expect(map).toContainText("51.2");
+    // Legend is titled with the active metric and split into quantile classes.
+    const legend = page.getByTestId("map-legend");
+    await expect(legend).toContainText("Rent burden");
+    await expect(legend.locator("[data-legend-class]").first()).toBeVisible();
 
     const canvas = map.locator("canvas");
     await expect(canvas).toHaveCount(1);
@@ -222,13 +223,14 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByText("Median income by municipality")).toBeVisible();
     await expect(map).toHaveAttribute("data-metric", "median_income");
     await expect(map).not.toHaveAttribute("data-domain-max", initialDomainMax ?? "");
-    await expect(map).toContainText("141K");
+    // Legend retitles to the active metric (quantile classes shown below it).
+    await expect(page.getByTestId("map-legend")).toContainText("Median income");
 
     await page.getByLabel("Map metric").selectOption("population_growth_pct");
     await expect(page.getByText("Population growth by municipality")).toBeVisible();
     await expect(map).toHaveAttribute("data-metric", "population_growth_pct");
     await expect(map).toHaveAttribute("data-domain-max", "44.4");
-    await expect(map).toContainText("44.4");
+    await expect(page.getByTestId("map-legend")).toContainText("Population growth");
     await expect(page.getByText("Updating map...")).toHaveCount(0);
 
     const canvasBox = await map.locator("canvas").boundingBox();
@@ -415,9 +417,9 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.getByLabel("Map metric").selectOption("housing_starts_total");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "housing_starts_total");
 
-    // Badge must mark CMHC tract values as an estimated allocation.
+    // Badge must mark CMHC count tract values as an estimated allocation.
     await expect(
-      page.getByTestId("data-quality-badge").filter({ hasText: "estimated allocation" }).first()
+      page.getByTestId("data-quality-badge").filter({ hasText: /allocation/i }).first()
     ).toBeVisible();
 
     // Toronto's tracts inherit/allocate from a fully-surveyed parent municipality.
@@ -430,6 +432,111 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(panel).toContainText("Toronto census tract 0001.00");
     // Inherited rate metrics are labeled as municipal rates (not tract-native).
     await expect(panel).toContainText("municipal rates");
+  });
+
+  test("map legend is titled with the metric and split into quantile classes", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    await page.getByLabel("Map metric").selectOption("population");
+    await expect(map).toHaveAttribute("data-metric", "population");
+
+    // Quantile legend: titled with the metric and split into multiple classes so
+    // skewed data (population) is differentiated rather than washed into one band.
+    const legend = page.getByTestId("map-legend");
+    await expect(legend).toContainText("Population");
+    const classes = legend.locator("[data-legend-class]");
+    await expect(classes.first()).toBeVisible();
+    expect(await classes.count()).toBeGreaterThanOrEqual(3);
+  });
+
+  test("map shows a hover tooltip with the geography name and metric value", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-feature-count", "25", { timeout: 30000 });
+
+    const canvas = map.locator("canvas");
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box!.x + box!.width * 0.47, box!.y + box!.height * 0.6);
+
+    const tooltip = page.locator(".maplibregl-popup-content");
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
+    await expect(tooltip).toContainText("Rent burden");
+  });
+
+  test("data-sources footer attributes Statistics Canada and CMHC", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    const footer = page.locator("footer");
+    await expect(footer).toContainText("Statistics Canada");
+    await expect(footer).toContainText("CMHC");
+  });
+
+  test("CMHC rate metric in tract mode is labeled inherited, not allocated", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    await page.getByLabel("Map metric").selectOption("average_rent_total");
+    await expect(map).toHaveAttribute("data-metric", "average_rent_total");
+
+    // The badge must explain that the rent is the inherited municipal value
+    // (so identical values across a municipality's tracts are not seen as a bug).
+    const badge = page.getByTestId("data-quality-badge").first();
+    await expect(badge).toContainText(/inherited|municipal/i);
+    await expect(badge).not.toContainText(/allocation/i);
+  });
+
+  test("a metric with no data shows an explicit empty state on the map", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    // turnover_rate is not collected in this dataset -> empty, not silently blank.
+    await page.getByLabel("Map metric").selectOption("turnover_rate");
+    await expect(map).toHaveAttribute("data-empty", "true", { timeout: 30000 });
+    await expect(page.getByTestId("map-empty-state")).toContainText("No data available");
+  });
+
+  test("search with no matches shows a no-results message", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    const search = page.getByTestId("geography-search");
+    await search.click();
+    await search.fill("zzzznomatch");
+    await expect(page.getByTestId("search-empty")).toContainText("No", { timeout: 5000 });
+  });
+
+  test("the no-results message does not block other controls", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+    // Leave a no-match query in the box so the empty-state dropdown is showing,
+    // then switch geography level — the overlay must not intercept the click.
+    await page.getByTestId("geography-search").fill("zzzznomatch");
+    await expect(page.getByTestId("search-empty")).toBeVisible();
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "census_tract",
+      { timeout: 30000 }
+    );
+  });
+
+  test("map exposes an accessible region label", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("role", "region");
+    await expect(map).toHaveAttribute("aria-label", /map of .+ by/i);
   });
 });
 
