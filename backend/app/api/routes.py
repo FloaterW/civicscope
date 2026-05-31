@@ -384,21 +384,28 @@ def get_summary(
         Geography.type == "municipality"
     )
     if id_list and normalized_type == "census_tract":
-        # Resolve selected tracts' parent municipalities via the county name
-        parent_names = (
-            db.query(Geography.county)
+        # Resolve selected tracts' parent municipalities via the county name.
+        parent_names = [
+            name
+            for (name,) in db.query(Geography.county)
             .filter(Geography.geoid.in_(id_list), Geography.county.isnot(None))
             .distinct()
             .all()
-        )
-        if parent_names:
-            parent_geoids = [
+        ]
+        parent_geoids = (
+            [
                 geoid
                 for (geoid,) in db.query(Geography.geoid)
-                .filter(Geography.type == "municipality", Geography.name.in_([n for (n,) in parent_names]))
+                .filter(Geography.type == "municipality", Geography.name.in_(parent_names))
                 .all()
             ]
-            cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(parent_geoids))
+            if parent_names
+            else []
+        )
+        # Always scope to the resolved parents. If none resolve, scope to an
+        # empty set so the summary reports no CMHC aggregate rather than silently
+        # falling back to ALL-municipality (GTA-wide) data attributed to one tract.
+        cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(parent_geoids))
     elif id_list:
         cmhc_query = cmhc_query.filter(CmhcMetric.geoid.in_(id_list))
     cmhc_records = cmhc_query.all()
@@ -681,13 +688,26 @@ def data_quality(
     metric_key: str | None = None,
 ) -> dict[str, str]:
     if cmhc and geography_type == "census_tract":
+        if metric_key is not None and metric_key in CMHC_COUNT_METRICS:
+            return {
+                "metric_status": "estimated",
+                "label": "CMHC (estimated tract allocation)",
+                "description": (
+                    "CMHC does not publish this count at the census-tract level. The parent "
+                    "municipality's total is allocated to each tract by its share of municipal "
+                    "renter households, so values vary per tract."
+                ),
+            }
+        # Rate / average metrics (vacancy, rents, turnover, availability) are
+        # inherited UNCHANGED from the parent municipality — not allocated — so
+        # every tract in a municipality shows the same value by design.
         return {
             "metric_status": "estimated",
-            "label": "CMHC (estimated allocation)",
+            "label": "CMHC municipal value (inherited)",
             "description": (
-                "Rate metrics (vacancy, rents) are inherited from the parent municipality. "
-                "Count metrics (starts, completions) are estimated by proportional allocation "
-                "based on each tract's share of municipal renter households."
+                "CMHC does not survey this rate at the census-tract level, so the parent "
+                "municipality's value is shown for every tract within it. All tracts in the "
+                "same municipality share the same value by design."
             ),
         }
     if cmhc:

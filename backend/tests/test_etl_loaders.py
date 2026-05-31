@@ -86,6 +86,26 @@ def test_official_metric_validation_rejects_missing_characteristics():
         validate_official_metrics(metrics, ["3520005"])
 
 
+def test_official_metric_validation_tolerates_suppressed_rent_burden():
+    # Statistics Canada routinely suppresses rent_burden_pct for small
+    # geographies; it is derivable from rent and income, so a missing value
+    # must NOT crash the official-metrics ETL (regression for code-review #12).
+    metrics = [
+        MetricInput(
+            geoid="3520005",
+            year=2021,
+            median_income=90000.0,
+            median_rent=1500.0,
+            population=2700000,
+            previous_population=2650000,
+            renter_households=500000,
+            rent_burden_pct=None,
+        )
+    ]
+
+    validate_official_metrics(metrics, ["3520005"])  # must not raise
+
+
 def test_geo_loader_normalizes_statcan_feature():
     feature = {
         "type": "Feature",

@@ -43,9 +43,13 @@ OFFICIAL_CHARACTERISTIC_IDS = {
 
 DEFAULT_CHARACTERISTIC_IDS = OFFICIAL_CHARACTERISTIC_IDS
 CHARACTERISTIC_TO_FIELD = {value: key for key, value in OFFICIAL_CHARACTERISTIC_IDS.items()}
+# rent_burden_pct is intentionally NOT required: Statistics Canada routinely
+# suppresses it for small geographies, and it is derivable from rent and income
+# as a clearly-labeled estimate at serialization time. Requiring it would crash
+# the official-metrics ETL whenever a single CSD value is suppressed.
 REQUIRED_OFFICIAL_FIELDS = (
     "population", "previous_population", "median_income",
-    "renter_households", "rent_burden_pct", "median_rent",
+    "renter_households", "median_rent",
 )
 
 FIELD_ALIASES = {

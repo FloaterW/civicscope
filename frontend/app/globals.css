@@ -35,3 +35,36 @@ select {
 .maplibregl-ctrl-bottom-right {
   display: none;
 }
+
+/* Hover tooltip — match the restrained civic panel styling. */
+.civic-map-popup .maplibregl-popup-content {
+  padding: 8px 10px;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  box-shadow: 0 14px 38px -24px rgba(15, 38, 64, 0.55);
+  font-family: inherit;
+  pointer-events: none;
+}
+
+.civic-map-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.civic-map-popup__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #18212f;
+}
+
+.civic-map-popup__metric {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #667085;
+}
+
+.civic-map-popup__value {
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #117c78;
+}
