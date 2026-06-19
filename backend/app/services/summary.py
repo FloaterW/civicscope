@@ -123,5 +123,6 @@ def build_summary(
         "notes": [
             "Summary uses weighted averages of local median values; use official regional aggregates for publication-grade reporting.",
             "Rent burden uses official Statistics Canada tenant shelter-cost burden values, falling back to a rent-and-income estimate where the official value is suppressed (consistent with the map).",
+            "CMHC starts/completions here are municipality-level survey totals (the regional figure). The map and comparison show real per-tract values where CMHC publishes them, so a single tract's figure there may differ from this aggregate.",
         ],
     }

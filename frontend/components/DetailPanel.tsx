@@ -137,14 +137,28 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                   <SectionHeader
                     title="Housing Construction"
                     period={cmhcYear ? `${cmhcYear} YTD` : undefined}
-                    note={cmhcMetrics?.allocated ? "est. from municipal data" : undefined}
                   />
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <MetricLine label="Starts" value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)} />
-                    <MetricLine label="Completions" value={formatMetric("housing_completions", cmhcMetrics.housing_completions)} />
-                    <MetricLine label="Under const." value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} />
-                    <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} />
+                    <MetricLine
+                      label="Starts"
+                      value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)}
+                      status={cmhcSourceStatus(cmhcMetrics.starts_source, geographyLevel)}
+                    />
+                    <MetricLine
+                      label="Completions"
+                      value={formatMetric("housing_completions", cmhcMetrics.housing_completions)}
+                      status={cmhcSourceStatus(cmhcMetrics.completions_source, geographyLevel)}
+                    />
+                    <MetricLine label="Under const." value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
+                    <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
                   </div>
+                  {geographyLevel === "census_tract" && (
+                    <p className="mt-2 text-xs leading-5 text-civic-muted">
+                      Starts & completions marked “CMHC tract data” are real published census-tract
+                      values; “est.” values are allocated from the parent municipality where CMHC has
+                      no tract figure.
+                    </p>
+                  )}
                 </div>
               )}
             </>
@@ -309,7 +323,28 @@ function MetricLine({
             ⚠
           </span>
         )}
+        {status === "official" && (
+          <span
+            data-testid="official-flag"
+            className="ml-1 align-middle text-xs font-medium text-emerald-600"
+            title="Real CMHC census-tract value (Starts & Completions Survey)."
+          >
+            CMHC tract data
+          </span>
+        )}
       </span>
     </div>
   );
+}
+
+/** Map a CMHC count metric's source flag to a MetricLine status, but only in
+ * census-tract mode (municipality values are the survey value itself). */
+function cmhcSourceStatus(
+  source: "official" | "estimated" | undefined,
+  geographyLevel: GeographyLevel
+): MetricFieldStatus | undefined {
+  if (geographyLevel !== "census_tract") return undefined;
+  if (source === "official") return "official";
+  if (source === "estimated") return "estimated";
+  return undefined;
 }
