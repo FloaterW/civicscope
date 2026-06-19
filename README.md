@@ -17,7 +17,14 @@ CivicScope is a portfolio-grade full-stack project for public-sector analytics. 
 
 Municipal geometries use Statistics Canada 2021 cartographic census subdivision boundaries. Metric values use official Statistics Canada 2021 Census Profile characteristics for the selected GTA municipalities.
 
-Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Tract-level metrics are official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow. CivicScope is deliberate about honesty here: source-suppressed values are shown as "Not available" rather than filled, the few tracts with a tiny 2016 base population have their growth rate flagged as low-confidence, and where the official rent-burden value is suppressed the app shows a clearly-labeled estimate derived from rent and income. Every metric carries field-level provenance (`official` / `estimated` / `unavailable` / `low_confidence`) so the UI never presents an estimate as if it were official. CMHC metrics are municipality-level; in census tract mode rate metrics are inherited and count metrics are allocated by renter-household share, both labeled as estimated.
+Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Tract-level metrics are official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow.
+
+**Data honesty is the project's defining principle.** Most demos fabricate or silently impute their data; CivicScope does not:
+
+- **Every metric carries field-level provenance** (`official` / `estimated` / `unavailable` / `low_confidence`), surfaced in the UI, so an estimate is never shown as if it were official.
+- Source-suppressed census values render as "Not available" rather than being filled. Where the official rent-burden value is suppressed, the app shows a clearly-labeled *estimate* derived from rent and income.
+- Tracts with a tiny 2016 base population have their growth rate flagged low-confidence (a near-empty base turns ordinary growth into an absurd percentage).
+- **Real CMHC census-tract data, validated, not faked.** CMHC publishes Starts & Completions at the census-tract level for the GTA's three CMAs (Toronto, Oshawa, Hamilton). CivicScope ingests these real values — **validated during ETL against CMHC's own published CMA totals** (a slice is rejected unless its tract values sum to the published total) — and labels them `official`. For the ~9% of tracts CMHC does not survey, it falls back to a renter-household-share allocation labeled `estimated`. The map badge reads "official + estimated" and the detail panel marks each value accordingly. CMHC *rate* metrics (vacancy, average rent) are not published at tract level, so they are inherited unchanged from the parent municipality and labeled as such.
 
 ## Screenshots
 
@@ -59,11 +66,17 @@ npm run demo:video
 
 CivicScope answers a practical planning question: where are GTA housing affordability conditions most strained relative to local incomes, and how do those conditions differ between nearby municipalities and census tracts?
 
-The core workflow is designed for a policy analyst or planner: scan the regional overview, switch metrics, search or click a geography, inspect local affordability indicators, and compare selected areas. The app intentionally separates official Census Profile metrics from CMHC metrics that are estimated when allocated from municipalities to census tracts.
+The core workflow is designed for a policy analyst or planner: scan the regional overview, switch metrics, search or click a geography, inspect local affordability indicators, and compare selected areas. Throughout, the app is explicit about data provenance — official Census Profile and real CMHC values are visibly distinguished from estimated fallbacks, so a planner is never misled about which numbers are survey-grade.
 
 See [docs/case-study.md](docs/case-study.md) for the full project narrative.
 
-See [docs/tract-metric-upgrade.md](docs/tract-metric-upgrade.md) for the completed tract-metric upgrade notes and remaining follow-ups.
+### Documentation
+
+- [docs/architecture.md](docs/architecture.md) — system design and component overview.
+- [docs/data-dictionary.md](docs/data-dictionary.md) — every column, metric, provenance status, and fallback formula.
+- [docs/cmhc-real-tract-data-plan.md](docs/cmhc-real-tract-data-plan.md) — the verified CMHC census-tract acquisition recipe, validation gate, and honesty guardrails.
+- [docs/etl.md](docs/etl.md) — ETL workflows and data refresh.
+- [docs/tract-metric-upgrade.md](docs/tract-metric-upgrade.md) — tract-metric upgrade notes and follow-ups.
 
 ## Architecture
 
@@ -73,9 +86,9 @@ flowchart LR
   web --> api["FastAPI API"]
   api --> db["PostgreSQL + PostGIS"]
   migrations["Alembic migrations"] --> db
-  seed["Packaged GTA seed data"] --> api
-  statcan["Statistics Canada Census Profile"] --> etl["Python ETL scripts"]
-  geohub["Ontario GeoHub / StatCan boundaries"] --> etl
+  seed["Packaged GTA seed data (validated)"] --> api
+  statcan["Statistics Canada Census Profile + boundaries"] --> etl["Python ETL scripts"]
+  cmhc["CMHC HMIP (Starts & Completions, validated)"] --> etl
   etl --> db
 ```
 
@@ -94,12 +107,15 @@ civicscope/
     lib/
     types/
   docs/
+    architecture.md
     case-study.md
-    demo/
+    data-dictionary.md
+    cmhc-real-tract-data-plan.md
     etl.md
     launch-checklist.md
     tract-metric-upgrade.md
     deployment.md
+    demo/
     screenshots/
   docker-compose.yml
   render.yaml
@@ -173,10 +189,13 @@ Supported metrics:
 - `average_rent_total`
 - `housing_starts_total`
 - `housing_completions`
+- `units_under_construction`
+- `unabsorbed_units`
+- `rental_universe`
 - `turnover_rate`
 - `availability_rate`
 
-Aliases such as `rent_burden`, `income`, `rent`, and `growth` are accepted by the backend.
+Aliases such as `rent_burden`, `income`, `rent`, and `growth` are accepted by the backend. CMHC metrics accept a `year` query parameter (2018–2025); census metrics are a single 2021 vintage and ignore `year`.
 
 ## Data Sources
 
@@ -188,7 +207,12 @@ The packaged seed covers GTA lower/single-tier municipalities:
 - Durham municipalities: Pickering, Ajax, Whitby, Oshawa, Clarington, Uxbridge, Scugog, Brock
 - Halton municipalities: Oakville, Burlington, Milton, Halton Hills
 
-It also includes 1,334 packaged census tract features assigned to those municipalities by tract centroid. Tract boundaries are official 2021 Statistics Canada cartographic census tract polygons, and tract Census Profile metrics are official 2021 Statistics Canada values loaded from the normalized DF_CT extract. Some tract values are suppressed or unavailable in the source and are handled as missing data. CMHC metrics are municipality-level; when shown in census tract mode, count metrics are estimated by proportional allocation and rate metrics are inherited from the parent municipality.
+It also includes 1,334 packaged census tract features assigned to those municipalities by tract centroid. Tract boundaries are official 2021 Statistics Canada cartographic census tract polygons, and tract Census Profile metrics are official 2021 Statistics Canada values loaded from the normalized DF_CT extract. Some tract values are suppressed or unavailable in the source and are handled as missing data.
+
+CMHC data is stored at municipality level, with two refinements for census tracts:
+
+- **Starts & Completions:** real CMHC census-tract values where published (1,213 of 1,334 tracts, ~91%), labeled `official` and validated against CMHC's published CMA totals during ETL; a renter-share allocation labeled `estimated` for the rest.
+- **Rate metrics** (vacancy, average rent, turnover, availability): not published at tract level, so inherited unchanged from the parent municipality and labeled as inherited.
 
 Current and planned sources:
 
@@ -270,11 +294,25 @@ Load a normalized Census Profile CSV extract:
 docker compose exec backend python etl/load_census.py --csv /app/data/statcan_metrics.csv
 ```
 
-More details are in `docs/etl.md`.
+Regenerate the real CMHC census-tract Starts & Completions data from the CMHC
+Housing Market Information Portal. Each `(metric, CMA, year)` slice is validated
+against CMHC's published CMA total and the run aborts on any mismatch, so the
+committed `cmhc_ct_metrics.csv` is never unverified:
+
+```bash
+# Offline parser self-test (no network):
+docker compose exec backend python etl/load_cmhc_tracts.py --self-test
+
+# Live pull + validation (writes app/data/cmhc_ct_metrics.csv):
+docker compose exec backend python etl/load_cmhc_tracts.py --generate-csv
+```
+
+More details are in `docs/etl.md`, and the verified acquisition recipe + honesty
+guardrails are documented in `docs/cmhc-real-tract-data-plan.md`.
 
 ## Database Migrations
 
-Docker Compose runs `alembic upgrade head` before starting Uvicorn, and the FastAPI app verifies the database is on the expected migration revision during startup. The current migration creates the core tables, enables PostGIS, adds `geographies.geom geometry(GEOMETRY, 4326)`, backfills it from stored GeoJSON, and creates a GiST spatial index.
+Docker Compose runs `alembic upgrade head` before starting Uvicorn, and the FastAPI app verifies the database is on the expected migration revision during startup. The migration chain (currently through `0007`) creates the core tables, enables PostGIS, adds `geographies.geom geometry(GEOMETRY, 4326)` (backfilled from stored GeoJSON with a GiST spatial index), then layers on the CMHC metrics, dwelling/tenure columns, county/state indexes, and the real CMHC census-tract Starts & Completions table (`cmhc_tract_metrics`).
 
 Run migrations manually:
 
@@ -315,7 +353,9 @@ npm run test:e2e
 ```
 
 The Playwright suite expects the backend API to be running at `NEXT_PUBLIC_API_URL` or `http://127.0.0.1:8000`.
-It starts a separate Next.js test server on port `3101` by default so it does not conflict with the normal local dashboard port.
+It starts a separate Next.js test server on port `3101` by default so it does not conflict with the normal local dashboard port. To run against an already-running dashboard (e.g. the Docker frontend on `3102`), pass `PLAYWRIGHT_PORT=3102`.
+
+Continuous integration (`.github/workflows/ci.yml`) runs the full gate — backend `pytest`, frontend typecheck/lint/build, and the Playwright suite against a freshly-seeded backend — on **every branch push** and pull request, so regressions are caught before they reach `main`.
 
 Screenshot generation:
 
@@ -345,12 +385,14 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 
 - Built CivicScope, a geospatial housing-affordability analytics platform using Next.js, FastAPI, PostgreSQL/PostGIS, and public-data-ready workflows to visualize rent burden and income patterns across Greater Toronto Area municipalities and census tracts.
 - Designed ETL-ready civic data workflows for Statistics Canada municipal and census tract boundary loading, Census Profile metric normalization, PostGIS geometry indexing, and GeoJSON API delivery for interactive map visualizations.
-- Implemented production-style API, database, testing, and Docker workflows for a public-sector analytics dashboard used to compare housing affordability across regions.
+- Engineered a field-level data-provenance model that ingests real CMHC census-tract data validated against the agency's own published totals, and labels every metric `official` / `estimated` / `unavailable` so the UI never presents an estimate as fact.
+- Implemented production-style API, database, CI (GitHub Actions gating every push), testing, and Docker workflows for a public-sector analytics dashboard used to compare housing affordability across regions.
 
 ## Current Limitations
 
-- Packaged seed data remains available for offline demos even though the database can refresh boundaries and metrics from Statistics Canada.
+- Packaged seed data remains available for offline demos even though the database can refresh boundaries and metrics from Statistics Canada and CMHC.
 - The native PostGIS `geom` column is currently backfilled from stored GeoJSON; a future migration can make it the canonical geometry store.
-- Census tract boundaries and metrics now use official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow. A small number of tracts (~1%) have suppressed values for privacy.
+- Census tract boundaries and metrics use official Statistics Canada 2021 Census Profile values (SDMX DF_CT). A small number of tracts have source-suppressed values, surfaced as "Not available".
+- Real CMHC tract data covers **Starts & Completions** only. CMHC *rate* metrics (vacancy, rent) are heavily suppressed at tract level, so they remain inherited from the parent municipality; `units_under_construction`/`unabsorbed_units` keep the renter-share allocation. Ingesting these as real tract values is a possible follow-up.
 - Dissemination areas and parcel-level workflows remain planned expansion paths.
 - Transit/access scoring is intentionally not implemented yet; GTFS ingestion is the next domain feature after deployment polish.
