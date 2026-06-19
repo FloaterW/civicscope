@@ -234,3 +234,60 @@ def seed_cmhc_data(db: Session, force: bool = False) -> int:
     db.flush()
     db.commit()
     return row_count
+
+
+def load_cmhc_tract_seed() -> list[dict[str, Any]]:
+    """Read the committed real CMHC census-tract CSV (geoid, year, metrics)."""
+    import csv
+
+    path = files("app.data").joinpath("cmhc_ct_metrics.csv")
+    rows: list[dict[str, Any]] = []
+    for row in csv.DictReader(path.read_text(encoding="utf-8").splitlines()):
+
+        def _int(key: str, row=row) -> int | None:
+            v = (row.get(key) or "").strip()
+            return int(v) if v != "" else None
+
+        rows.append(
+            {
+                "geoid": row["geoid"].strip(),
+                "year": int(row["year"]),
+                "housing_starts_total": _int("housing_starts_total"),
+                "housing_completions": _int("housing_completions"),
+            }
+        )
+    return rows
+
+
+def seed_cmhc_tract_data(db: Session, force: bool = False) -> int:
+    """Load real census-tract SCSS values from cmhc_ct_metrics.csv.
+
+    Idempotent: skips when rows already exist unless forced. Only rows for known
+    tract geoids are inserted.
+    """
+    from app.models import CmhcTractMetric
+
+    existing = db.query(CmhcTractMetric).count()
+    if existing and not force:
+        return 0
+    if existing:
+        db.query(CmhcTractMetric).delete()
+        db.flush()
+
+    known = {row[0] for row in db.query(Geography.geoid).all()}
+    count = 0
+    for r in load_cmhc_tract_seed():
+        if r["geoid"] not in known:
+            continue
+        db.add(
+            CmhcTractMetric(
+                geoid=r["geoid"],
+                year=r["year"],
+                housing_starts_total=r["housing_starts_total"],
+                housing_completions=r["housing_completions"],
+            )
+        )
+        count += 1
+    db.flush()
+    db.commit()
+    return count

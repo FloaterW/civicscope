@@ -10,7 +10,7 @@ from app.api.routes import router as api_router
 from app.core.config import settings
 from app.db.init_db import init_db
 from app.db.session import SessionLocal, get_db
-from app.services.seed import seed_cmhc_data, seed_demo_data
+from app.services.seed import seed_cmhc_data, seed_cmhc_tract_data, seed_demo_data
 
 
 def create_app(auto_initialize: bool = True) -> FastAPI:
@@ -23,6 +23,7 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
                 try:
                     seed_demo_data(db, force=settings.force_reseed)
                     seed_cmhc_data(db, force=settings.force_reseed)
+                    seed_cmhc_tract_data(db, force=settings.force_reseed)
                 except Exception:
                     db.rollback()
                     raise
