@@ -435,7 +435,13 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const panel = page.getByTestId("detail-panel");
     await expect(panel).toContainText("census tract 0017.01");
+    // Real starts value carries the "CMHC tract data" badge...
     await expect(panel.getByTestId("official-flag").first()).toBeVisible();
+    // ...but the badge belongs ONLY to the Housing Construction section. The
+    // census "Household & Housing Profile" fields are Statistics Canada values
+    // and must NOT be mislabeled "CMHC tract data" (regression).
+    const censusSection = panel.locator("div", { hasText: "Household & Housing Profile" }).first();
+    await expect(censusSection.getByTestId("official-flag")).toHaveCount(0);
   });
 
   test("map legend is titled with the metric and split into quantile classes", async ({ page }) => {
