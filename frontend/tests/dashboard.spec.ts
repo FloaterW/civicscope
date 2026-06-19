@@ -404,7 +404,7 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(domainMax).toBeLessThan(5000);
   });
 
-  test("CMHC metric in census tract mode is labeled estimated/allocated", async ({ page }) => {
+  test("CMHC starts in census tract mode shows official+estimated provenance", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Census tracts" }).click();
@@ -417,21 +417,25 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.getByLabel("Map metric").selectOption("housing_starts_total");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "housing_starts_total");
 
-    // Badge must mark CMHC count tract values as an estimated allocation.
+    // housing_starts_total now has REAL CMHC census-tract values where published,
+    // with the allocation as a labeled estimate elsewhere -> mixed badge.
     await expect(
-      page.getByTestId("data-quality-badge").filter({ hasText: /allocation/i }).first()
+      page.getByTestId("data-quality-badge").filter({ hasText: /official \+ estimated/i }).first()
     ).toBeVisible();
 
-    // Toronto's tracts inherit/allocate from a fully-surveyed parent municipality.
-    await page.getByTestId("geography-search").fill("5350001.00");
-    const result = page.getByRole("option").filter({ hasText: "5350001.00" });
+    // 2023 has real published tract starts; select it so a covered tract shows
+    // the real value (the latest year has no tract data yet).
+    await page.getByLabel("Data year").selectOption("2023");
+
+    // A covered Toronto tract shows the real value flagged "CMHC tract data".
+    await page.getByTestId("geography-search").fill("5350017.01");
+    const result = page.getByRole("option").filter({ hasText: "5350017.01" });
     await expect(result).toHaveCount(1);
     await result.click();
 
     const panel = page.getByTestId("detail-panel");
-    await expect(panel).toContainText("Toronto census tract 0001.00");
-    // Inherited rate metrics are labeled as municipal rates (not tract-native).
-    await expect(panel).toContainText("municipal rates");
+    await expect(panel).toContainText("census tract 0017.01");
+    await expect(panel.getByTestId("official-flag").first()).toBeVisible();
   });
 
   test("map legend is titled with the metric and split into quantile classes", async ({ page }) => {

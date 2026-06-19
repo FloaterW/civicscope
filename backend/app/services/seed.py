@@ -234,3 +234,97 @@ def seed_cmhc_data(db: Session, force: bool = False) -> int:
     db.flush()
     db.commit()
     return row_count
+
+
+def load_cmhc_tract_seed() -> list[dict[str, Any]]:
+    """Read the committed real CMHC census-tract CSV (geoid, year, metrics)."""
+    import csv
+
+    path = files("app.data").joinpath("cmhc_ct_metrics.csv")
+    rows: list[dict[str, Any]] = []
+    for row in csv.DictReader(path.read_text(encoding="utf-8").splitlines()):
+
+        def _int(key: str, row=row) -> int | None:
+            v = (row.get(key) or "").strip()
+            return int(v) if v != "" else None
+
+        rows.append(
+            {
+                "geoid": row["geoid"].strip(),
+                "year": int(row["year"]),
+                "housing_starts_total": _int("housing_starts_total"),
+                "housing_completions": _int("housing_completions"),
+            }
+        )
+    return rows
+
+
+def _cmhc_tract_content_changed(
+    db: Session, seed_rows: list[dict[str, Any]], known: set[str]
+) -> bool:
+    """Detect a stale cmhc_tract_metrics table vs the packaged CSV.
+
+    Guards against the stale-volume bug: a regenerated cmhc_ct_metrics.csv
+    (corrected/extended data) must reseed even if the row count is unchanged.
+    Compares a content fingerprint over EVERY row (the table is small), so a
+    single changed value cannot slip through a sparse sample.
+    """
+    from app.models import CmhcTractMetric
+
+    expected = [r for r in seed_rows if r["geoid"] in known]
+    db_rows = db.query(
+        CmhcTractMetric.geoid,
+        CmhcTractMetric.year,
+        CmhcTractMetric.housing_starts_total,
+        CmhcTractMetric.housing_completions,
+    ).all()
+    if len(db_rows) != len(expected):
+        return True
+
+    def _fingerprint(items: list) -> set[tuple]:
+        return {
+            (geoid, year, starts, completions)
+            for geoid, year, starts, completions in items
+        }
+
+    db_fp = _fingerprint(db_rows)
+    seed_fp = {
+        (r["geoid"], r["year"], r["housing_starts_total"], r["housing_completions"])
+        for r in expected
+    }
+    return db_fp != seed_fp
+
+
+def seed_cmhc_tract_data(db: Session, force: bool = False) -> int:
+    """Load real census-tract SCSS values from cmhc_ct_metrics.csv.
+
+    Idempotent, but reseeds when the packaged CSV's content has changed (not just
+    its row count). Only rows for known tract geoids are inserted.
+    """
+    from app.models import CmhcTractMetric
+
+    seed_rows = load_cmhc_tract_seed()
+    known = {row[0] for row in db.query(Geography.geoid).all()}
+    existing = db.query(CmhcTractMetric).count()
+    if existing and not force and not _cmhc_tract_content_changed(db, seed_rows, known):
+        return 0
+    if existing:
+        db.query(CmhcTractMetric).delete()
+        db.flush()
+
+    count = 0
+    for r in seed_rows:
+        if r["geoid"] not in known:
+            continue
+        db.add(
+            CmhcTractMetric(
+                geoid=r["geoid"],
+                year=r["year"],
+                housing_starts_total=r["housing_starts_total"],
+                housing_completions=r["housing_completions"],
+            )
+        )
+        count += 1
+    db.flush()
+    db.commit()
+    return count

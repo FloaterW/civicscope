@@ -89,6 +89,10 @@ export type CmhcMetricValues = {
   unabsorbed_units: number | null;
   rms_surveyed: boolean;
   allocated?: boolean;
+  /** Provenance of the SCSS count metrics: "official" = real CMHC census-tract
+   * value; "estimated" = renter-share allocation fallback. */
+  starts_source?: "official" | "estimated";
+  completions_source?: "official" | "estimated";
 };
 
 export type Geography = {

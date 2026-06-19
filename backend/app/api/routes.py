@@ -7,7 +7,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, load_only
 
 from app.db.session import get_db
-from app.models import CmhcMetric, Geography, Metric
+from app.models import CmhcMetric, CmhcTractMetric, Geography, Metric
 from app.schemas.responses import GeographiesListResponse, GeographyResponse
 from app.services.geojson import compact_geometry
 from app.services.metric_calculations import (
@@ -42,6 +42,28 @@ CMHC_COUNT_METRICS = frozenset({
     "units_under_construction",
     "unabsorbed_units",
 })
+
+# Count metrics for which CMHC publishes REAL census-tract values (loaded into
+# cmhc_tract_metrics during ETL, validated against published CMA totals). For a
+# tract+year that has a real value we serve it (provenance "official"); for
+# everything else we keep the renter-share allocation (provenance "estimated").
+CMHC_REAL_TRACT_METRICS = frozenset({"housing_starts_total", "housing_completions"})
+
+
+def load_real_tract_cmhc(db: Session, year: int) -> dict[str, CmhcTractMetric]:
+    """Map tract geoid -> real CMHC SCSS row for a given year (may be empty)."""
+    return {
+        row.geoid: row
+        for row in db.query(CmhcTractMetric).filter(CmhcTractMetric.year == year).all()
+    }
+
+
+def real_tract_count(
+    real_row: CmhcTractMetric | None, metric_key: str
+) -> int | None:
+    if real_row is None or metric_key not in CMHC_REAL_TRACT_METRICS:
+        return None
+    return getattr(real_row, metric_key, None)
 
 
 def resolve_year(db: Session, year: int | None) -> int:
@@ -152,6 +174,7 @@ def serialize_cmhc_metric(
     *,
     tract_inherited: bool = False,
     tract_share: float | None = None,
+    real_tract: "CmhcTractMetric | None" = None,
 ) -> dict[str, Any]:
     """Serialize a CmhcMetric row to a dict.
 
@@ -160,6 +183,10 @@ def serialize_cmhc_metric(
     count-based metrics are proportionally allocated to the tract based on its
     share of the municipality's renter households. Rate-based metrics
     (vacancy, rents, turnover, availability) are inherited unchanged.
+
+    When ``real_tract`` is provided (a real CMHC census-tract SCSS row), its
+    starts/completions REPLACE the allocation for those fields and are flagged
+    ``official`` via the ``*_source`` keys; other count fields stay estimated.
     """
 
     def _alloc(val: int | None) -> int | None:
@@ -170,6 +197,24 @@ def serialize_cmhc_metric(
         return round(val * tract_share)
 
     allocated = tract_inherited and tract_share is not None
+
+    # Real-vs-estimated resolution for the two metrics CMHC publishes at CT level.
+    def _count_with_source(metric_key: str, allocated_val: int | None) -> tuple[int | None, str]:
+        if real_tract is not None:
+            real = getattr(real_tract, metric_key, None)
+            if real is not None:
+                return real, "official"
+        if not tract_inherited:
+            return allocated_val, "official"  # municipality-level: real survey value
+        return allocated_val, "estimated"
+
+    starts, starts_source = _count_with_source(
+        "housing_starts_total", _alloc(cmhc.housing_starts_total)
+    )
+    completions, completions_source = _count_with_source(
+        "housing_completions", _alloc(cmhc.housing_completions)
+    )
+
     result: dict[str, Any] = {
         "year": cmhc.year,
         "vacancy_rate": cmhc.vacancy_rate,
@@ -181,16 +226,18 @@ def serialize_cmhc_metric(
         "turnover_rate": cmhc.turnover_rate,
         "availability_rate": cmhc.availability_rate,
         "rental_universe": _alloc(cmhc.rental_universe),
-        "housing_starts_total": _alloc(cmhc.housing_starts_total),
+        "housing_starts_total": starts,
         "housing_starts_single": _alloc(cmhc.housing_starts_single),
         "housing_starts_semi": _alloc(cmhc.housing_starts_semi),
         "housing_starts_row": _alloc(cmhc.housing_starts_row),
         "housing_starts_apartment": _alloc(cmhc.housing_starts_apartment),
-        "housing_completions": _alloc(cmhc.housing_completions),
+        "housing_completions": completions,
         "units_under_construction": _alloc(cmhc.units_under_construction),
         "unabsorbed_units": _alloc(cmhc.unabsorbed_units),
         "rms_surveyed": cmhc.rms_surveyed,
         "allocated": allocated,
+        "starts_source": starts_source,
+        "completions_source": completions_source,
     }
     return result
 
@@ -440,6 +487,7 @@ def compare_geographies(
     # Build name-to-geoid lookup for census tract CMHC inheritance.
     municipality_name_to_geoid: dict[str, str] = {}
     tract_shares: dict[str, float] = {}
+    real_tract_cmhc: dict[str, CmhcTractMetric] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
             name: geoid
@@ -455,6 +503,9 @@ def compare_geographies(
             db, metric_year, geography_type="census_tract", include_geometry=False
         )
         tract_shares = _compute_tract_shares(all_tract_records)
+        # Real published CMHC tract values for this year (same as the map uses)
+        # so compare and map agree per tract instead of diverging.
+        real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
 
     items = []
     for geography, metric in ordered_records:
@@ -476,7 +527,10 @@ def compare_geographies(
         share = tract_shares.get(geography.geoid) if is_tract_inherited else None
         if cmhc_row:
             item["cmhc_metrics"] = serialize_cmhc_metric(
-                cmhc_row, tract_inherited=is_tract_inherited, tract_share=share,
+                cmhc_row,
+                tract_inherited=is_tract_inherited,
+                tract_share=share,
+                real_tract=real_tract_cmhc.get(geography.geoid),
             )
         else:
             item["cmhc_metrics"] = None
@@ -540,6 +594,7 @@ def get_map_data(
     }
     municipality_name_to_geoid: dict[str, str] = {}
     tract_shares: dict[str, float] = {}
+    real_tract_cmhc: dict[str, CmhcTractMetric] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
             name: geoid
@@ -548,12 +603,24 @@ def get_map_data(
             .all()
         }
         tract_shares = _compute_tract_shares(records)
+        # Always load real tract values in CMHC tract mode (not just when the
+        # mapped metric is starts/completions): the detail panel serializes the
+        # full cmhc_metrics for every feature, so starts/completions must keep
+        # their real "official" provenance regardless of which metric colours
+        # the map.
+        if cmhc:
+            real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
 
     if cmhc:
         if normalized_type == "census_tract" and metric_key in CMHC_COUNT_METRICS:
-            # Estimate tract-level values via proportional allocation
+            # Prefer the REAL published tract value; fall back to proportional
+            # allocation only where CMHC has no tract value.
             values = []
             for geography, _ in records:
+                real = real_tract_count(real_tract_cmhc.get(geography.geoid), metric_key)
+                if real is not None:
+                    values.append(real)
+                    continue
                 if not geography.county:
                     continue
                 parent_geoid = municipality_name_to_geoid.get(geography.county)
@@ -626,8 +693,13 @@ def get_map_data(
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
         share = tract_shares.get(geography.geoid) if is_tract_inherited else None
+        real_row = real_tract_cmhc.get(geography.geoid)
         if cmhc:
-            if is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
+            real = real_tract_count(real_row, metric_key)
+            if real is not None:
+                # Real published CMHC census-tract value wins over allocation.
+                props["value"] = real
+            elif is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
                 raw = metric_value(metric_key, cmhc_row) if cmhc_row else None
                 props["value"] = round(raw * share) if raw is not None and share is not None else None
             else:
@@ -636,7 +708,10 @@ def get_map_data(
             props["value"] = metric_value(metric_key, row)
         if cmhc_row:
             props["cmhc_metrics"] = serialize_cmhc_metric(
-                cmhc_row, tract_inherited=is_tract_inherited, tract_share=share,
+                cmhc_row,
+                tract_inherited=is_tract_inherited,
+                tract_share=share,
+                real_tract=real_row,
             )
         props["cmhc_year"] = cmhc_year
         geometry = postgis_geometries.get(geography.geoid)
@@ -688,6 +763,16 @@ def data_quality(
     metric_key: str | None = None,
 ) -> dict[str, str]:
     if cmhc and geography_type == "census_tract":
+        if metric_key is not None and metric_key in CMHC_REAL_TRACT_METRICS:
+            return {
+                "metric_status": "mixed",
+                "label": "CMHC tract values (official + estimated)",
+                "description": (
+                    "Real CMHC census-tract values are shown where CMHC publishes them "
+                    "(official); tracts outside CMHC's survey coverage fall back to the parent "
+                    "municipality's total allocated by renter-household share (estimated)."
+                ),
+            }
         if metric_key is not None and metric_key in CMHC_COUNT_METRICS:
             return {
                 "metric_status": "estimated",

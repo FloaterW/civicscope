@@ -274,18 +274,24 @@ def test_compare_includes_cmhc_metrics(client):
 
 
 def test_census_tract_cmhc_allocation(client):
-    """Census tracts get proportionally allocated CMHC count metrics."""
+    """Census tracts still get the renter-share allocation as a labeled estimate
+    fallback (used where CMHC has no real tract value, e.g. the latest CMHC year
+    which has no published tract data yet)."""
     response = client.get("/api/map-data?metric=housing_starts_total&type=census_tract")
     assert response.status_code == 200
     payload = response.json()
     assert payload["metadata"]["metric"] == "housing_starts_total"
-    assert payload["metadata"]["data_quality"]["metric_status"] == "estimated"
+    # Real-tract metric -> mixed provenance badge.
+    assert payload["metadata"]["data_quality"]["metric_status"] == "mixed"
     features_with_value = [f for f in payload["features"] if f["properties"]["value"] is not None]
     assert len(features_with_value) >= 1
-    sample = features_with_value[0]["properties"]
-    cmhc = sample["cmhc_metrics"]
-    assert cmhc["allocated"] is True
-    assert cmhc["housing_starts_total"] is not None
+    # At least one tract is served via the allocation estimate fallback.
+    estimated = [
+        f for f in payload["features"]
+        if f["properties"].get("cmhc_metrics", {}).get("starts_source") == "estimated"
+    ]
+    assert estimated
+    assert estimated[0]["properties"]["cmhc_metrics"]["housing_starts_total"] is not None
 
 
 def test_census_tract_compare_allocation(client):

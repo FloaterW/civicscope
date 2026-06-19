@@ -160,16 +160,22 @@ def test_growth_map_domain_excludes_low_denominator_outliers(client):
     assert outliers and max(outliers) > domain["max"]
 
 
-def test_cmhc_metric_on_tracts_labeled_estimated_and_allocated(client):
-    response = client.get("/api/map-data?metric=housing_starts_total&type=census_tract&detail=display")
+def test_cmhc_starts_on_tracts_is_mixed_official_and_estimated(client):
+    # housing_starts_total now has REAL CMHC census-tract values where published,
+    # with the renter-share allocation as a labeled estimate elsewhere -> mixed.
+    response = client.get(
+        "/api/map-data?metric=housing_starts_total&type=census_tract&detail=display&year=2023"
+    )
     payload = response.json()
-    assert payload["metadata"]["data_quality"]["metric_status"] == "estimated"
-    allocated = [
-        f
+    assert payload["metadata"]["data_quality"]["metric_status"] == "mixed"
+    sources = {
+        f["properties"]["cmhc_metrics"]["starts_source"]
         for f in payload["features"]
-        if f["properties"].get("cmhc_metrics", {}).get("allocated")
-    ]
-    assert allocated, "count CMHC metrics must be allocated to tracts and flagged"
+        if f["properties"].get("cmhc_metrics")
+    }
+    # Both provenance kinds occur across the GTA tracts.
+    assert "official" in sources
+    assert "estimated" in sources
 
 
 def test_map_data_display_detail_compacts_geometry(client):
