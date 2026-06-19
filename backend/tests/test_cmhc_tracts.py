@@ -51,6 +51,23 @@ def test_published_total_sums_named_rows():
     assert parse_published_total(csv_text) == 47428
 
 
+def test_published_total_returns_none_for_unparseable_stub():
+    # An HTML/error stub (no header row) must yield None — NOT 0 — so the
+    # validation gate can refuse it instead of silently passing.
+    assert parse_published_total("<!DOCTYPE html><html>error</html>") is None
+    assert parse_published_total("") is None
+
+
+def test_published_total_distinguishes_genuine_zero_from_parse_failure():
+    # A real table whose named rows sum to 0 returns 0 (validatable), not None.
+    csv_text = (
+        ",Single,Semi-Detached,Row,Apartment,All,\r\n"
+        "Ontario,0,0,0,0,0,\r\n"
+        "Source,CMHC\r\n"
+    )
+    assert parse_published_total(csv_text) == 0
+
+
 def test_metric_and_cma_config_is_complete():
     # Both shipped metrics have a CT table code and a validation-total code.
     assert set(METRICS) == {"housing_starts_total", "housing_completions"}

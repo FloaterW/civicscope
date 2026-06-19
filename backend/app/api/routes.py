@@ -487,6 +487,7 @@ def compare_geographies(
     # Build name-to-geoid lookup for census tract CMHC inheritance.
     municipality_name_to_geoid: dict[str, str] = {}
     tract_shares: dict[str, float] = {}
+    real_tract_cmhc: dict[str, CmhcTractMetric] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
             name: geoid
@@ -502,6 +503,9 @@ def compare_geographies(
             db, metric_year, geography_type="census_tract", include_geometry=False
         )
         tract_shares = _compute_tract_shares(all_tract_records)
+        # Real published CMHC tract values for this year (same as the map uses)
+        # so compare and map agree per tract instead of diverging.
+        real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
 
     items = []
     for geography, metric in ordered_records:
@@ -523,7 +527,10 @@ def compare_geographies(
         share = tract_shares.get(geography.geoid) if is_tract_inherited else None
         if cmhc_row:
             item["cmhc_metrics"] = serialize_cmhc_metric(
-                cmhc_row, tract_inherited=is_tract_inherited, tract_share=share,
+                cmhc_row,
+                tract_inherited=is_tract_inherited,
+                tract_share=share,
+                real_tract=real_tract_cmhc.get(geography.geoid),
             )
         else:
             item["cmhc_metrics"] = None
@@ -596,7 +603,12 @@ def get_map_data(
             .all()
         }
         tract_shares = _compute_tract_shares(records)
-        if cmhc and metric_key in CMHC_REAL_TRACT_METRICS:
+        # Always load real tract values in CMHC tract mode (not just when the
+        # mapped metric is starts/completions): the detail panel serializes the
+        # full cmhc_metrics for every feature, so starts/completions must keep
+        # their real "official" provenance regardless of which metric colours
+        # the map.
+        if cmhc:
             real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
 
     if cmhc:

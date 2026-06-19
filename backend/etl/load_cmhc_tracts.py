@@ -102,6 +102,7 @@ def parse_published_total(text: str) -> int | None:
     header: list[str] | None = None
     all_idx: int | None = None
     named_sum = 0
+    named_rows = 0
     summary: int | None = None
     for row in reader:
         if not row:
@@ -120,7 +121,13 @@ def parse_published_total(text: str) -> int | None:
             summary = val
         elif first not in ("Source", "Notes"):
             named_sum += val
-    return summary if summary is not None else (named_sum or None)
+            named_rows += 1
+    if summary is not None:
+        return summary
+    # ``named_rows`` distinguishes a genuine zero total from "no parseable rows":
+    # only return a number when we actually saw at least one named data row, so
+    # the caller can treat None as "could not validate" rather than "zero".
+    return named_sum if (all_idx is not None and named_rows) else None
 
 
 def _fetch(table_id: str, cma_id: str, year: int) -> str:
@@ -152,7 +159,14 @@ def fetch_validated_slice(metric: str, cma_id: str, year: int) -> dict[str, int]
         return None  # CMHC has not published this slice yet
     ct_sum = sum(ct_rows.values())
     published = parse_published_total(_fetch(total_code, cma_id, year))
-    if published is not None and ct_sum != published:
+    if published is None:
+        # CT rows exist but the published total could not be parsed (e.g. an
+        # HTML/stub gateway response). Refuse to write data we cannot validate.
+        raise ValueError(
+            f"VALIDATION ABORTED {metric} CMA {cma_id} {year}: CT table has "
+            f"{len(ct_rows)} rows but the published CMA total could not be parsed."
+        )
+    if ct_sum != published:
         raise ValueError(
             f"VALIDATION FAILED {metric} CMA {cma_id} {year}: "
             f"CT sum {ct_sum} != published total {published}"

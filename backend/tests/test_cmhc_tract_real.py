@@ -9,6 +9,37 @@ def _feature(payload, geoid):
     )
 
 
+def test_seed_cmhc_tract_reseeds_when_a_value_changed(db_session):
+    # A regenerated CSV (corrected value) must reseed even though the row count
+    # is unchanged — same stale-volume guard as the demo/CMHC seeders.
+    from app.models import CmhcTractMetric
+    from app.services.seed import seed_cmhc_tract_data
+
+    row = (
+        db_session.query(CmhcTractMetric)
+        .filter(CmhcTractMetric.geoid == "5350017.01", CmhcTractMetric.year == 2023)
+        .one()
+    )
+    official = row.housing_starts_total
+    row.housing_starts_total = official + 999
+    db_session.commit()
+
+    reseeded = seed_cmhc_tract_data(db_session)  # no force
+    assert reseeded > 0
+    restored = (
+        db_session.query(CmhcTractMetric)
+        .filter(CmhcTractMetric.geoid == "5350017.01", CmhcTractMetric.year == 2023)
+        .one()
+    )
+    assert restored.housing_starts_total == official
+
+
+def test_seed_cmhc_tract_is_idempotent_when_unchanged(db_session):
+    from app.services.seed import seed_cmhc_tract_data
+
+    assert seed_cmhc_tract_data(db_session) == 0
+
+
 def test_seed_loads_real_cmhc_tract_rows(db_session):
     from app.models import CmhcTractMetric
 
@@ -58,6 +89,36 @@ def test_badge_is_mixed_for_count_metric_in_tract_mode(client):
     # Some tracts real, some estimated -> mixed provenance.
     assert dq["metric_status"] == "mixed"
     assert "official" in dq["description"].lower() and "estimat" in dq["description"].lower()
+
+
+def test_compare_serves_real_tract_value_consistent_with_map(client):
+    # Regression: /api/compare must show the SAME real CMHC value as the map for
+    # a covered tract, not the allocation estimate (they diverged before fix).
+    map_payload = client.get(
+        "/api/map-data?metric=housing_starts_total&type=census_tract&detail=display&year=2023"
+    ).json()
+    f = _feature(map_payload, "5350017.01")
+    map_value = f["properties"]["cmhc_metrics"]["housing_starts_total"]
+    assert map_value == 2304
+
+    compare = client.get("/api/compare?type=census_tract&ids=5350017.01&year=2023").json()
+    cm = compare["items"][0]["cmhc_metrics"]
+    assert cm["housing_starts_total"] == map_value
+    assert cm["starts_source"] == "official"
+
+
+def test_detail_panel_starts_stays_official_regardless_of_mapped_metric(client):
+    # Regression: the cmhc_metrics panel must reflect the tract's REAL starts
+    # provenance even when the map is colored by a different CMHC metric
+    # (rental_universe). Previously real_tract data was only loaded for the
+    # mapped metric, so starts was mislabeled "estimated" here.
+    payload = client.get(
+        "/api/map-data?metric=rental_universe&type=census_tract&detail=display&year=2023"
+    ).json()
+    f = _feature(payload, "5350017.01")
+    cmhc = f["properties"]["cmhc_metrics"]
+    assert cmhc["housing_starts_total"] == 2304
+    assert cmhc["starts_source"] == "official"
 
 
 def test_real_value_replaces_allocation_not_adds_to_it(client):
