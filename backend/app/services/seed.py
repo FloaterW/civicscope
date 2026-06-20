@@ -247,12 +247,18 @@ def load_cmhc_tract_seed() -> list[dict[str, Any]]:
             v = (row.get(key) or "").strip()
             return int(v) if v != "" else None
 
+        def _str(key: str, row=row) -> str | None:
+            v = (row.get(key) or "").strip()
+            return v or None
+
         rows.append(
             {
                 "geoid": row["geoid"].strip(),
                 "year": int(row["year"]),
                 "housing_starts_total": _int("housing_starts_total"),
                 "housing_completions": _int("housing_completions"),
+                "housing_starts_total_source": _str("housing_starts_total_source"),
+                "housing_completions_source": _str("housing_completions_source"),
             }
         )
     return rows
@@ -274,19 +280,22 @@ def _cmhc_tract_content_changed(
         CmhcTractMetric.year,
         CmhcTractMetric.housing_starts_total,
         CmhcTractMetric.housing_completions,
+        CmhcTractMetric.housing_starts_total_source,
+        CmhcTractMetric.housing_completions_source,
     ).all()
     if len(db_rows) != len(expected):
         return True
 
-    def _fingerprint(items: list) -> set[tuple]:
-        return {
-            (geoid, year, starts, completions)
-            for geoid, year, starts, completions in items
-        }
-
-    db_fp = _fingerprint(db_rows)
+    db_fp = {tuple(r) for r in db_rows}
     seed_fp = {
-        (r["geoid"], r["year"], r["housing_starts_total"], r["housing_completions"])
+        (
+            r["geoid"],
+            r["year"],
+            r["housing_starts_total"],
+            r["housing_completions"],
+            r["housing_starts_total_source"],
+            r["housing_completions_source"],
+        )
         for r in expected
     }
     return db_fp != seed_fp
@@ -320,6 +329,8 @@ def seed_cmhc_tract_data(db: Session, force: bool = False) -> int:
                 year=r["year"],
                 housing_starts_total=r["housing_starts_total"],
                 housing_completions=r["housing_completions"],
+                housing_starts_total_source=r["housing_starts_total_source"],
+                housing_completions_source=r["housing_completions_source"],
             )
         )
         count += 1

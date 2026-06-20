@@ -11,6 +11,7 @@ from etl.load_cmhc_tracts import (
     METRICS,
     parse_ct_table,
     parse_published_total,
+    resolve_cma_slice,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "cmhc_ct_starts_sample.csv"
@@ -66,6 +67,50 @@ def test_published_total_distinguishes_genuine_zero_from_parse_failure():
         "Source,CMHC\r\n"
     )
     assert parse_published_total(csv_text) == 0
+
+
+def test_resolve_exact_match_is_official():
+    # CMHC publishes our exact 2021 tract -> real official value.
+    cmhc = {"0001.00": 410, "0002.00": 0}
+    out = resolve_cma_slice(cmhc, ["5320001.00"], "532", renter={})
+    assert out["5320001.00"] == (410, "official")
+
+
+def test_resolve_zero_parent_yields_official_zero_for_every_child():
+    # Parent tract recorded 0 -> every 2021 child is a genuine, official 0.
+    cmhc = {"0002.00": 0}  # our 0002.01/.02/.03 are not in CMHC (post-split)
+    children = ["5320002.01", "5320002.02", "5320002.03"]
+    out = resolve_cma_slice(cmhc, children, "532", renter={})
+    for c in children:
+        assert out[c] == (0, "official")
+
+
+def test_resolve_nonzero_parent_allocates_by_renter_share_conserving_total():
+    # Parent recorded 18; split between two children by renter share (455 vs 450),
+    # labelled estimated_parent, and the children MUST sum back to 18 exactly.
+    cmhc = {"0003.00": 18}
+    children = ["5320003.01", "5320003.02"]
+    renter = {"5320003.01": 455, "5320003.02": 450}
+    out = resolve_cma_slice(cmhc, children, "532", renter)
+    assert {s for (s) in (out[c][1] for c in children)} == {"estimated_parent"}
+    assert sum(out[c][0] for c in children) == 18  # conserved
+    # Larger renter share gets at least as much.
+    assert out["5320003.01"][0] >= out["5320003.02"][0]
+
+
+def test_resolve_nonzero_parent_equal_split_when_no_renter_data():
+    cmhc = {"0008.00": 7}
+    children = [f"5320008.0{i}" for i in (1, 2, 3)]
+    out = resolve_cma_slice(cmhc, children, "532", renter={})
+    assert sum(out[c][0] for c in children) == 7  # conserved even with equal split
+    assert {out[c][1] for c in children} == {"estimated_parent"}
+
+
+def test_resolve_omits_tracts_with_no_cmhc_match():
+    # No exact and no parent -> omitted (API keeps municipal estimate).
+    cmhc = {"0001.00": 5}
+    out = resolve_cma_slice(cmhc, ["5320999.00"], "532", renter={})
+    assert "5320999.00" not in out
 
 
 def test_metric_and_cma_config_is_complete():
