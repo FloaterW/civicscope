@@ -444,6 +444,28 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(censusSection.getByTestId("official-flag")).toHaveCount(0);
   });
 
+  test("a parent-tract-allocated tract is flagged 'est. (CMHC parent tract)'", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "census_tract",
+      { timeout: 30000 }
+    );
+    await page.getByLabel("Map metric").selectOption("housing_starts_total");
+    await page.getByLabel("Data year").selectOption("2023");
+
+    // 5320003.01 split from CMHC parent 0003.00 -> allocated value, distinct
+    // "est. (CMHC parent tract)" provenance (not "CMHC tract data", not plain "est.").
+    await page.getByTestId("geography-search").fill("5320003.01");
+    await page.getByRole("option").filter({ hasText: "5320003.01" }).first().click();
+
+    const panel = page.getByTestId("detail-panel");
+    await expect(panel.getByTestId("parent-est-flag").first()).toBeVisible();
+    await expect(panel).toContainText("CMHC parent tract");
+  });
+
   test("map legend is titled with the metric and split into quantile classes", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");

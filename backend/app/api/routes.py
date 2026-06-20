@@ -203,7 +203,11 @@ def serialize_cmhc_metric(
         if real_tract is not None:
             real = getattr(real_tract, metric_key, None)
             if real is not None:
-                return real, "official"
+                # The ETL stored the provenance per metric: "official" (real CMHC
+                # value, incl. a parent that recorded 0) or "estimated_parent"
+                # (allocated from a real CMHC parent tract).
+                stored = getattr(real_tract, f"{metric_key}_source", None) or "official"
+                return real, stored
         if not tract_inherited:
             return allocated_val, "official"  # municipality-level: real survey value
         return allocated_val, "estimated"

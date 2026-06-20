@@ -4,6 +4,7 @@ import { MapPin, X } from "lucide-react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
 import type {
+  CmhcCountSource,
   CmhcMetricValues,
   Geography,
   GeographyLevel,
@@ -142,23 +143,22 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                     <MetricLine
                       label="Starts"
                       value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)}
-                      status={cmhcSourceStatus(cmhcMetrics.starts_source, geographyLevel)}
-                      cmhcOfficial={isCmhcOfficial(cmhcMetrics.starts_source, geographyLevel)}
+                      cmhcSource={cmhcSourceFor(cmhcMetrics.starts_source, geographyLevel)}
                     />
                     <MetricLine
                       label="Completions"
                       value={formatMetric("housing_completions", cmhcMetrics.housing_completions)}
-                      status={cmhcSourceStatus(cmhcMetrics.completions_source, geographyLevel)}
-                      cmhcOfficial={isCmhcOfficial(cmhcMetrics.completions_source, geographyLevel)}
+                      cmhcSource={cmhcSourceFor(cmhcMetrics.completions_source, geographyLevel)}
                     />
                     <MetricLine label="Under const." value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
                     <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
                   </div>
                   {geographyLevel === "census_tract" && (
                     <p className="mt-2 text-xs leading-5 text-civic-muted">
-                      Starts & completions marked “CMHC tract data” are real published census-tract
-                      values; “est.” values are allocated from the parent municipality where CMHC has
-                      no tract figure.
+                      “CMHC tract data” = real published census-tract values. “est. (CMHC parent
+                      tract)” = allocated from CMHC’s real parent tract (a 2016 tract that split in
+                      2021). “est.” = allocated from the parent municipality where CMHC has no tract
+                      figure.
                     </p>
                   )}
                 </div>
@@ -297,16 +297,16 @@ function MetricLine({
   label,
   value,
   status,
-  cmhcOfficial
+  cmhcSource
 }: {
   label: string;
   value: string;
   /** Census field-level provenance. "official" intentionally renders NO badge
    * (the default, clean state). */
   status?: MetricFieldStatus;
-  /** Set only for CMHC SCSS count metrics whose value is a real published
-   * census-tract figure — renders the distinct "CMHC tract data" badge. */
-  cmhcOfficial?: boolean;
+  /** Provenance of a CMHC SCSS count metric in census-tract mode; renders a
+   * distinct badge per source. Undefined elsewhere (no badge). */
+  cmhcSource?: CmhcCountSource;
 }) {
   return (
     <div className="rounded-md border border-civic-line bg-white px-3 py-2">
@@ -331,7 +331,7 @@ function MetricLine({
             ⚠
           </span>
         )}
-        {cmhcOfficial && (
+        {cmhcSource === "official" && (
           <span
             data-testid="official-flag"
             className="ml-1 align-middle text-xs font-medium text-emerald-600"
@@ -340,26 +340,34 @@ function MetricLine({
             CMHC tract data
           </span>
         )}
+        {cmhcSource === "estimated_parent" && (
+          <span
+            data-testid="parent-est-flag"
+            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            title="Allocated from CMHC's real parent tract (a 2016 tract that split in 2021); a closer estimate than the municipal allocation, but still an estimate."
+          >
+            est. (CMHC parent tract)
+          </span>
+        )}
+        {cmhcSource === "estimated" && (
+          <span
+            data-testid="estimated-flag"
+            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            title="Estimated by allocating the parent municipality's total by renter-household share."
+          >
+            est.
+          </span>
+        )}
       </span>
     </div>
   );
 }
 
-/** Whether a CMHC count metric's value is a real published census-tract figure
- * (so the "CMHC tract data" badge should show). Only in census-tract mode. */
-function isCmhcOfficial(
-  source: "official" | "estimated" | undefined,
+/** A CMHC count metric's source, but only in census-tract mode (municipality
+ * values are the survey value itself, shown without a badge). */
+function cmhcSourceFor(
+  source: CmhcCountSource | undefined,
   geographyLevel: GeographyLevel
-): boolean {
-  return geographyLevel === "census_tract" && source === "official";
-}
-
-/** Whether a CMHC count metric is an allocation estimate (show "est."). */
-function cmhcSourceStatus(
-  source: "official" | "estimated" | undefined,
-  geographyLevel: GeographyLevel
-): MetricFieldStatus | undefined {
-  if (geographyLevel !== "census_tract") return undefined;
-  if (source === "estimated") return "estimated";
-  return undefined;
+): CmhcCountSource | undefined {
+  return geographyLevel === "census_tract" ? source : undefined;
 }

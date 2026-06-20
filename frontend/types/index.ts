@@ -89,11 +89,15 @@ export type CmhcMetricValues = {
   unabsorbed_units: number | null;
   rms_surveyed: boolean;
   allocated?: boolean;
-  /** Provenance of the SCSS count metrics: "official" = real CMHC census-tract
-   * value; "estimated" = renter-share allocation fallback. */
-  starts_source?: "official" | "estimated";
-  completions_source?: "official" | "estimated";
+  /** Provenance of the SCSS count metrics:
+   * - "official": real CMHC census-tract value (incl. a parent tract that recorded 0)
+   * - "estimated_parent": allocated from a real CMHC parent tract (2016→2021 split)
+   * - "estimated": renter-share allocation from the parent municipality */
+  starts_source?: CmhcCountSource;
+  completions_source?: CmhcCountSource;
 };
+
+export type CmhcCountSource = "official" | "estimated_parent" | "estimated";
 
 export type Geography = {
   id: number;
