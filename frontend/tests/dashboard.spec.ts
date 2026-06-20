@@ -466,6 +466,19 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(panel).toContainText("CMHC parent tract");
   });
 
+  test("a combined-zone municipality discloses its shared CMHC survey zone", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    // Municipality mode (default). Select a CMHC metric so rental data loads.
+    await page.getByLabel("Map metric").selectOption("vacancy_rate");
+    await page.getByTestId("geography-search").fill("Richmond Hill");
+    await page.getByRole("option").filter({ hasText: "Richmond Hill" }).first().click();
+
+    const panel = page.getByTestId("detail-panel");
+    await expect(panel.getByTestId("survey-zone-note")).toBeVisible();
+    await expect(panel.getByTestId("survey-zone-note")).toContainText("Richmond Hill / Vaughan / King");
+  });
+
   test("map legend is titled with the metric and split into quantile classes", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");

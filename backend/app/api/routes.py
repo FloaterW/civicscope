@@ -49,6 +49,24 @@ CMHC_COUNT_METRICS = frozenset({
 # everything else we keep the renter-share allocation (provenance "estimated").
 CMHC_REAL_TRACT_METRICS = frozenset({"housing_starts_total", "housing_completions"})
 
+# CMHC's Rental Market Survey reports several GTA municipalities together as a
+# single combined survey zone, so each constituent municipality shows IDENTICAL
+# rental values. That is CMHC's real survey granularity (not a bug), but it is
+# surfaced here so the UI can disclose it rather than look like duplicated data.
+CMHC_RMS_SHARED_ZONES = {
+    "3519038": "Richmond Hill / Vaughan / King",
+    "3519028": "Richmond Hill / Vaughan / King",
+    "3519049": "Richmond Hill / Vaughan / King",
+    "3519046": "Aurora / Newmarket / Whitchurch-Stouffville",
+    "3519048": "Aurora / Newmarket / Whitchurch-Stouffville",
+    "3519044": "Aurora / Newmarket / Whitchurch-Stouffville",
+    "3518001": "Pickering / Ajax / Uxbridge",
+    "3518005": "Pickering / Ajax / Uxbridge",
+    "3518029": "Pickering / Ajax / Uxbridge",
+    "3524009": "Milton / Halton Hills",
+    "3524015": "Milton / Halton Hills",
+}
+
 
 def load_real_tract_cmhc(db: Session, year: int) -> dict[str, CmhcTractMetric]:
     """Map tract geoid -> real CMHC SCSS row for a given year (may be empty)."""
@@ -242,6 +260,10 @@ def serialize_cmhc_metric(
         "allocated": allocated,
         "starts_source": starts_source,
         "completions_source": completions_source,
+        # When the source municipality shares a CMHC RMS survey zone, disclose it
+        # so identical rental values across those municipalities read as real
+        # survey granularity, not duplicated data.
+        "survey_zone": CMHC_RMS_SHARED_ZONES.get(cmhc.geoid),
     }
     return result
 
