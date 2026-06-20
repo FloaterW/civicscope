@@ -74,11 +74,39 @@ def test_uncovered_tract_keeps_estimated_allocation(client):
     payload = client.get(
         "/api/map-data?metric=housing_starts_total&type=census_tract&detail=display&year=2023"
     ).json()
-    f = _feature(payload, "5320002.01")  # not in CMHC CT coverage
+    # 5370206.00 (Burlington) has no CMHC tract data at all — not even a parent
+    # tract — so it keeps the municipal allocation estimate.
+    f = _feature(payload, "5370206.00")
     assert f is not None
     cmhc = f["properties"]["cmhc_metrics"]
-    # Still served (allocation), but clearly marked estimated, not official.
     assert cmhc["starts_source"] == "estimated"
+
+
+def test_zero_parent_tract_is_served_as_official_zero(client):
+    # 5320002.01's CMHC parent tract (0002.00) recorded 0 starts in 2023, so the
+    # child is a real, measured 0 — official, not a positive municipal estimate.
+    payload = client.get(
+        "/api/map-data?metric=housing_starts_total&type=census_tract&detail=display&year=2023"
+    ).json()
+    f = _feature(payload, "5320002.01")
+    assert f is not None
+    cmhc = f["properties"]["cmhc_metrics"]
+    assert cmhc["housing_starts_total"] == 0
+    assert cmhc["starts_source"] == "official"
+
+
+def test_nonzero_parent_tract_is_labeled_estimated_parent(client):
+    # 5320003.01/.02 split from CMHC parent 0003.00 (18 starts in 2023). Their
+    # allocated values are a distinct "estimated_parent" provenance and must sum
+    # back to the real parent total.
+    payload = client.get(
+        "/api/map-data?metric=housing_starts_total&type=census_tract&detail=display&year=2023"
+    ).json()
+    children = [_feature(payload, g) for g in ("5320003.01", "5320003.02")]
+    assert all(c is not None for c in children)
+    sources = {c["properties"]["cmhc_metrics"]["starts_source"] for c in children}
+    assert sources == {"estimated_parent"}
+    assert sum(c["properties"]["cmhc_metrics"]["housing_starts_total"] for c in children) == 18
 
 
 def test_badge_is_mixed_for_count_metric_in_tract_mode(client):

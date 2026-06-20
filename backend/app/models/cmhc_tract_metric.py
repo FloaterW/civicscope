@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -30,5 +30,11 @@ class CmhcTractMetric(Base):
 
     housing_starts_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     housing_completions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Per-metric provenance of the stored value: "official" (real CMHC tract
+    # value, including a parent tract that recorded 0) or "estimated_parent"
+    # (allocated from a real CMHC parent tract). Null where the metric is absent.
+    housing_starts_total_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    housing_completions_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     geography = relationship("Geography")
