@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -7,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import CmhcMetric, ETLRun, Geography, Metric
+from app.models import CmhcMetric, CmhcTractMetric, ETLRun, Geography, Metric
 from app.services.metric_calculations import calculate_affordability_index
 from app.services.postgis import sync_geography_geoms
 
@@ -238,8 +239,6 @@ def seed_cmhc_data(db: Session, force: bool = False) -> int:
 
 def load_cmhc_tract_seed() -> list[dict[str, Any]]:
     """Read the committed real CMHC census-tract CSV (geoid, year, metrics)."""
-    import csv
-
     path = files("app.data").joinpath("cmhc_ct_metrics.csv")
     rows: list[dict[str, Any]] = []
     for row in csv.DictReader(path.read_text(encoding="utf-8").splitlines()):
@@ -269,8 +268,6 @@ def _cmhc_tract_content_changed(
     Compares a content fingerprint over EVERY row (the table is small), so a
     single changed value cannot slip through a sparse sample.
     """
-    from app.models import CmhcTractMetric
-
     expected = [r for r in seed_rows if r["geoid"] in known]
     db_rows = db.query(
         CmhcTractMetric.geoid,
@@ -301,8 +298,6 @@ def seed_cmhc_tract_data(db: Session, force: bool = False) -> int:
     Idempotent, but reseeds when the packaged CSV's content has changed (not just
     its row count). Only rows for known tract geoids are inserted.
     """
-    from app.models import CmhcTractMetric
-
     seed_rows = load_cmhc_tract_seed()
     known = {row[0] for row in db.query(Geography.geoid).all()}
     existing = db.query(CmhcTractMetric).count()
@@ -311,6 +306,9 @@ def seed_cmhc_tract_data(db: Session, force: bool = False) -> int:
     if existing:
         db.query(CmhcTractMetric).delete()
         db.flush()
+        # Clear the identity map so re-inserted rows that reuse autoincrement
+        # ids (SQLite/StaticPool) don't collide with the just-deleted ones.
+        db.expunge_all()
 
     count = 0
     for r in seed_rows:

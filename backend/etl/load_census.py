@@ -341,7 +341,7 @@ def update_seed_metrics(seed_path: Path, metrics: list[MetricInput]) -> int:
         "Municipal geometries are Statistics Canada 2021 cartographic census subdivision boundaries.",
         "Metrics are loaded from official Statistics Canada 2021 Census Profile characteristics: population 2021, population 2016, median household income, tenant households, tenant rent burden, and median monthly shelter costs for rented dwellings.",
     ]
-    seed_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return updated
 
 
