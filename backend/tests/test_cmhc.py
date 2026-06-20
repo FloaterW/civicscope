@@ -326,6 +326,24 @@ def test_municipality_cmhc_not_allocated(client):
     assert cmhc["housing_starts_total"] is not None
 
 
+def test_combined_zone_municipality_discloses_shared_survey_zone(client):
+    # Richmond Hill (3519038) is reported by CMHC as part of a combined RMS zone
+    # with Vaughan and King, so the API discloses survey_zone.
+    rh = client.get("/api/compare?ids=3519038").json()["items"][0]["cmhc_metrics"]
+    assert rh["survey_zone"] == "Richmond Hill / Vaughan / King"
+    # Vaughan (3519028) shares the same zone AND the same rental values.
+    van = client.get("/api/compare?ids=3519028").json()["items"][0]["cmhc_metrics"]
+    assert van["survey_zone"] == "Richmond Hill / Vaughan / King"
+    assert van["average_rent_total"] == rh["average_rent_total"]
+    assert van["vacancy_rate"] == rh["vacancy_rate"]
+
+
+def test_standalone_municipality_has_no_survey_zone(client):
+    # Toronto is its own set of zones (aggregated), not a shared combined zone.
+    tor = client.get("/api/compare?ids=3520005").json()["items"][0]["cmhc_metrics"]
+    assert tor["survey_zone"] is None
+
+
 def test_summary_no_cmhc_blend_for_unresolvable_tract_parent(client, db_session):
     # If a selected tract's parent municipality cannot be resolved (null county),
     # the summary must NOT silently fall back to ALL-municipality CMHC aggregates

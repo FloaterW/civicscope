@@ -95,6 +95,10 @@ export type CmhcMetricValues = {
    * - "estimated": renter-share allocation from the parent municipality */
   starts_source?: CmhcCountSource;
   completions_source?: CmhcCountSource;
+  /** When set, CMHC reports this municipality as part of a combined Rental
+   * Market Survey zone, so its rental values are shared across the named
+   * municipalities (real survey granularity, not duplicated data). */
+  survey_zone?: string | null;
 };
 
 export type CmhcCountSource = "official" | "estimated_parent" | "estimated";

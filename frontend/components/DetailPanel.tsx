@@ -243,6 +243,13 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
           ))}
         </div>
       )}
+      {geographyLevel === "municipality" && cmhcMetrics.survey_zone && marketFields.length > 0 && (
+        <p data-testid="survey-zone-note" className="mt-2 text-xs leading-5 text-civic-muted">
+          CMHC surveys this municipality as part of the <strong>{cmhcMetrics.survey_zone}</strong>{" "}
+          rental market zone, so these rental values are shared across those municipalities
+          (CMHC’s survey granularity, not duplicated data).
+        </p>
+      )}
     </div>
   );
 }
