@@ -1,6 +1,14 @@
 # CivicScope
 
-A geospatial civic analytics platform that helps users explore housing affordability, income, population growth, and access patterns across Greater Toronto Area communities using public-data-ready workflows.
+A geospatial civic analytics platform that helps users explore housing affordability, income, population growth, and access patterns across Greater Toronto Area communities — with rigorous, visible data provenance.
+
+[![CI](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml/badge.svg)](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.11x-009688)
+![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-316192)
+
+[![CivicScope overview dashboard](docs/screenshots/overview-dashboard.png)](https://civicscope-gold.vercel.app)
 
 ## Live Demo
 
@@ -13,7 +21,7 @@ A geospatial civic analytics platform that helps users explore housing affordabi
 
 ## Overview
 
-CivicScope is a portfolio-grade full-stack project for public-sector analytics. The MVP includes a FastAPI backend, SQLAlchemy data model, Postgres/PostGIS Docker stack, packaged Greater Toronto Area seed data, tested API endpoints, repeatable Statistics Canada ETL scripts, and a Next.js dashboard with an interactive MapLibre map, municipality/census-tract level switching, summary cards, comparison chart, search, and detail panel.
+CivicScope is a portfolio-grade full-stack project for public-sector analytics. It pairs a FastAPI backend, SQLAlchemy data model, Postgres/PostGIS Docker stack, packaged Greater Toronto Area seed data, tested API endpoints, and repeatable Statistics Canada + CMHC ETL scripts with a Next.js dashboard — an interactive MapLibre map, municipality/census-tract level switching, summary cards, comparison chart, search, and a detail panel.
 
 Municipal geometries use Statistics Canada 2021 cartographic census subdivision boundaries. Metric values use official Statistics Canada 2021 Census Profile characteristics for the selected GTA municipalities.
 
@@ -147,11 +155,18 @@ Local URLs:
 - API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/health
 
-Run services manually:
+Run services manually. The backend requires a running PostgreSQL + PostGIS instance
+(the migrations are PostGIS-specific). The easiest way is to start just the database
+with Docker, then point the backend at it:
 
 ```bash
+# 1. Start the PostGIS database (or use your own Postgres+PostGIS).
+docker compose up -d db
+
+# 2. Backend — DATABASE_URL must point at PostGIS (.env.example has this value).
 cd backend
 pip install -r requirements.txt
+export DATABASE_URL="postgresql+psycopg://civicscope:civicscope@localhost:5432/civicscope"
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -161,6 +176,10 @@ cd frontend
 npm install
 npm run dev
 ```
+
+> Note: without a PostGIS database, `alembic upgrade head` fails — the schema uses
+> PostGIS types and functions that SQLite does not support. (Tests are the exception:
+> `pytest` uses an isolated in-memory SQLite database created from SQLAlchemy metadata.)
 
 ## API Reference
 
@@ -396,3 +415,7 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 - Real CMHC tract data covers **Starts & Completions** only. CMHC *rate* metrics (vacancy, rent) are heavily suppressed at tract level, so they remain inherited from the parent municipality; `units_under_construction`/`unabsorbed_units` keep the renter-share allocation. Ingesting these as real tract values is a possible follow-up.
 - Dissemination areas and parcel-level workflows remain planned expansion paths.
 - Transit/access scoring is intentionally not implemented yet; GTFS ingestion is the next domain feature after deployment polish.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

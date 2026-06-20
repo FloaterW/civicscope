@@ -68,7 +68,7 @@ def update_seed_file(seed_path: Path, source: str | None = None) -> int:
         "Census tract geometries are official Statistics Canada 2021 cartographic tract boundaries filtered by centroid to the current GTA municipalities.",
         "Packaged tract-level metrics are estimated from parent municipality values for offline demo use; replace with tract-level Census Profile metrics before publication-grade analysis.",
     ]
-    seed_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return len(tract_rows)
 
 

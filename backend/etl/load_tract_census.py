@@ -260,7 +260,7 @@ def update_seed_with_official_metrics(
         "fetched via the SDMX DF_CT dataflow.",
     ]
 
-    seed_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return updated
 
 
@@ -319,7 +319,7 @@ def sync_seed_from_csv(seed_path: Path, csv_path: Path) -> int:
         "unavailable values are stored as null; rent burden is estimated from rent and "
         "income only as a clearly labeled fallback at serialization time.",
     ]
-    seed_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return updated
 
 
