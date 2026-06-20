@@ -33,14 +33,18 @@ Decide whether to replace the app's CMHC municipality inheritance/allocation wit
 
 ## Prototype
 
-`backend/etl/spike_cmhc_tract.py` (throwaway; not wired in, no tests) demonstrates
-the Python ingestion path:
+> The throwaway prototype `backend/etl/spike_cmhc_tract.py` was **removed** once the
+> production loader (`backend/etl/load_cmhc_tracts.py`) landed and was validated. Its
+> findings are preserved below and in git history; the production loader is now the
+> single authoritative ingestion path.
 
-- `--dry-run` parses an embedded sample CSV and prints a coverage report
-  (real / suppressed / missing) — proves the parse + coverage logic **offline**.
-- Live mode builds the HMIP `TableMapChart` CSV-export URL (params mirror the `cmhc`
-  R package), fetches a CT-breakdown table for the Toronto CMA, parses it (marking
-  `**`/blank cells as suppressed), and reports per-metric tract coverage.
+The original spike demonstrated the Python ingestion path:
+
+- `--dry-run` parsed an embedded sample CSV and printed a coverage report
+  (real / suppressed / missing) — proving the parse + coverage logic **offline**.
+- Live mode built the HMIP `TableMapChart` CSV-export URL (params mirroring the `cmhc`
+  R package), fetched a CT-breakdown table for the Toronto CMA, parsed it (marking
+  `**`/blank cells as suppressed), and reported per-metric tract coverage.
 
 **Empirical finding (2026-05-30, updated): the CSV data endpoint IS reachable.**
 An earlier draft of this note said a plain HTTP pull fails. That is true only for the
@@ -81,12 +85,11 @@ project's honesty principle. The labeled inheritance/allocation fallback stays i
 meantime. A follow-up can start from the verified `ExportTable` contract above instead
 of from zero.
 
-To run where network is available:
+The production loader supersedes the spike — run it instead:
 
 ```bash
-python backend/etl/spike_cmhc_tract.py --dry-run                 # offline logic check
-python backend/etl/spike_cmhc_tract.py --metric vacancy_rate --year 2024
-python backend/etl/spike_cmhc_tract.py --metric housing_starts --year 2024
+python backend/etl/load_cmhc_tracts.py --self-test     # offline parser check
+python backend/etl/load_cmhc_tracts.py --generate-csv  # live pull + validation
 ```
 
 The single most reliable reference path remains the `cmhc` R package:

@@ -131,7 +131,7 @@ def update_seed_file(seed_path: Path, geographies: list[dict[str, Any]]) -> int:
 
     seed["metadata"]["source"] = "demo_seed_gta_municipalities_statcan_csd_cartographic"
     seed["metadata"]["year"] = 2021
-    seed_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return updated
 
 
