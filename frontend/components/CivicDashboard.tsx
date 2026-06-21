@@ -393,8 +393,9 @@ export function CivicDashboard() {
               {geographyLevel === "census_tract" &&
                 visibleMapData?.metadata.data_quality?.label?.includes("inherited") && (
                   <p className="mt-1 max-w-prose text-xs leading-5 text-amber-700">
-                    CMHC surveys this rate at the municipal level, not per tract, so every tract in a
-                    municipality shows the same (its municipality&apos;s) value.
+                    Showing each tract&apos;s municipal average. CMHC publishes this rate by survey
+                    zone (finer than a municipality), but that sub-municipal variation is not yet
+                    broken out to individual tracts here.
                   </p>
                 )}
             </div>
