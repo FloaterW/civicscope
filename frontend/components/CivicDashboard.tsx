@@ -390,6 +390,13 @@ export function CivicDashboard() {
               <p className="text-xs text-civic-muted">
                 {getMetricLabel(metric)} by {geographyLabel.singular}
               </p>
+              {geographyLevel === "census_tract" &&
+                visibleMapData?.metadata.data_quality?.label?.includes("inherited") && (
+                  <p className="mt-1 max-w-prose text-xs leading-5 text-amber-700">
+                    CMHC surveys this rate at the municipal level, not per tract, so every tract in a
+                    municipality shows the same (its municipality&apos;s) value.
+                  </p>
+                )}
             </div>
             <div className="flex items-center gap-2">
               <DataQualityBadge
