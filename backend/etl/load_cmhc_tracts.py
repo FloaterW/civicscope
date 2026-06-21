@@ -1,24 +1,16 @@
-"""Acquire REAL CMHC census-tract Starts & Completions (SCSS) data from HMIP.
+"""Acquire CMHC census-tract Starts & Completions (SCSS) data from HMIP.
 
-This replaces the renter-share *allocation estimate* with CMHC's actually
-published census-tract values for the metrics and years where they exist.
+Replaces the renter-share allocation estimate with CMHC's published census-tract
+values for the metrics/years where they exist. Each (CMA, metric, year) slice is
+validated: the sum of the census-tract "All" column must equal CMHC's published
+CMA total, otherwise the slice is rejected. Parser tests use a committed fixture
+of real CMHC rows (tests/fixtures/cmhc_ct_starts_sample.csv).
 
-Honesty contract (see docs/cmhc-real-tract-data-plan.md):
-  * Every (CMA, metric, year) slice is validated: the sum of the census-tract
-    "All" column MUST equal CMHC's own published CMA total. A mismatch aborts
-    the slice rather than writing unverified data.
-  * Parser tests run against a committed fixture of REAL CMHC rows
-    (backend/tests/fixtures/cmhc_ct_starts_sample.csv), never synthetic data.
-  * Where CMHC publishes no row for a tract/year, the value is simply absent
-    (the app keeps its labeled allocation estimate); zero is a real value
-    distinct from absent.
-
-Verified recipe (confirmed by direct HMIP calls, 2026-06-01):
-  POST .../TableMapChart/ExportTable, form-encoded:
-    TableId, GeographyId (CMA METCODE), GeographyTypeId=3, ForTimePeriod.Year,
-    Frequency=Annual, exportType=csv  -> latin1 multi-section CSV.
-  CT tables use the ".11" breakdown suffix; CMHC returns SHORT ct ids
-  (e.g. "0001.00") which map to our CTUID by prepending the CMA prefix.
+HMIP request: POST .../TableMapChart/ExportTable, form-encoded with TableId,
+GeographyId (CMA METCODE), GeographyTypeId=3, ForTimePeriod.Year, Frequency=Annual,
+exportType=csv. Returns a latin1 multi-section CSV. CT tables use the ".11"
+breakdown suffix; CMHC returns short CT ids (e.g. "0001.00") that map to our CTUID
+by prepending the CMA prefix.
 
 Usage:
   python etl/load_cmhc_tracts.py --self-test          # offline parser test

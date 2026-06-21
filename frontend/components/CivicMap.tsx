@@ -54,7 +54,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   // Same quantile computation the map paints by, so the legend always agrees.
   const legend = useMemo(() => (data ? computeColorStops(data) : null), [data]);
   // Data loaded, but every geography is null for this metric (e.g. turnover /
-  // availability — not collected in this dataset). Surface an explicit empty
+  // availability, not collected in this dataset). Surface an explicit empty
   // state instead of a silently blank map.
   const dataIsEmpty = Boolean(
     data && data.metadata.domain.min === null && data.metadata.domain.max === null
@@ -461,7 +461,7 @@ function quantileBreaks(sorted: number[], count: number): number[] {
  * the active metric's non-null feature values. This differentiates right-skewed
  * metrics far better than linear min/mid/max interpolation, which washes most
  * areas into the palest band. Returns the stop boundaries (ascending, deduped)
- * paired with the ramp colour for each, plus the domain min/max — shared by the
+ * paired with the ramp colour for each, plus the domain min/max, shared by the
  * map paint expression and the legend so the two always agree.
  */
 function computeColorStops(data: MapData): {
@@ -478,7 +478,7 @@ function computeColorStops(data: MapData): {
   const min = values.length ? values[0] : (data.metadata.domain.min ?? 0);
   const max = values.length ? values[values.length - 1] : (data.metadata.domain.max ?? 1);
 
-  // All equal (or no data): flat fill — interpolate needs ascending stops.
+  // All equal (or no data): flat fill, interpolate needs ascending stops.
   if (!values.length || min === max) {
     return { stops: [], min, max, flat: true };
   }
@@ -489,7 +489,7 @@ function computeColorStops(data: MapData): {
   const candidate = [min, ...interior];
 
   // Dedupe equal boundaries (heavily-tied distributions collapse quantiles)
-  // to keep stops strictly ascending — MapLibre throws otherwise.
+  // to keep stops strictly ascending, MapLibre throws otherwise.
   const ascending: number[] = [];
   for (const value of candidate) {
     if (ascending.length === 0 || value > ascending[ascending.length - 1]) {
@@ -555,7 +555,7 @@ function normalizeFeatureProperties(feature: {
   };
 }
 
-// (formatLegendValue removed — the legend now renders quantile classes via formatMetric.)
+// (formatLegendValue removed, the legend now renders quantile classes via formatMetric.)
 
 function getDataBounds(data?: MapData | null): LngLatBoundsLike | null {
   if (!data?.features.length) {

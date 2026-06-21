@@ -45,20 +45,20 @@ GEO_TYPE_ZONE = 5  # Survey zone breakdown (used by RMS)
 # average rent, median rent, rent % change, and rental universe in one CSV.
 TABLE_RMS_SUMMARY = "2.1.31.3"
 
-# Scss (Starts & Completions Survey) tables — queried per CSD
+# Scss (Starts & Completions Survey) tables, queried per CSD
 TABLE_SCSS_STARTS = "1.1.1"  # Housing starts by dwelling type
 TABLE_SCSS_COMPLETIONS = "1.2.2"  # Historical completions by dwelling type
 TABLE_SCSS_UNDER_CONSTRUCTION = "1.2.3"  # Historical under-construction inventory
 TABLE_SCSS_UNABSORBED = "1.2.4"  # Historical completed-and-unabsorbed inventory
 
-# RMS survey month — the Rental Market Survey is conducted in October each year.
+# RMS survey month, the Rental Market Survey is conducted in October each year.
 RMS_SURVEY_MONTH = 10
 
 SEED_PATH = PROJECT_ROOT / "app" / "data" / "cmhc_seed.json"
 
 REQUEST_DELAY = 0.3  # seconds between requests to be polite
 
-# All 25 GTA municipalities — used for per-CSD Scss queries
+# All 25 GTA municipalities, used for per-CSD Scss queries
 ALL_GTA_GEOIDS: dict[str, str] = {
     "3518001": "Pickering",
     "3518005": "Ajax",
@@ -108,7 +108,7 @@ DEFAULT_END_YEAR = 2025
 
 # Maps survey zone name (as it appears in the CSV) → list of geoids
 ZONE_TO_GEOIDS: dict[str, list[str]] = {
-    # City of Toronto — 17 internal survey zones
+    # City of Toronto, 17 internal survey zones
     "Toronto (Central)": ["3520005"],
     "Toronto (East)": ["3520005"],
     "Toronto (North)": ["3520005"],
@@ -126,23 +126,23 @@ ZONE_TO_GEOIDS: dict[str, list[str]] = {
     "North York (Southwest)": ["3520005"],
     "North York (N.Central)": ["3520005"],
     "North York (Northwest)": ["3520005"],
-    # Mississauga — 3 zones
+    # Mississauga, 3 zones
     "Mississauga (South)": ["3521005"],
     "Mississauga (Northwest)": ["3521005"],
     "Mississauga (Northeast)": ["3521005"],
-    # Brampton — 2 zones
+    # Brampton, 2 zones
     "Brampton (West)": ["3521010"],
     "Brampton (East)": ["3521010"],
     # Single-municipality zones
     "Oakville": ["3524001"],
     "Caledon": ["3521024"],
     "Markham": ["3519036"],
-    # Combined zones — data shared across constituent municipalities
+    # Combined zones, data shared across constituent municipalities
     "Richmond Hill/Vaughan/King": ["3519038", "3519028", "3519049"],
     "Aurora, Newmkt, Whit-St.": ["3519046", "3519048", "3519044"],
     "Pickering/Ajax/Uxbridge": ["3518001", "3518005", "3518029"],
     "Milton/Halton Hills": ["3524009", "3524015"],
-    # These zones are outside our GTA-25 municipality set — skip
+    # These zones are outside our GTA-25 municipality set, skip
     # "Orangeville/Mono", "Bradford/West Gwillimbury/New Tecumseth"
 }
 
@@ -409,7 +409,7 @@ def merge_bedroom_rents(
 
 
 # ---------------------------------------------------------------------------
-# Scss (Starts & Completions Survey) — per-CSD queries
+# Scss (Starts & Completions Survey), per-CSD queries
 # ---------------------------------------------------------------------------
 
 # Month abbreviations used in HMIP historical CSV rows (e.g. "Jan 2024", "Dec 2025")
@@ -558,7 +558,7 @@ def parse_scss_historical_csv(csv_text: str) -> list[ScssMonthlyRow]:
         except ValueError:
             continue
 
-        # "All" (total) is the last real column — field index 5
+        # "All" (total) is the last real column, field index 5
         rows.append(
             ScssMonthlyRow(
                 year=row_year,
@@ -595,7 +595,7 @@ def fetch_scss_for_municipality(
     """
     result: dict[int, dict[str, Any]] = {}
 
-    # 1. Fetch starts — one call per year (Ytd=True gives annual total)
+    # 1. Fetch starts, one call per year (Ytd=True gives annual total)
     for year in years:
         csv_text = fetch_scss_csv(geoid, TABLE_SCSS_STARTS, year, month=12, ytd=True)
         starts = parse_scss_starts_csv(csv_text)
@@ -611,7 +611,7 @@ def fetch_scss_for_municipality(
         }
         time.sleep(REQUEST_DELAY)
 
-    # 2. Fetch completions — one call from start year, returns all months
+    # 2. Fetch completions, one call from start year, returns all months
     csv_text = fetch_scss_csv(
         geoid, TABLE_SCSS_COMPLETIONS, years[0], month=1, ytd=False
     )
@@ -620,7 +620,7 @@ def fetch_scss_for_municipality(
         result[year]["housing_completions"] = _sum_completions_for_year(comp_monthly, year)
     time.sleep(REQUEST_DELAY)
 
-    # 3. Fetch under construction — one call from start year, take Dec snapshot
+    # 3. Fetch under construction, one call from start year, take Dec snapshot
     csv_text = fetch_scss_csv(
         geoid, TABLE_SCSS_UNDER_CONSTRUCTION, years[0], month=1, ytd=False
     )
@@ -629,7 +629,7 @@ def fetch_scss_for_municipality(
         result[year]["units_under_construction"] = _dec_snapshot_for_year(uc_monthly, year)
     time.sleep(REQUEST_DELAY)
 
-    # 4. Fetch unabsorbed inventory — one call from start year, take Dec snapshot
+    # 4. Fetch unabsorbed inventory, one call from start year, take Dec snapshot
     csv_text = fetch_scss_csv(
         geoid, TABLE_SCSS_UNABSORBED, years[0], month=1, ytd=False
     )
@@ -901,7 +901,7 @@ def update_seed(years: list[int] | None = None) -> int:
     print("\n=== Phase 3: Merging RMS + Scss data ===")
     all_metrics: list[CmhcRow] = []
 
-    # Build the full set of (geoid, year) pairs — union of RMS and Scss coverage
+    # Build the full set of (geoid, year) pairs, union of RMS and Scss coverage
     all_keys: set[tuple[str, int]] = set(rms_by_key.keys())
     for geoid, year_data in all_scss.items():
         if geoid in known_geoids:
