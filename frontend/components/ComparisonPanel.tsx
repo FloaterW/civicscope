@@ -4,6 +4,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -11,6 +13,7 @@ import {
 } from "recharts";
 
 import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
+import { rampColorForValue } from "@/lib/colors";
 import type { CompareResponse, GeographyLevel, MetricKey } from "@/types";
 
 type Props = {
@@ -44,6 +47,9 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
       })
       .filter((item) => item.value !== null) ?? [];
   const hasChartData = chartData.length > 0;
+  const values = chartData.map((d) => d.value as number);
+  const minValue = values.length ? Math.min(...values) : 0;
+  const maxValue = values.length ? Math.max(...values) : 0;
 
   return (
     <div data-testid="comparison-panel" className="p-4">
@@ -82,7 +88,20 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                   ]}
                   labelStyle={{ color: "#18212f" }}
                 />
-                <Bar dataKey="value" fill="#117c78" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64}>
+                  {chartData.map((item) => (
+                    <Cell
+                      key={item.geoid}
+                      fill={rampColorForValue(item.value as number, minValue, maxValue)}
+                    />
+                  ))}
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    formatter={(v: number) => formatMetric(metric, v)}
+                    style={{ fontSize: 11, fill: "#18212f" }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}

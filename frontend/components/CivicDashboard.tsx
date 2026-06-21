@@ -285,14 +285,21 @@ export function CivicDashboard() {
     <main data-testid="dashboard-root" className="min-h-screen bg-civic-surface">
       <header className="border-b border-civic-line bg-white">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-civic-teal">
-              <Database className="h-4 w-4" aria-hidden="true" />
-              CivicScope
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-civic-teal text-white">
+              <Database className="h-5 w-5" aria-hidden="true" />
             </div>
-            <h1 className="mt-1 text-2xl font-semibold text-civic-ink">
-              Greater Toronto Housing Affordability Monitor
-            </h1>
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-civic-teal">
+                CivicScope
+              </div>
+              <h1 className="text-2xl font-semibold leading-tight text-civic-ink">
+                Greater Toronto Housing Affordability Monitor
+              </h1>
+              <p className="mt-0.5 text-sm text-civic-muted">
+                Rent burden, income, and CMHC housing data for 25 GTA municipalities and 1,334 census tracts.
+              </p>
+            </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <div className="relative w-full sm:w-80">
