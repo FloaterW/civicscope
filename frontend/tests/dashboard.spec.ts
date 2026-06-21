@@ -251,9 +251,12 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const select = page.getByLabel("Map metric");
     const optgroups = select.locator("optgroup");
-    await expect(optgroups).toHaveCount(2);
-    await expect(optgroups.first()).toHaveAttribute("label", "Census Profile");
-    await expect(optgroups.last()).toHaveAttribute("label", "CMHC Rental Market");
+    // Census Profile, CMHC Rental Market, and a separate group for the two
+    // metrics CMHC does not supply (turnover / availability).
+    await expect(optgroups).toHaveCount(3);
+    await expect(optgroups.nth(0)).toHaveAttribute("label", "Census Profile");
+    await expect(optgroups.nth(1)).toHaveAttribute("label", "CMHC Rental Market");
+    await expect(optgroups.nth(2)).toHaveAttribute("label", "Not surveyed (no data)");
 
     await select.selectOption("vacancy_rate");
     await expect(page.getByText("Vacancy rate by municipality")).toBeVisible();
