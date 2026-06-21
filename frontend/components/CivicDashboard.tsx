@@ -103,7 +103,7 @@ export function CivicDashboard() {
   }
 
   // Keep selected geography's CMHC data in sync with current map data.
-  // Handles: search selection, metric switch, year switch — all paths
+  // Handles: search selection, metric switch, year switch, all paths
   // that change mapData while a geography is selected.
   useEffect(() => {
     if (!selected || !mapData) {
@@ -246,7 +246,7 @@ export function CivicDashboard() {
           setSearchLoading(false);
         })
         .catch((err: unknown) => {
-          // An aborted request (stale keystroke / unmount) is expected — leave
+          // An aborted request (stale keystroke / unmount) is expected, leave
           // the loading state for the next effect run to manage. For a real
           // failure, clear results and stop the spinner so the empty-state
           // message can render instead of hanging on "Searching…".
