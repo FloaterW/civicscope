@@ -416,6 +416,10 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 - Dissemination areas and parcel-level workflows remain planned expansion paths.
 - Transit/access scoring is intentionally not implemented yet; GTFS ingestion is the next domain feature after deployment polish.
 
+## How this was built
+
+CivicScope was built with AI-assisted development (Claude Code) under my direction. I owned the architecture and data-modeling decisions, defined the data-honesty principles that anchor the project, and drove the data validation — including the investigation that uncovered a 2016-vs-2021 census-tract boundary mismatch in CMHC's published Starts & Completions data, and the fix that recovered real values for the affected tracts. Every metric value is verified against its official published source.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
