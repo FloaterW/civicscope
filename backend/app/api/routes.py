@@ -49,10 +49,9 @@ CMHC_COUNT_METRICS = frozenset({
 # everything else we keep the renter-share allocation (provenance "estimated").
 CMHC_REAL_TRACT_METRICS = frozenset({"housing_starts_total", "housing_completions"})
 
-# CMHC's Rental Market Survey reports several GTA municipalities together as a
-# single combined survey zone, so each constituent municipality shows IDENTICAL
-# rental values. That is CMHC's real survey granularity (not a bug), but it is
-# surfaced here so the UI can disclose it rather than look like duplicated data.
+# CMHC reports some GTA municipalities together as one combined survey zone, so
+# those municipalities share identical rental values. This map lets the UI
+# disclose the shared zone instead of looking like duplicated data.
 CMHC_RMS_SHARED_ZONES = {
     "3519038": "Richmond Hill / Vaughan / King",
     "3519028": "Richmond Hill / Vaughan / King",
@@ -809,9 +808,9 @@ def data_quality(
                     "renter households, so values vary per tract."
                 ),
             }
-        # Rate / average metrics (vacancy, rents, turnover, availability) are
-        # inherited UNCHANGED from the parent municipality — not allocated — so
-        # every tract in a municipality shows the same value by design.
+        # Rate metrics (vacancy, rents, turnover, availability) are inherited from
+        # the parent municipality rather than allocated, so every tract in a
+        # municipality shows the same value.
         return {
             "metric_status": "estimated",
             "label": "CMHC municipal value (inherited)",

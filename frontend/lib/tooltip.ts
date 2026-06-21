@@ -21,7 +21,7 @@ export function escapeHtml(value: string): string {
 /**
  * Build the hover-tooltip markup for a geography feature. Properties arrive
  * JSON-stringified from the vector source, so `value`/`metrics` may be strings
- * — parse them defensively. Appends a provenance note when the census metric is
+ *, parse them defensively. Appends a provenance note when the census metric is
  * flagged estimated / low confidence for this feature.
  *
  * Pure and dependency-light so it can be unit-tested without a browser/WebGL
