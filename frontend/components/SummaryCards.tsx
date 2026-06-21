@@ -19,7 +19,22 @@ const summaryNouns: Record<GeographyLevel, string> = {
 
 export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const regionCount = new Intl.NumberFormat("en-CA").format(summary?.region_count ?? 0);
-  const cards = useMemo(() => [
+  // The two headline affordability metrics get prominent "hero" cards; the rest
+  // sit in a smaller grid below, so the panel has a clear visual hierarchy
+  // instead of six equal-weight tiles.
+  const heroCards = useMemo(() => [
+    {
+      label: "Rent burden",
+      value: formatMetric("rent_burden_pct", summary?.rent_burden_pct),
+      icon: Percent
+    },
+    {
+      label: "Affordability",
+      value: formatMetric("affordability_index", summary?.affordability_index),
+      icon: Gauge
+    }
+  ], [summary]);
+  const subCards = useMemo(() => [
     {
       label: "Median income",
       value: formatMetric("median_income", summary?.median_income),
@@ -39,16 +54,6 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
       label: "Population",
       value: formatMetric("population", summary?.population),
       icon: Users
-    },
-    {
-      label: "Rent burden",
-      value: formatMetric("rent_burden_pct", summary?.rent_burden_pct),
-      icon: Percent
-    },
-    {
-      label: "Affordability",
-      value: formatMetric("affordability_index", summary?.affordability_index),
-      icon: Gauge
     }
   ], [summary]);
 
@@ -70,16 +75,35 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
           {summary?.year ?? "2021"}
         </span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-2">
-        {cards.map((card) => {
+      <div className="grid grid-cols-2 gap-2">
+        {heroCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="min-h-[78px] rounded-md border border-civic-line bg-slate-50 p-3">
+            <div
+              key={card.label}
+              className="rounded-md border border-civic-line border-l-4 border-l-civic-teal bg-civic-surface p-3"
+            >
               <div className="flex items-center gap-2 text-xs font-medium text-civic-muted">
-                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <Icon className="h-4 w-4 shrink-0 text-civic-teal" aria-hidden="true" />
                 {card.label}
               </div>
-              <div className="mt-2 min-h-7 text-xl font-semibold text-civic-ink">
+              <div className="mt-1 min-h-9 text-3xl font-semibold tracking-tight text-civic-ink">
+                {loading ? "..." : card.value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {subCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="min-h-[70px] rounded-md border border-civic-line bg-slate-50 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-civic-muted">
+                <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {card.label}
+              </div>
+              <div className="mt-1 min-h-6 text-lg font-semibold text-civic-ink">
                 {loading ? "..." : card.value}
               </div>
             </div>

@@ -4,6 +4,7 @@ import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup }
 import { useEffect, useMemo, useRef } from "react";
 
 import { formatMetric, getMetricLabel } from "@/lib/api";
+import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
 import { buildTooltipHtml, escapeHtml, safeJsonParse } from "@/lib/tooltip";
 import type { GeographyLevel, MapData, MapFeature, MetricFieldStatus, MetricKey, MetricQuality, MetricValues } from "@/types";
 
@@ -162,8 +163,10 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
               source: sourceId,
               filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
               paint: {
-                "fill-color": "#fef3c7",
-                "fill-opacity": 0.5
+                // Subtle white lift keeps the choropleth value readable while
+                // marking the selection; the bold outline below does the work.
+                "fill-color": "#ffffff",
+                "fill-opacity": 0.2
               }
             },
             {
@@ -403,39 +406,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   );
 }
 
-// Null geographies (no value for the active metric) render in this neutral grey.
-const NULL_COLOR = "#d8dee6";
-// Flat fill used when every geography shares one value (e.g. CMA-level CMHC data).
-const FLAT_COLOR = "#68b7aa";
-// 3-stop civic ramp, interpolated across the quantile breaks below.
-const RAMP = ["#f1f7f0", "#68b7aa", "#a64822"];
-
-/**
- * Linearly sample the 3-colour civic ramp at fraction t in [0, 1].
- * Used to spread the ramp evenly across N quantile breaks so the legend and
- * map agree on which colour each class gets.
- */
-function rampColorAt(t: number): string {
-  const clamped = Math.min(1, Math.max(0, t));
-  const scaled = clamped * (RAMP.length - 1);
-  const lower = Math.floor(scaled);
-  const upper = Math.min(RAMP.length - 1, lower + 1);
-  const frac = scaled - lower;
-  return mixHex(RAMP[lower], RAMP[upper], frac);
-}
-
-function mixHex(a: string, b: string, t: number): string {
-  const parse = (hex: string): [number, number, number] => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16)
-  ];
-  const [ar, ag, ab] = parse(a);
-  const [br, bg, bb] = parse(b);
-  const channel = (x: number, y: number) => Math.round(x + (y - x) * t);
-  const toHex = (n: number) => n.toString(16).padStart(2, "0");
-  return `#${toHex(channel(ar, br))}${toHex(channel(ag, bg))}${toHex(channel(ab, bb))}`;
-}
+// Color ramp shared with the comparison chart (see lib/colors).
 
 /**
  * Compute quantile boundaries from a sorted ascending array of values.
