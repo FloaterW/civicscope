@@ -391,11 +391,17 @@ export function CivicDashboard() {
                 {getMetricLabel(metric)} by {geographyLabel.singular}
               </p>
               {geographyLevel === "census_tract" &&
+                visibleMapData?.metadata.data_quality?.metric_status === "zone" && (
+                  <p className="mt-1 max-w-prose text-xs leading-5 text-teal-700">
+                    Each tract shows its CMHC survey zone&apos;s value. Zones are sub-city areas
+                    surveyed by CMHC, so tracts in the same zone share the same value.
+                  </p>
+                )}
+              {geographyLevel === "census_tract" &&
                 visibleMapData?.metadata.data_quality?.label?.includes("inherited") && (
                   <p className="mt-1 max-w-prose text-xs leading-5 text-amber-700">
-                    Showing each tract&apos;s municipal average. CMHC publishes this rate by survey
-                    zone (finer than a municipality), but that sub-municipal variation is not yet
-                    broken out to individual tracts here.
+                    Showing each tract&apos;s municipal average. CMHC does not publish this
+                    metric at the survey-zone level.
                   </p>
                 )}
             </div>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -65,6 +67,47 @@ CMHC_RMS_SHARED_ZONES = {
     "3524009": "Milton / Halton Hills",
     "3524015": "Milton / Halton Hills",
 }
+
+# CMHC survey-zone crosswalk: maps each census-tract geoid to its CMHC survey
+# zone. Built from CMHC's official HMIP_CURRENT_CAWD FeatureServer.
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+CMHC_ZONE_RATE_METRICS = frozenset({"vacancy_rate", "average_rent_total"})
+
+
+def _load_tract_zone_crosswalk() -> dict[str, str]:
+    path = _DATA_DIR / "cmhc_tract_zone_crosswalk.csv"
+    if not path.exists():
+        return {}
+    result: dict[str, str] = {}
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            result[row["geoid"]] = row["zone_name"]
+    return result
+
+
+def _load_zone_rms() -> dict[str, dict[str, float | None]]:
+    path = _DATA_DIR / "cmhc_zone_rms.csv"
+    if not path.exists():
+        return {}
+    result: dict[str, dict[str, float | None]] = {}
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            def _float(s: str) -> float | None:
+                try:
+                    return float(s) if s else None
+                except ValueError:
+                    return None
+            result[row["zone_name"]] = {
+                "vacancy_rate": _float(row["vacancy_rate"]),
+                "average_rent_total": _float(row["average_rent_total"]),
+                "rental_universe": _float(row["rental_universe"]),
+            }
+    return result
+
+
+TRACT_ZONE_CROSSWALK: dict[str, str] = _load_tract_zone_crosswalk()
+ZONE_RMS: dict[str, dict[str, float | None]] = _load_zone_rms()
 
 
 def load_real_tract_cmhc(db: Session, year: int) -> dict[str, CmhcTractMetric]:
@@ -192,14 +235,18 @@ def serialize_cmhc_metric(
     tract_inherited: bool = False,
     tract_share: float | None = None,
     real_tract: "CmhcTractMetric | None" = None,
+    zone_name: str | None = None,
 ) -> dict[str, Any]:
     """Serialize a CmhcMetric row to a dict.
 
     When ``tract_inherited`` is True the row is a municipality-level record
     being attached to a census tract.  If ``tract_share`` (0-1) is provided,
     count-based metrics are proportionally allocated to the tract based on its
-    share of the municipality's renter households. Rate-based metrics
-    (vacancy, rents, turnover, availability) are inherited unchanged.
+    share of the municipality's renter households.
+
+    When ``zone_name`` is provided, rate metrics (vacancy, average rent) are
+    overridden with the tract's CMHC survey-zone value instead of inheriting
+    the flat municipal average.
 
     When ``real_tract`` is provided (a real CMHC census-tract SCSS row), its
     starts/completions REPLACE the allocation for those fields and are flagged
@@ -215,18 +262,14 @@ def serialize_cmhc_metric(
 
     allocated = tract_inherited and tract_share is not None
 
-    # Real-vs-estimated resolution for the two metrics CMHC publishes at CT level.
     def _count_with_source(metric_key: str, allocated_val: int | None) -> tuple[int | None, str]:
         if real_tract is not None:
             real = getattr(real_tract, metric_key, None)
             if real is not None:
-                # The ETL stored the provenance per metric: "official" (real CMHC
-                # value, incl. a parent that recorded 0) or "estimated_parent"
-                # (allocated from a real CMHC parent tract).
                 stored = getattr(real_tract, f"{metric_key}_source", None) or "official"
                 return real, stored
         if not tract_inherited:
-            return allocated_val, "official"  # municipality-level: real survey value
+            return allocated_val, "official"
         return allocated_val, "estimated"
 
     starts, starts_source = _count_with_source(
@@ -236,10 +279,14 @@ def serialize_cmhc_metric(
         "housing_completions", _alloc(cmhc.housing_completions)
     )
 
+    zone_data = ZONE_RMS.get(zone_name) if zone_name else None
+    vacancy = zone_data["vacancy_rate"] if zone_data and zone_data["vacancy_rate"] is not None else cmhc.vacancy_rate
+    avg_rent = zone_data["average_rent_total"] if zone_data and zone_data["average_rent_total"] is not None else cmhc.average_rent_total
+
     result: dict[str, Any] = {
         "year": cmhc.year,
-        "vacancy_rate": cmhc.vacancy_rate,
-        "average_rent_total": cmhc.average_rent_total,
+        "vacancy_rate": vacancy,
+        "average_rent_total": avg_rent,
         "average_rent_bachelor": cmhc.average_rent_bachelor,
         "average_rent_1br": cmhc.average_rent_1br,
         "average_rent_2br": cmhc.average_rent_2br,
@@ -259,10 +306,7 @@ def serialize_cmhc_metric(
         "allocated": allocated,
         "starts_source": starts_source,
         "completions_source": completions_source,
-        # When the source municipality shares a CMHC RMS survey zone, disclose it
-        # so identical rental values across those municipalities read as real
-        # survey granularity, not duplicated data.
-        "survey_zone": CMHC_RMS_SHARED_ZONES.get(cmhc.geoid),
+        "survey_zone": zone_name or CMHC_RMS_SHARED_ZONES.get(cmhc.geoid),
     }
     return result
 
@@ -550,12 +594,14 @@ def compare_geographies(
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
         share = tract_shares.get(geography.geoid) if is_tract_inherited else None
+        zone = TRACT_ZONE_CROSSWALK.get(geography.geoid) if is_tract_inherited else None
         if cmhc_row:
             item["cmhc_metrics"] = serialize_cmhc_metric(
                 cmhc_row,
                 tract_inherited=is_tract_inherited,
                 tract_share=share,
                 real_tract=real_tract_cmhc.get(geography.geoid),
+                zone_name=zone,
             )
         else:
             item["cmhc_metrics"] = None
@@ -638,8 +684,6 @@ def get_map_data(
 
     if cmhc:
         if normalized_type == "census_tract" and metric_key in CMHC_COUNT_METRICS:
-            # Prefer the REAL published tract value; fall back to proportional
-            # allocation only where CMHC has no tract value.
             values = []
             for geography, _ in records:
                 real = real_tract_count(real_tract_cmhc.get(geography.geoid), metric_key)
@@ -655,6 +699,20 @@ def get_map_data(
                     raw = metric_value(metric_key, cr)
                     if raw is not None:
                         values.append(round(raw * share))
+        elif normalized_type == "census_tract" and metric_key in CMHC_ZONE_RATE_METRICS:
+            values = []
+            for geography, _ in records:
+                zone = TRACT_ZONE_CROSSWALK.get(geography.geoid)
+                zd = ZONE_RMS.get(zone) if zone else None
+                if zd and zd.get(metric_key) is not None:
+                    values.append(zd[metric_key])
+                elif geography.county:
+                    parent_geoid = municipality_name_to_geoid.get(geography.county)
+                    cr = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
+                    if cr:
+                        v = metric_value(metric_key, cr)
+                        if v is not None:
+                            values.append(v)
         else:
             values = [
                 v
@@ -709,7 +767,6 @@ def get_map_data(
             "metric": metric_key,
             "metrics": serialize_metric(row),
         }
-        # For census tracts, resolve CMHC row from parent municipality
         if normalized_type == "census_tract" and geography.county:
             parent_geoid = municipality_name_to_geoid.get(geography.county)
             cmhc_row = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
@@ -718,15 +775,21 @@ def get_map_data(
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
         share = tract_shares.get(geography.geoid) if is_tract_inherited else None
+        zone = TRACT_ZONE_CROSSWALK.get(geography.geoid) if is_tract_inherited else None
         real_row = real_tract_cmhc.get(geography.geoid)
         if cmhc:
             real = real_tract_count(real_row, metric_key)
             if real is not None:
-                # Real published CMHC census-tract value wins over allocation.
                 props["value"] = real
             elif is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
                 raw = metric_value(metric_key, cmhc_row) if cmhc_row else None
                 props["value"] = round(raw * share) if raw is not None and share is not None else None
+            elif is_tract_inherited and metric_key in CMHC_ZONE_RATE_METRICS:
+                zd = ZONE_RMS.get(zone) if zone else None
+                if zd and zd.get(metric_key) is not None:
+                    props["value"] = zd[metric_key]
+                else:
+                    props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
             else:
                 props["value"] = metric_value(metric_key, cmhc_row) if cmhc_row else None
         else:
@@ -737,6 +800,7 @@ def get_map_data(
                 tract_inherited=is_tract_inherited,
                 tract_share=share,
                 real_tract=real_row,
+                zone_name=zone,
             )
         props["cmhc_year"] = cmhc_year
         geometry = postgis_geometries.get(geography.geoid)
@@ -808,9 +872,16 @@ def data_quality(
                     "renter households, so values vary per tract."
                 ),
             }
-        # Rate metrics (vacancy, rents, turnover, availability) are inherited from
-        # the parent municipality rather than allocated, so every tract in a
-        # municipality shows the same value.
+        if metric_key is not None and metric_key in CMHC_ZONE_RATE_METRICS and TRACT_ZONE_CROSSWALK:
+            return {
+                "metric_status": "zone",
+                "label": "CMHC survey-zone value",
+                "description": (
+                    "Each tract shows its CMHC survey zone's value. Zones are sub-city areas "
+                    "surveyed by CMHC, finer than the municipality but coarser than census tracts. "
+                    "Tracts in the same zone share the same value."
+                ),
+            }
         return {
             "metric_status": "estimated",
             "label": "CMHC municipal value (inherited)",
