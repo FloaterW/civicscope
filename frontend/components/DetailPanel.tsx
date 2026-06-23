@@ -22,7 +22,7 @@ type Props = {
   cmhcMetrics?: CmhcMetricValues | null;
   cmhcYear?: number;
   dataQualityLabel?: string;
-  metricStatus?: "official" | "estimated" | "mixed";
+  metricStatus?: "official" | "estimated" | "mixed" | "zone";
   onClear: () => void;
 };
 
@@ -248,6 +248,12 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
           CMHC surveys this municipality as part of the <strong>{cmhcMetrics.survey_zone}</strong>{" "}
           rental market zone, so these rental values are shared across those municipalities
           (CMHC’s survey granularity, not duplicated data).
+        </p>
+      )}
+      {geographyLevel === "census_tract" && cmhcMetrics.survey_zone && marketFields.length > 0 && (
+        <p data-testid="survey-zone-note" className="mt-2 text-xs leading-5 text-civic-muted">
+          CMHC survey zone: <strong>{cmhcMetrics.survey_zone}</strong>.
+          Rent and vacancy reflect this zone&apos;s surveyed values.
         </p>
       )}
     </div>

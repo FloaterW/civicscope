@@ -8,8 +8,8 @@ type Props = {
   geographyLevel: GeographyLevel;
   /** When supplied (from API metadata), overrides the default label. */
   dataQualityLabel?: string;
-  /** "estimated"/"mixed" use amber tones instead of green to flag non-official values. */
-  metricStatus?: "official" | "estimated" | "mixed";
+  /** "estimated"/"mixed" use amber; "zone" uses teal (real CMHC zone data). */
+  metricStatus?: "official" | "estimated" | "mixed" | "zone";
 };
 
 const qualityCopy: Record<
@@ -29,12 +29,14 @@ const qualityCopy: Record<
 };
 
 const estimatedTone = "border-amber-200 bg-amber-50 text-amber-900";
+const zoneTone = "border-teal-200 bg-teal-50 text-teal-900";
 
 export function DataQualityBadge({ geographyLevel, dataQualityLabel, metricStatus }: Props) {
   const quality = qualityCopy[geographyLevel];
   const Icon = quality.icon;
   const label = dataQualityLabel ?? quality.label;
   const tone =
+    metricStatus === "zone" ? zoneTone :
     metricStatus === "estimated" || metricStatus === "mixed" ? estimatedTone : quality.tone;
 
   return (
