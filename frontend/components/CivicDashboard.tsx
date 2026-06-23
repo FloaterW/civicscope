@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Database, Search } from "lucide-react";
+import { AlertCircle, ChevronUp, Database, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -29,6 +29,7 @@ import { GeographyLevelSelector } from "./GeographyLevelSelector";
 import { MetricSelector } from "./MetricSelector";
 import { CivicMap } from "./CivicMap";
 import { SummaryCards } from "./SummaryCards";
+import { ThemeToggle } from "./ThemeToggle";
 import { YearSelector } from "./YearSelector";
 
 const defaultCompareIds = ["3520005", "3521005", "3521010", "3519036", "3519028"];
@@ -68,6 +69,7 @@ export function CivicDashboard() {
   const [mapLoading, setMapLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [comparisonLoading, setComparisonLoading] = useState(true);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
   const isCmhc = isCmhcMetric(metric);
@@ -92,9 +94,6 @@ export function CivicDashboard() {
       return;
     }
     setGeographyLevel(level);
-    // Clear any active selection synchronously (in the same update as the level
-    // change) so the summary/comparison effects never fire a stale request for
-    // a geoid that belongs to the other geography type (which would 404).
     setSelected(null);
     setSearch("");
     setSearchResults([]);
@@ -102,9 +101,6 @@ export function CivicDashboard() {
     setSelectedCmhcYear(undefined);
   }
 
-  // Keep selected geography's CMHC data in sync with current map data.
-  // Handles: search selection, metric switch, year switch, all paths
-  // that change mapData while a geography is selected.
   useEffect(() => {
     if (!selected || !mapData) {
       return;
@@ -246,10 +242,6 @@ export function CivicDashboard() {
           setSearchLoading(false);
         })
         .catch((err: unknown) => {
-          // An aborted request (stale keystroke / unmount) is expected, leave
-          // the loading state for the next effect run to manage. For a real
-          // failure, clear results and stop the spinner so the empty-state
-          // message can render instead of hanging on "Searching…".
           if (err instanceof DOMException && err.name === "AbortError") {
             return;
           }
@@ -279,14 +271,15 @@ export function CivicDashboard() {
     });
     setSelectedCmhcMetrics(feature.cmhc_metrics ?? null);
     setSelectedCmhcYear(feature.cmhc_year);
+    setMobilePanelOpen(true);
   }
 
   return (
     <main data-testid="dashboard-root" className="min-h-screen bg-civic-surface">
-      <header className="border-b border-civic-line bg-white">
+      <header className="border-b border-civic-line bg-civic-panel">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-civic-teal text-white">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-civic-teal text-white dark:text-slate-900">
               <Database className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
@@ -312,9 +305,6 @@ export function CivicDashboard() {
                 onChange={(event) => {
                   const next = event.target.value;
                   setSearch(next);
-                  // Enter the loading state synchronously so the dropdown shows
-                  // "Searching…" on the first keystroke instead of flashing a
-                  // premature "No matches" before the debounced request fires.
                   if (next.trim()) {
                     setSearchLoading(true);
                   }
@@ -326,10 +316,10 @@ export function CivicDashboard() {
                 aria-expanded={searchResults.length > 0 && Boolean(search.trim()) && search !== selected?.name}
                 aria-controls="geography-search-results"
                 aria-autocomplete="list"
-                className="h-10 w-full rounded-md border border-civic-line bg-white pl-9 pr-3 text-sm outline-none ring-civic-teal focus:ring-2"
+                className="h-10 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2"
               />
               {searchResults.length > 0 && search.trim() && search !== selected?.name && (
-                <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-white shadow-panel">
+                <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-civic-panel shadow-panel">
                   {searchResults.slice(0, 8).map((geography) => (
                     <button
                       key={geography.geoid}
@@ -339,15 +329,14 @@ export function CivicDashboard() {
                       onClick={() => {
                         setSelected(geography);
                         setSearch(geography.name);
-                        // Propagate CMHC metrics from current map data so
-                        // the detail panel displays them (same as map-click path).
                         const feature = mapData?.features.find(
                           (f) => f.properties.geoid === geography.geoid
                         );
                         setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
                         setSelectedCmhcYear(feature?.properties.cmhc_year);
+                        setMobilePanelOpen(true);
                       }}
-                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition hover:bg-civic-subtle"
                     >
                       <span className="font-medium text-civic-ink">{geography.name}</span>
                       <span className="text-xs text-civic-muted">{geography.geoid}</span>
@@ -359,11 +348,11 @@ export function CivicDashboard() {
                 <div
                   data-testid="search-empty"
                   role="status"
-                  className="pointer-events-none absolute right-0 z-20 mt-2 w-full rounded-md border border-civic-line bg-white px-3 py-2 text-sm text-civic-muted shadow-panel"
+                  className="pointer-events-none absolute right-0 z-20 mt-2 w-full rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-sm text-civic-muted shadow-panel"
                 >
                   {searchLoading
                     ? "Searching…"
-                    : `No ${geographyLabel.plural} match “${search.trim()}”.`}
+                    : `No ${geographyLabel.plural} match "${search.trim()}".`}
                 </div>
               )}
             </div>
@@ -375,6 +364,7 @@ export function CivicDashboard() {
               disabled={!isCmhc}
               onChange={(year) => setSelectedYear(year)}
             />
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -382,7 +372,7 @@ export function CivicDashboard() {
       <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.45fr)_430px] lg:px-6">
         <section
           data-testid="map-panel"
-          className="flex min-h-[560px] flex-col overflow-hidden rounded-lg border border-civic-line bg-white shadow-panel"
+          className="flex min-h-[400px] flex-col overflow-hidden rounded-lg border border-civic-line bg-civic-panel shadow-panel xl:min-h-[560px]"
         >
           <div className="flex flex-col gap-2 border-b border-civic-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -392,14 +382,14 @@ export function CivicDashboard() {
               </p>
               {geographyLevel === "census_tract" &&
                 visibleMapData?.metadata.data_quality?.metric_status === "zone" && (
-                  <p className="mt-1 max-w-prose text-xs leading-5 text-teal-700">
+                  <p className="mt-1 max-w-prose text-xs leading-5 text-teal-700 dark:text-teal-400">
                     Each tract shows its CMHC survey zone&apos;s value. Zones are sub-city areas
                     surveyed by CMHC, so tracts in the same zone share the same value.
                   </p>
                 )}
               {geographyLevel === "census_tract" &&
                 visibleMapData?.metadata.data_quality?.label?.includes("inherited") && (
-                  <p className="mt-1 max-w-prose text-xs leading-5 text-amber-700">
+                  <p className="mt-1 max-w-prose text-xs leading-5 text-amber-700 dark:text-amber-400">
                     Showing each tract&apos;s municipal average. CMHC does not publish this
                     metric at the survey-zone level.
                   </p>
@@ -416,7 +406,7 @@ export function CivicDashboard() {
               </div>
             </div>
           </div>
-          <div className="min-h-[520px] flex-1">
+          <div className="min-h-[360px] flex-1 xl:min-h-[520px]">
             <CivicMap
               key={geographyLevel}
               data={visibleMapData}
@@ -429,9 +419,19 @@ export function CivicDashboard() {
           </div>
         </section>
 
-        <aside className="flex flex-col gap-4">
+        {/* Mobile: slide-up panel toggle */}
+        <button
+          type="button"
+          onClick={() => setMobilePanelOpen(!mobilePanelOpen)}
+          className="flex items-center justify-center gap-2 rounded-lg border border-civic-line bg-civic-panel py-3 text-sm font-medium text-civic-ink shadow-panel transition xl:hidden"
+        >
+          <ChevronUp className={`h-4 w-4 transition-transform ${mobilePanelOpen ? "rotate-180" : ""}`} />
+          {selected ? selected.name : "Summary & Details"}
+        </button>
+
+        <aside className={`flex flex-col gap-4 transition-all duration-300 xl:opacity-100 xl:max-h-none ${mobilePanelOpen ? "max-h-[5000px] opacity-100" : "max-h-0 overflow-hidden opacity-0 xl:max-h-none xl:overflow-visible"}`}>
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+            <div className="animate-fade-in rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertCircle className="h-4 w-4" aria-hidden="true" />
                 API error
@@ -461,7 +461,7 @@ export function CivicDashboard() {
           />
         </aside>
 
-        <section className="rounded-lg border border-civic-line bg-white shadow-panel xl:col-span-2">
+        <section className="rounded-lg border border-civic-line bg-civic-panel shadow-panel xl:col-span-2">
           <ComparisonPanel
             comparison={comparison}
             metric={metric}
@@ -472,7 +472,7 @@ export function CivicDashboard() {
         </section>
       </div>
 
-      <footer className="border-t border-civic-line bg-white">
+      <footer className="border-t border-civic-line bg-civic-panel">
         <div className="mx-auto max-w-[1600px] space-y-1 px-4 py-4 text-xs text-civic-muted lg:px-6">
           <p>
             Boundaries &amp; census metrics: Statistics Canada 2021 Census (cartographic boundary
@@ -499,9 +499,6 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
 
   const values = data.features
     .map((feature) => {
-      // Low-confidence growth (a tiny 2016 base) would blow out the color
-      // scale, so exclude it from the domain. The tract is still rendered and
-      // its real value is shown, flagged, in the detail panel.
       if (
         metric === "population_growth_pct" &&
         feature.properties.metrics.data_quality?.population_growth_pct === "low_confidence"

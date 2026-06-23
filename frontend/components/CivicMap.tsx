@@ -345,12 +345,15 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       className="relative h-full w-full"
     >
       {!data && (
-        <div className="absolute inset-0 z-10 grid place-items-center bg-white text-sm text-civic-muted">
-          Loading map data...
+        <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel text-sm text-civic-muted">
+          <div className="flex flex-col items-center gap-3">
+            <div className="skeleton h-3 w-40" />
+            <div className="skeleton h-3 w-28" />
+          </div>
         </div>
       )}
       {data && loading && loadedMetric !== metric && (
-        <div className="absolute right-3 top-3 z-10 rounded-md border border-civic-line bg-white/95 px-3 py-2 text-xs font-medium text-civic-ink shadow-panel">
+        <div className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel/95 px-3 py-2 text-xs font-medium text-civic-ink shadow-panel">
           Updating map...
         </div>
       )}
@@ -358,7 +361,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         <div
           data-testid="map-empty-state"
           role="status"
-          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-white/95 px-3 py-2 text-center text-xs text-civic-muted shadow-panel"
+          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-civic-panel/95 px-3 py-2 text-center text-xs text-civic-muted shadow-panel"
         >
           No data available for {getMetricLabel(metric)} in this dataset.
         </div>
@@ -367,7 +370,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       {data && legend && (
         <div
           data-testid="map-legend"
-          className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-white/95 px-3 py-2 text-xs shadow-panel"
+          className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel/95 px-3 py-2 text-xs shadow-panel"
         >
           <div className="mb-1.5 font-semibold text-civic-ink">{getMetricLabel(metric)}</div>
           {legend.flat || legend.stops.length < 2 ? (

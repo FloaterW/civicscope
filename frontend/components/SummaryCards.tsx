@@ -17,11 +17,12 @@ const summaryNouns: Record<GeographyLevel, string> = {
   census_tract: "GTA census tracts"
 };
 
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`skeleton ${className ?? ""}`} />;
+}
+
 export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const regionCount = new Intl.NumberFormat("en-CA").format(summary?.region_count ?? 0);
-  // The two headline affordability metrics get prominent "hero" cards; the rest
-  // sit in a smaller grid below, so the panel has a clear visual hierarchy
-  // instead of six equal-weight tiles.
   const heroCards = useMemo(() => [
     {
       label: "Rent burden",
@@ -60,7 +61,7 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   return (
     <section
       data-testid="summary-panel"
-      className="rounded-lg border border-civic-line bg-white p-4 shadow-panel"
+      className="animate-fade-in rounded-lg border border-civic-line bg-civic-panel p-4 shadow-panel"
     >
       <div className="mb-3 flex items-center justify-between">
         <div>
@@ -88,7 +89,7 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
                 {card.label}
               </div>
               <div className="mt-1 min-h-9 text-3xl font-semibold tracking-tight text-civic-ink">
-                {loading ? "..." : card.value}
+                {loading ? <Skeleton className="h-9 w-24" /> : card.value}
               </div>
             </div>
           );
@@ -98,13 +99,13 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
         {subCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="min-h-[70px] rounded-md border border-civic-line bg-slate-50 p-3">
+            <div key={card.label} className="min-h-[70px] rounded-md border border-civic-line bg-civic-subtle p-3">
               <div className="flex items-center gap-2 text-xs font-medium text-civic-muted">
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {card.label}
               </div>
               <div className="mt-1 min-h-6 text-lg font-semibold text-civic-ink">
-                {loading ? "..." : card.value}
+                {loading ? <Skeleton className="h-6 w-16" /> : card.value}
               </div>
             </div>
           );

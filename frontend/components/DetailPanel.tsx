@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, X } from "lucide-react";
+import { MapPin, MousePointerClick, X } from "lucide-react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
 import type {
@@ -58,7 +58,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
   return (
     <section
       data-testid="detail-panel"
-      className="rounded-lg border border-civic-line bg-white p-4 shadow-panel"
+      className="rounded-lg border border-civic-line bg-civic-panel p-4 shadow-panel"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -82,7 +82,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           <button
             type="button"
             onClick={onClear}
-            className="rounded-md border border-civic-line p-2 text-civic-muted hover:bg-slate-50 hover:text-civic-ink"
+            className="rounded-md border border-civic-line p-2 text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
             aria-label="Clear selected geography"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -91,9 +91,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
       </div>
 
       {geography ? (
-        <>
+        <div className="animate-fade-in">
           {/* Census Profile */}
-          <div className="mt-4">
+          <div className="mt-4" data-section="census">
             <SectionHeader title="Household & Housing Profile" period="2021 Census" />
             <div className="grid grid-cols-3 gap-2 text-sm">
               <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} status={quality?.median_income} />
@@ -104,12 +104,12 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
               <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} status={quality?.affordability_index} />
             </div>
             {quality?.rent_burden_pct === "estimated" && (
-              <p className="mt-2 text-xs leading-5 text-amber-700">
+              <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-400">
                 Rent burden estimated from median rent and income (Statistics Canada value suppressed for this tract).
               </p>
             )}
             {quality?.population_growth_pct === "low_confidence" && (
-              <p className="mt-2 text-xs leading-5 text-amber-700">
+              <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-400">
                 Population growth computed off a very small 2016 base; treat the percentage with caution.
               </p>
             )}
@@ -126,7 +126,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
               {hasAnyRentalData ? (
                 <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
               ) : (
-                <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
+                <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
                   {cmhcMetrics.rms_surveyed
                     ? "Rental market data suppressed for confidentiality in this survey zone."
                     : "Not covered by the CMHC Rental Market Survey."}
@@ -155,9 +155,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                   </div>
                   {geographyLevel === "census_tract" && (
                     <p className="mt-2 text-xs leading-5 text-civic-muted">
-                      “CMHC tract data” = real published census-tract values. “est. (CMHC parent
-                      tract)” = allocated from CMHC’s real parent tract (a 2016 tract that split in
-                      2021). “est.” = allocated from the parent municipality where CMHC has no tract
+                      &quot;CMHC tract data&quot; = real published census-tract values. &quot;est. (CMHC parent
+                      tract)&quot; = allocated from CMHC&apos;s real parent tract (a 2016 tract that split in
+                      2021). &quot;est.&quot; = allocated from the parent municipality where CMHC has no tract
                       figure.
                     </p>
                   )}
@@ -165,20 +165,28 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
               )}
             </>
           ) : (
-            <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
+            <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
               {geographyLevel === "census_tract"
                 ? "CMHC does not publish census tract-level data. Estimated values allocated from parent municipality."
                 : "No CMHC survey coverage for this municipality."}
             </div>
           )}
 
-          <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
+          <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
             {geography.geometry_source}
           </div>
-        </>
+        </div>
       ) : (
-        <div className="mt-4 rounded-md border border-dashed border-civic-line bg-slate-50 p-3 text-xs leading-5 text-civic-muted">
-          {isCmhcMetric(metric) ? cmhcCopy[geographyLevel] : censusCopy[geographyLevel]}
+        <div className="mt-6 flex flex-col items-center gap-3 py-4 text-center">
+          <div className="grid h-12 w-12 place-items-center rounded-full bg-civic-surface text-civic-muted">
+            <MousePointerClick className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-civic-ink">{emptyCopy[geographyLevel]}</p>
+            <p className="mt-1 max-w-xs text-xs leading-5 text-civic-muted">
+              {isCmhcMetric(metric) ? cmhcCopy[geographyLevel] : censusCopy[geographyLevel]}
+            </p>
+          </div>
         </div>
       )}
     </section>
@@ -247,7 +255,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
         <p data-testid="survey-zone-note" className="mt-2 text-xs leading-5 text-civic-muted">
           CMHC surveys this municipality as part of the <strong>{cmhcMetrics.survey_zone}</strong>{" "}
           rental market zone, so these rental values are shared across those municipalities
-          (CMHC’s survey granularity, not duplicated data).
+          (CMHC&apos;s survey granularity, not duplicated data).
         </p>
       )}
       {geographyLevel === "census_tract" && cmhcMetrics.survey_zone && marketFields.length > 0 && (
@@ -314,22 +322,18 @@ function MetricLine({
 }: {
   label: string;
   value: string;
-  /** Census field-level provenance. "official" intentionally renders NO badge
-   * (the default, clean state). */
   status?: MetricFieldStatus;
-  /** Provenance of a CMHC SCSS count metric in census-tract mode; renders a
-   * distinct badge per source. Undefined elsewhere (no badge). */
   cmhcSource?: CmhcCountSource;
 }) {
   return (
-    <div className="rounded-md border border-civic-line bg-white px-3 py-2">
+    <div className="rounded-md border border-civic-line bg-civic-panel px-3 py-2">
       <span className="block text-xs text-civic-muted">{label}</span>
       <span className="mt-1 block text-base font-semibold text-civic-ink">
         {value}
         {status === "estimated" && (
           <span
             data-testid="estimated-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
             title="Estimated fallback; Statistics Canada value suppressed."
           >
             est.
@@ -338,16 +342,16 @@ function MetricLine({
         {status === "low_confidence" && (
           <span
             data-testid="low-confidence-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
             title="Derived off a very small base population; low confidence."
           >
-            ⚠
+            &#x26A0;
           </span>
         )}
         {cmhcSource === "official" && (
           <span
             data-testid="official-flag"
-            className="ml-1 align-middle text-xs font-medium text-emerald-600"
+            className="ml-1 align-middle text-xs font-medium text-emerald-600 dark:text-emerald-400"
             title="Real CMHC census-tract value (Starts & Completions Survey)."
           >
             CMHC tract data
@@ -356,7 +360,7 @@ function MetricLine({
         {cmhcSource === "estimated_parent" && (
           <span
             data-testid="parent-est-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
             title="Allocated from CMHC's real parent tract (a 2016 tract that split in 2021); a closer estimate than the municipal allocation, but still an estimate."
           >
             est. (CMHC parent tract)
@@ -365,7 +369,7 @@ function MetricLine({
         {cmhcSource === "estimated" && (
           <span
             data-testid="estimated-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600"
+            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
             title="Estimated by allocating the parent municipality's total by renter-household share."
           >
             est.
@@ -376,8 +380,6 @@ function MetricLine({
   );
 }
 
-/** A CMHC count metric's source, but only in census-tract mode (municipality
- * values are the survey value itself, shown without a badge). */
 function cmhcSourceFor(
   source: CmhcCountSource | undefined,
   geographyLevel: GeographyLevel
