@@ -141,7 +141,7 @@ export type MapData = {
     geography_type: GeographyLevel;
     available_years?: number[];
     data_quality: {
-      metric_status: "official" | "estimated" | "mixed";
+      metric_status: "official" | "estimated" | "mixed" | "zone";
       label: string;
       description: string;
     };

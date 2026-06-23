@@ -1,0 +1,1233 @@
+geoid,zone_code,zone_name,match_type
+5350001.00,02,Toronto (East),direct
+5350002.00,01,Toronto (Central),direct
+5350004.00,04,Toronto (West),direct
+5350005.00,04,Toronto (West),direct
+5350006.00,04,Toronto (West),direct
+5350007.01,04,Toronto (West),direct
+5350007.02,04,Toronto (West),direct
+5350008.01,04,Toronto (West),direct
+5350008.02,04,Toronto (West),direct
+5350009.00,04,Toronto (West),direct
+5350010.01,04,Toronto (West),direct
+5350010.02,04,Toronto (West),direct
+5350011.01,01,Toronto (Central),direct
+5350011.02,01,Toronto (Central),direct
+5350011.03,01,Toronto (Central),direct
+5350012.01,01,Toronto (Central),direct
+5350012.03,01,Toronto (Central),direct
+5350012.04,01,Toronto (Central),direct
+5350013.01,01,Toronto (Central),direct
+5350013.02,01,Toronto (Central),direct
+5350014.00,01,Toronto (Central),direct
+5350015.00,01,Toronto (Central),direct
+5350016.00,01,Toronto (Central),direct
+5350017.01,01,Toronto (Central),direct
+5350017.02,01,Toronto (Central),direct
+5350018.00,02,Toronto (East),direct
+5350019.00,02,Toronto (East),direct
+5350020.00,02,Toronto (East),direct
+5350021.00,02,Toronto (East),direct
+5350022.00,02,Toronto (East),direct
+5350023.00,02,Toronto (East),direct
+5350024.00,02,Toronto (East),direct
+5350025.00,02,Toronto (East),direct
+5350026.00,02,Toronto (East),direct
+5350027.00,02,Toronto (East),direct
+5350028.01,02,Toronto (East),direct
+5350028.02,02,Toronto (East),direct
+5350029.00,02,Toronto (East),direct
+5350030.00,01,Toronto (Central),direct
+5350031.00,01,Toronto (Central),direct
+5350032.00,01,Toronto (Central),direct
+5350033.00,01,Toronto (Central),direct
+5350034.01,01,Toronto (Central),direct
+5350034.02,01,Toronto (Central),direct
+5350035.00,01,Toronto (Central),direct
+5350036.00,01,Toronto (Central),direct
+5350037.00,01,Toronto (Central),direct
+5350038.00,01,Toronto (Central),direct
+5350039.00,01,Toronto (Central),direct
+5350040.00,04,Toronto (West),direct
+5350041.00,04,Toronto (West),direct
+5350042.00,04,Toronto (West),direct
+5350043.00,04,Toronto (West),direct
+5350044.01,04,Toronto (West),direct
+5350044.02,04,Toronto (West),direct
+5350045.00,04,Toronto (West),direct
+5350046.00,04,Toronto (West),direct
+5350047.02,04,Toronto (West),direct
+5350047.03,04,Toronto (West),direct
+5350047.04,04,Toronto (West),direct
+5350048.00,04,Toronto (West),direct
+5350049.00,04,Toronto (West),direct
+5350050.01,04,Toronto (West),direct
+5350050.03,04,Toronto (West),direct
+5350050.04,04,Toronto (West),direct
+5350051.00,04,Toronto (West),direct
+5350052.00,04,Toronto (West),direct
+5350053.00,04,Toronto (West),direct
+5350054.00,04,Toronto (West),direct
+5350055.00,04,Toronto (West),direct
+5350056.00,04,Toronto (West),direct
+5350057.00,04,Toronto (West),direct
+5350058.00,04,Toronto (West),direct
+5350059.00,01,Toronto (Central),direct
+5350060.00,01,Toronto (Central),direct
+5350061.00,01,Toronto (Central),direct
+5350062.01,01,Toronto (Central),direct
+5350062.03,01,Toronto (Central),direct
+5350062.04,01,Toronto (Central),direct
+5350063.03,01,Toronto (Central),direct
+5350063.04,01,Toronto (Central),direct
+5350063.05,01,Toronto (Central),direct
+5350063.06,01,Toronto (Central),direct
+5350064.00,01,Toronto (Central),direct
+5350065.01,01,Toronto (Central),direct
+5350065.02,01,Toronto (Central),direct
+5350066.00,01,Toronto (Central),direct
+5350067.00,01,Toronto (Central),direct
+5350068.00,01,Toronto (Central),direct
+5350069.00,02,Toronto (East),direct
+5350070.00,02,Toronto (East),direct
+5350071.00,02,Toronto (East),direct
+5350072.01,02,Toronto (East),direct
+5350072.02,02,Toronto (East),direct
+5350073.00,02,Toronto (East),direct
+5350074.00,02,Toronto (East),direct
+5350075.00,02,Toronto (East),direct
+5350076.00,02,Toronto (East),direct
+5350077.00,02,Toronto (East),direct
+5350078.00,02,Toronto (East),direct
+5350079.00,02,Toronto (East),direct
+5350080.01,02,Toronto (East),direct
+5350080.02,02,Toronto (East),direct
+5350081.00,02,Toronto (East),direct
+5350082.00,02,Toronto (East),direct
+5350083.00,02,Toronto (East),direct
+5350084.00,02,Toronto (East),direct
+5350085.00,02,Toronto (East),direct
+5350086.00,01,Toronto (Central),direct
+5350087.00,01,Toronto (Central),direct
+5350088.00,01,Toronto (Central),direct
+5350089.00,01,Toronto (Central),direct
+5350090.00,01,Toronto (Central),direct
+5350091.01,01,Toronto (Central),direct
+5350091.02,01,Toronto (Central),direct
+5350092.00,01,Toronto (Central),direct
+5350093.00,01,Toronto (Central),direct
+5350094.00,04,Toronto (West),direct
+5350095.00,04,Toronto (West),direct
+5350096.01,04,Toronto (West),direct
+5350096.02,04,Toronto (West),direct
+5350097.01,04,Toronto (West),direct
+5350097.03,04,Toronto (West),direct
+5350097.04,04,Toronto (West),direct
+5350098.00,04,Toronto (West),direct
+5350099.00,04,Toronto (West),direct
+5350100.00,04,Toronto (West),direct
+5350101.00,04,Toronto (West),direct
+5350102.02,04,Toronto (West),direct
+5350102.03,04,Toronto (West),direct
+5350102.04,04,Toronto (West),direct
+5350102.05,04,Toronto (West),direct
+5350103.00,04,Toronto (West),direct
+5350104.00,04,Toronto (West),direct
+5350105.00,04,Toronto (West),direct
+5350106.00,04,Toronto (West),direct
+5350107.00,04,Toronto (West),direct
+5350108.00,04,Toronto (West),direct
+5350109.00,04,Toronto (West),direct
+5350110.00,04,Toronto (West),direct
+5350111.00,04,Toronto (West),direct
+5350112.00,04,Toronto (West),direct
+5350113.00,04,Toronto (West),direct
+5350114.00,04,Toronto (West),direct
+5350115.00,04,Toronto (West),direct
+5350116.00,04,Toronto (West),direct
+5350117.00,03,Toronto (North),direct
+5350118.00,03,Toronto (North),direct
+5350119.00,03,Toronto (North),direct
+5350120.00,03,Toronto (North),direct
+5350121.00,03,Toronto (North),direct
+5350122.00,03,Toronto (North),direct
+5350123.00,03,Toronto (North),direct
+5350124.00,03,Toronto (North),direct
+5350125.00,03,Toronto (North),direct
+5350126.00,03,Toronto (North),direct
+5350127.00,03,Toronto (North),direct
+5350128.02,03,Toronto (North),direct
+5350128.04,03,Toronto (North),direct
+5350128.05,03,Toronto (North),direct
+5350128.06,03,Toronto (North),direct
+5350129.00,03,Toronto (North),direct
+5350130.00,03,Toronto (North),direct
+5350131.00,03,Toronto (North),direct
+5350132.00,03,Toronto (North),direct
+5350133.00,03,Toronto (North),direct
+5350134.00,03,Toronto (North),direct
+5350135.00,03,Toronto (North),direct
+5350136.01,03,Toronto (North),direct
+5350136.02,03,Toronto (North),direct
+5350137.00,03,Toronto (North),direct
+5350138.00,03,Toronto (North),direct
+5350139.01,03,Toronto (North),direct
+5350139.02,03,Toronto (North),direct
+5350140.00,03,Toronto (North),direct
+5350141.01,03,Toronto (North),direct
+5350141.02,03,Toronto (North),direct
+5350142.00,03,Toronto (North),direct
+5350150.00,08,York,direct
+5350151.00,08,York,direct
+5350152.00,08,York,direct
+5350153.00,08,York,direct
+5350154.00,08,York,direct
+5350155.00,08,York,direct
+5350156.01,08,York,direct
+5350156.02,08,York,direct
+5350157.00,08,York,direct
+5350158.00,08,York,direct
+5350159.01,08,York,direct
+5350159.02,08,York,direct
+5350160.00,08,York,direct
+5350161.00,08,York,direct
+5350162.00,08,York,direct
+5350163.00,08,York,direct
+5350164.00,08,York,direct
+5350165.00,08,York,direct
+5350166.00,08,York,direct
+5350167.01,08,York,direct
+5350167.02,08,York,direct
+5350168.00,08,York,direct
+5350169.01,08,York,direct
+5350169.02,08,York,direct
+5350170.00,08,York,direct
+5350171.00,08,York,direct
+5350172.00,08,York,direct
+5350173.00,08,York,direct
+5350174.00,08,York,direct
+5350175.01,08,York,direct
+5350175.02,08,York,direct
+5350176.00,08,York,direct
+5350180.00,09,East York,direct
+5350181.01,09,East York,direct
+5350181.02,09,East York,direct
+5350182.00,09,East York,direct
+5350183.01,09,East York,direct
+5350183.02,09,East York,direct
+5350184.01,09,East York,direct
+5350184.02,09,East York,direct
+5350185.01,09,East York,direct
+5350185.02,09,East York,direct
+5350186.00,09,East York,direct
+5350187.00,09,East York,direct
+5350188.00,09,East York,direct
+5350189.00,09,East York,direct
+5350190.01,09,East York,direct
+5350190.02,09,East York,direct
+5350191.00,09,East York,direct
+5350192.00,09,East York,direct
+5350193.00,09,East York,direct
+5350194.01,09,East York,direct
+5350194.02,09,East York,direct
+5350194.03,09,East York,direct
+5350194.04,09,East York,direct
+5350195.01,09,East York,direct
+5350195.02,09,East York,direct
+5350196.01,09,East York,direct
+5350196.02,09,East York,direct
+5350200.02,05,Etobicoke (South),direct
+5350201.00,05,Etobicoke (South),direct
+5350202.00,05,Etobicoke (South),direct
+5350203.00,05,Etobicoke (South),direct
+5350204.00,05,Etobicoke (South),direct
+5350205.00,05,Etobicoke (South),direct
+5350206.01,05,Etobicoke (South),direct
+5350206.02,05,Etobicoke (South),direct
+5350207.00,05,Etobicoke (South),direct
+5350208.00,05,Etobicoke (South),direct
+5350209.00,05,Etobicoke (South),direct
+5350210.01,05,Etobicoke (South),direct
+5350210.03,05,Etobicoke (South),direct
+5350211.00,05,Etobicoke (South),direct
+5350212.00,05,Etobicoke (South),direct
+5350213.01,05,Etobicoke (South),direct
+5350213.02,05,Etobicoke (South),direct
+5350214.00,05,Etobicoke (South),direct
+5350215.00,05,Etobicoke (South),direct
+5350216.00,05,Etobicoke (South),direct
+5350217.00,05,Etobicoke (South),direct
+5350218.00,05,Etobicoke (South),direct
+5350219.00,05,Etobicoke (South),direct
+5350220.00,05,Etobicoke (South),direct
+5350221.01,06,Etobicoke (Central),direct
+5350221.02,06,Etobicoke (Central),direct
+5350222.01,06,Etobicoke (Central),direct
+5350222.02,06,Etobicoke (Central),direct
+5350223.01,06,Etobicoke (Central),direct
+5350223.02,06,Etobicoke (Central),direct
+5350224.00,06,Etobicoke (Central),direct
+5350225.01,06,Etobicoke (Central),direct
+5350225.02,06,Etobicoke (Central),direct
+5350226.00,06,Etobicoke (Central),direct
+5350227.00,06,Etobicoke (Central),direct
+5350228.00,06,Etobicoke (Central),direct
+5350229.00,06,Etobicoke (Central),direct
+5350230.01,06,Etobicoke (Central),direct
+5350230.02,06,Etobicoke (Central),direct
+5350231.00,06,Etobicoke (Central),direct
+5350232.00,06,Etobicoke (Central),direct
+5350233.00,06,Etobicoke (Central),direct
+5350234.00,06,Etobicoke (Central),direct
+5350235.01,06,Etobicoke (Central),direct
+5350235.02,06,Etobicoke (Central),direct
+5350236.01,06,Etobicoke (Central),direct
+5350236.02,06,Etobicoke (Central),direct
+5350237.01,06,Etobicoke (Central),direct
+5350237.02,06,Etobicoke (Central),direct
+5350237.03,06,Etobicoke (Central),direct
+5350238.01,06,Etobicoke (Central),direct
+5350238.02,06,Etobicoke (Central),direct
+5350239.00,06,Etobicoke (Central),direct
+5350240.01,06,Etobicoke (Central),direct
+5350240.02,06,Etobicoke (Central),direct
+5350241.00,06,Etobicoke (Central),direct
+5350242.00,06,Etobicoke (Central),direct
+5350243.01,06,Etobicoke (Central),direct
+5350243.02,06,Etobicoke (Central),direct
+5350244.01,07,Etobicoke (North),direct
+5350244.02,07,Etobicoke (North),direct
+5350245.00,07,Etobicoke (North),direct
+5350246.00,07,Etobicoke (North),direct
+5350247.01,07,Etobicoke (North),direct
+5350247.02,07,Etobicoke (North),direct
+5350248.02,07,Etobicoke (North),direct
+5350248.03,07,Etobicoke (North),direct
+5350248.04,07,Etobicoke (North),direct
+5350248.05,07,Etobicoke (North),direct
+5350249.01,07,Etobicoke (North),direct
+5350249.03,07,Etobicoke (North),direct
+5350249.04,07,Etobicoke (North),direct
+5350249.05,07,Etobicoke (North),direct
+5350250.01,07,Etobicoke (North),direct
+5350250.02,07,Etobicoke (North),direct
+5350250.04,07,Etobicoke (North),direct
+5350250.05,07,Etobicoke (North),direct
+5350260.01,13,North York (Southeast),direct
+5350260.04,13,North York (Southeast),direct
+5350260.05,13,North York (Southeast),direct
+5350260.06,13,North York (Southeast),direct
+5350260.07,13,North York (Southeast),direct
+5350261.00,13,North York (Southeast),direct
+5350262.01,13,North York (Southeast),direct
+5350262.02,13,North York (Southeast),direct
+5350263.02,13,North York (Southeast),direct
+5350263.03,13,North York (Southeast),direct
+5350263.04,13,North York (Southeast),direct
+5350264.00,13,North York (Southeast),direct
+5350265.00,13,North York (Southeast),direct
+5350266.00,13,North York (Southeast),direct
+5350267.00,13,North York (Southeast),direct
+5350268.00,13,North York (Southeast),direct
+5350269.01,13,North York (Southeast),direct
+5350269.02,13,North York (Southeast),direct
+5350270.01,13,North York (Southeast),direct
+5350270.02,13,North York (Southeast),direct
+5350271.01,13,North York (Southeast),direct
+5350271.02,13,North York (Southeast),direct
+5350272.01,13,North York (Southeast),direct
+5350272.02,13,North York (Southeast),direct
+5350273.01,13,North York (Southeast),direct
+5350273.02,13,North York (Southeast),direct
+5350274.01,13,North York (Southeast),direct
+5350274.02,13,North York (Southeast),direct
+5350275.00,15,North York (Southwest),direct
+5350276.01,15,North York (Southwest),direct
+5350276.02,15,North York (Southwest),direct
+5350277.00,15,North York (Southwest),direct
+5350278.00,15,North York (Southwest),direct
+5350279.01,15,North York (Southwest),direct
+5350279.02,15,North York (Southwest),direct
+5350280.00,15,North York (Southwest),direct
+5350281.01,15,North York (Southwest),direct
+5350281.02,15,North York (Southwest),direct
+5350282.00,15,North York (Southwest),direct
+5350283.01,15,North York (Southwest),direct
+5350283.02,15,North York (Southwest),direct
+5350284.00,15,North York (Southwest),direct
+5350285.00,15,North York (Southwest),direct
+5350286.00,15,North York (Southwest),direct
+5350287.02,15,North York (Southwest),direct
+5350287.03,15,North York (Southwest),direct
+5350287.04,15,North York (Southwest),direct
+5350288.00,16,North York (N.Central),direct
+5350289.00,17,North York (Northwest),direct
+5350290.01,17,North York (Northwest),direct
+5350290.02,17,North York (Northwest),direct
+5350291.02,17,North York (Northwest),direct
+5350291.03,17,North York (Northwest),direct
+5350291.04,17,North York (Northwest),direct
+5350292.00,17,North York (Northwest),direct
+5350293.00,17,North York (Northwest),direct
+5350294.01,17,North York (Northwest),direct
+5350294.02,17,North York (Northwest),direct
+5350295.00,17,North York (Northwest),direct
+5350296.00,17,North York (Northwest),direct
+5350297.01,16,North York (N.Central),direct
+5350297.02,16,North York (N.Central),direct
+5350298.00,16,North York (N.Central),direct
+5350299.01,16,North York (N.Central),direct
+5350299.02,16,North York (N.Central),direct
+5350300.01,14,North York (Northeast),direct
+5350300.02,14,North York (Northeast),direct
+5350300.03,14,North York (Northeast),direct
+5350301.01,14,North York (Northeast),direct
+5350301.03,14,North York (Northeast),direct
+5350301.04,14,North York (Northeast),direct
+5350302.01,14,North York (Northeast),direct
+5350302.02,14,North York (Northeast),direct
+5350302.03,14,North York (Northeast),direct
+5350303.00,14,North York (Northeast),direct
+5350304.01,14,North York (Northeast),direct
+5350304.02,14,North York (Northeast),direct
+5350304.03,14,North York (Northeast),direct
+5350304.04,14,North York (Northeast),direct
+5350304.05,14,North York (Northeast),direct
+5350304.06,14,North York (Northeast),direct
+5350305.01,14,North York (Northeast),direct
+5350305.03,14,North York (Northeast),direct
+5350305.05,14,North York (Northeast),direct
+5350305.06,14,North York (Northeast),direct
+5350306.01,14,North York (Northeast),direct
+5350306.02,14,North York (Northeast),direct
+5350307.03,14,North York (Northeast),direct
+5350307.04,14,North York (Northeast),direct
+5350307.05,14,North York (Northeast),direct
+5350307.06,14,North York (Northeast),direct
+5350307.07,14,North York (Northeast),direct
+5350308.02,16,North York (N.Central),direct
+5350308.03,16,North York (N.Central),direct
+5350308.05,16,North York (N.Central),direct
+5350308.06,16,North York (N.Central),direct
+5350308.07,16,North York (N.Central),direct
+5350309.00,16,North York (N.Central),direct
+5350310.01,16,North York (N.Central),direct
+5350310.02,16,North York (N.Central),direct
+5350311.02,17,North York (Northwest),direct
+5350311.03,17,North York (Northwest),direct
+5350311.04,17,North York (Northwest),direct
+5350311.05,17,North York (Northwest),direct
+5350311.06,17,North York (Northwest),direct
+5350312.02,17,North York (Northwest),direct
+5350312.03,17,North York (Northwest),direct
+5350312.04,17,North York (Northwest),direct
+5350312.05,17,North York (Northwest),direct
+5350312.06,17,North York (Northwest),direct
+5350312.07,17,North York (Northwest),direct
+5350313.00,17,North York (Northwest),direct
+5350314.01,17,North York (Northwest),direct
+5350314.02,17,North York (Northwest),direct
+5350315.01,17,North York (Northwest),direct
+5350315.02,17,North York (Northwest),direct
+5350315.03,17,North York (Northwest),direct
+5350316.01,17,North York (Northwest),direct
+5350316.03,17,North York (Northwest),direct
+5350316.04,17,North York (Northwest),direct
+5350316.05,17,North York (Northwest),direct
+5350316.06,17,North York (Northwest),direct
+5350317.02,16,North York (N.Central),direct
+5350317.03,16,North York (N.Central),direct
+5350317.04,16,North York (N.Central),direct
+5350317.05,16,North York (N.Central),direct
+5350318.01,16,North York (N.Central),direct
+5350318.02,16,North York (N.Central),direct
+5350319.00,16,North York (N.Central),direct
+5350320.01,16,North York (N.Central),direct
+5350320.02,16,North York (N.Central),direct
+5350321.01,14,North York (Northeast),direct
+5350321.02,14,North York (Northeast),direct
+5350322.01,14,North York (Northeast),direct
+5350322.02,14,North York (Northeast),direct
+5350323.01,14,North York (Northeast),direct
+5350323.02,14,North York (Northeast),direct
+5350324.01,14,North York (Northeast),direct
+5350324.02,14,North York (Northeast),direct
+5350324.03,14,North York (Northeast),direct
+5350324.05,14,North York (Northeast),direct
+5350324.06,14,North York (Northeast),direct
+5350330.00,12,Scarborough (East),direct
+5350331.01,12,Scarborough (East),direct
+5350331.03,12,Scarborough (East),direct
+5350331.04,12,Scarborough (East),direct
+5350332.00,12,Scarborough (East),direct
+5350333.00,10,Scarborough (Central),direct
+5350334.00,10,Scarborough (Central),direct
+5350335.00,10,Scarborough (Central),direct
+5350336.00,10,Scarborough (Central),direct
+5350337.01,10,Scarborough (Central),direct
+5350337.02,10,Scarborough (Central),direct
+5350338.00,10,Scarborough (Central),direct
+5350339.00,10,Scarborough (Central),direct
+5350340.00,10,Scarborough (Central),direct
+5350341.02,10,Scarborough (Central),direct
+5350341.03,10,Scarborough (Central),direct
+5350341.04,10,Scarborough (Central),direct
+5350342.00,10,Scarborough (Central),direct
+5350343.00,10,Scarborough (Central),direct
+5350344.01,10,Scarborough (Central),direct
+5350344.02,10,Scarborough (Central),direct
+5350345.00,10,Scarborough (Central),direct
+5350346.01,10,Scarborough (Central),direct
+5350346.02,10,Scarborough (Central),direct
+5350347.00,10,Scarborough (Central),direct
+5350348.00,10,Scarborough (Central),direct
+5350349.00,10,Scarborough (Central),direct
+5350350.00,10,Scarborough (Central),direct
+5350351.01,10,Scarborough (Central),direct
+5350351.02,10,Scarborough (Central),direct
+5350352.00,10,Scarborough (Central),direct
+5350353.02,10,Scarborough (Central),direct
+5350353.03,10,Scarborough (Central),direct
+5350353.04,10,Scarborough (Central),direct
+5350354.00,10,Scarborough (Central),direct
+5350355.02,10,Scarborough (Central),direct
+5350355.04,10,Scarborough (Central),direct
+5350355.05,10,Scarborough (Central),direct
+5350355.06,10,Scarborough (Central),direct
+5350356.00,12,Scarborough (East),direct
+5350357.01,12,Scarborough (East),direct
+5350357.02,12,Scarborough (East),direct
+5350358.01,12,Scarborough (East),direct
+5350358.02,12,Scarborough (East),direct
+5350358.03,12,Scarborough (East),direct
+5350359.00,12,Scarborough (East),direct
+5350360.00,12,Scarborough (East),direct
+5350361.01,12,Scarborough (East),direct
+5350361.02,12,Scarborough (East),direct
+5350362.01,12,Scarborough (East),direct
+5350362.02,12,Scarborough (East),direct
+5350362.03,12,Scarborough (East),direct
+5350362.04,12,Scarborough (East),direct
+5350363.02,12,Scarborough (East),direct
+5350363.04,12,Scarborough (East),direct
+5350363.05,12,Scarborough (East),direct
+5350363.06,12,Scarborough (East),direct
+5350363.07,12,Scarborough (East),direct
+5350364.01,12,Scarborough (East),direct
+5350364.02,12,Scarborough (East),direct
+5350365.00,12,Scarborough (East),direct
+5350366.00,12,Scarborough (East),direct
+5350367.01,12,Scarborough (East),direct
+5350367.02,12,Scarborough (East),direct
+5350368.01,10,Scarborough (Central),direct
+5350368.02,10,Scarborough (Central),direct
+5350369.00,10,Scarborough (Central),direct
+5350370.01,10,Scarborough (Central),direct
+5350370.02,10,Scarborough (Central),direct
+5350370.03,10,Scarborough (Central),direct
+5350371.00,10,Scarborough (Central),direct
+5350372.00,10,Scarborough (Central),direct
+5350373.00,10,Scarborough (Central),direct
+5350374.01,11,Scarborough (North),direct
+5350374.02,11,Scarborough (North),direct
+5350374.03,11,Scarborough (North),direct
+5350375.01,11,Scarborough (North),direct
+5350375.02,11,Scarborough (North),direct
+5350375.03,11,Scarborough (North),direct
+5350375.04,11,Scarborough (North),direct
+5350375.05,11,Scarborough (North),direct
+5350376.01,11,Scarborough (North),direct
+5350376.02,11,Scarborough (North),direct
+5350376.04,11,Scarborough (North),direct
+5350376.05,11,Scarborough (North),direct
+5350376.06,11,Scarborough (North),direct
+5350376.08,11,Scarborough (North),direct
+5350376.09,11,Scarborough (North),direct
+5350376.11,11,Scarborough (North),direct
+5350376.12,11,Scarborough (North),direct
+5350376.13,11,Scarborough (North),direct
+5350376.14,11,Scarborough (North),direct
+5350376.15,11,Scarborough (North),direct
+5350376.16,11,Scarborough (North),direct
+5350377.02,11,Scarborough (North),direct
+5350377.03,11,Scarborough (North),direct
+5350377.04,11,Scarborough (North),direct
+5350377.06,11,Scarborough (North),direct
+5350377.07,11,Scarborough (North),direct
+5350377.08,11,Scarborough (North),direct
+5350377.09,11,Scarborough (North),direct
+5350378.02,11,Scarborough (North),direct
+5350378.03,11,Scarborough (North),direct
+5350378.04,11,Scarborough (North),direct
+5350378.05,11,Scarborough (North),direct
+5350378.06,11,Scarborough (North),direct
+5350378.07,11,Scarborough (North),direct
+5350378.08,11,Scarborough (North),direct
+5350378.11,11,Scarborough (North),direct
+5350378.12,11,Scarborough (North),direct
+5350378.14,11,Scarborough (North),direct
+5350378.16,11,Scarborough (North),direct
+5350378.17,11,Scarborough (North),direct
+5350378.18,11,Scarborough (North),direct
+5350378.19,11,Scarborough (North),direct
+5350378.20,11,Scarborough (North),direct
+5350378.21,11,Scarborough (North),direct
+5350378.22,11,Scarborough (North),direct
+5350378.23,11,Scarborough (North),direct
+5350378.24,11,Scarborough (North),direct
+5350378.25,11,Scarborough (North),direct
+5350378.26,11,Scarborough (North),direct
+5350378.27,11,Scarborough (North),direct
+5350378.28,11,Scarborough (North),direct
+5350400.02,27,Markham,direct
+5350400.03,27,Markham,direct
+5350400.04,27,Markham,direct
+5350400.06,27,Markham,direct
+5350400.07,27,Markham,direct
+5350400.08,27,Markham,direct
+5350400.11,27,Markham,direct
+5350400.12,27,Markham,direct
+5350400.13,27,Markham,direct
+5350400.14,27,Markham,direct
+5350400.15,27,Markham,direct
+5350400.16,27,Markham,direct
+5350400.17,27,Markham,direct
+5350400.18,27,Markham,direct
+5350400.19,27,Markham,direct
+5350400.20,27,Markham,direct
+5350400.21,27,Markham,direct
+5350400.22,27,Markham,direct
+5350400.23,27,Markham,direct
+5350401.04,27,Markham,direct
+5350401.05,27,Markham,direct
+5350401.06,27,Markham,direct
+5350401.07,27,Markham,direct
+5350401.08,27,Markham,direct
+5350401.09,27,Markham,direct
+5350401.10,27,Markham,direct
+5350401.11,27,Markham,direct
+5350401.13,27,Markham,direct
+5350401.14,27,Markham,direct
+5350401.15,27,Markham,direct
+5350401.17,27,Markham,direct
+5350401.18,27,Markham,direct
+5350401.19,27,Markham,direct
+5350401.20,27,Markham,direct
+5350401.21,27,Markham,direct
+5350401.22,27,Markham,direct
+5350401.23,27,Markham,direct
+5350402.01,27,Markham,direct
+5350402.02,27,Markham,direct
+5350402.03,27,Markham,direct
+5350402.04,27,Markham,direct
+5350402.05,27,Markham,direct
+5350402.06,27,Markham,direct
+5350402.07,27,Markham,direct
+5350402.08,27,Markham,direct
+5350402.09,27,Markham,direct
+5350402.10,27,Markham,direct
+5350402.12,27,Markham,direct
+5350402.13,27,Markham,direct
+5350403.01,27,Markham,direct
+5350403.04,27,Markham,direct
+5350403.05,27,Markham,direct
+5350403.07,27,Markham,direct
+5350403.09,27,Markham,direct
+5350403.10,27,Markham,direct
+5350403.11,27,Markham,direct
+5350403.12,27,Markham,direct
+5350403.13,27,Markham,direct
+5350403.14,27,Markham,direct
+5350403.15,27,Markham,direct
+5350403.16,27,Markham,direct
+5350410.02,25,Richmond Hill/Vaughan/King,direct
+5350410.03,25,Richmond Hill/Vaughan/King,direct
+5350410.04,25,Richmond Hill/Vaughan/King,direct
+5350410.05,25,Richmond Hill/Vaughan/King,direct
+5350410.07,25,Richmond Hill/Vaughan/King,direct
+5350410.09,25,Richmond Hill/Vaughan/King,direct
+5350410.10,25,Richmond Hill/Vaughan/King,direct
+5350410.11,25,Richmond Hill/Vaughan/King,direct
+5350410.12,25,Richmond Hill/Vaughan/King,direct
+5350410.13,25,Richmond Hill/Vaughan/King,direct
+5350410.14,25,Richmond Hill/Vaughan/King,direct
+5350410.15,25,Richmond Hill/Vaughan/King,direct
+5350411.01,25,Richmond Hill/Vaughan/King,direct
+5350411.04,25,Richmond Hill/Vaughan/King,direct
+5350411.07,25,Richmond Hill/Vaughan/King,direct
+5350411.08,25,Richmond Hill/Vaughan/King,direct
+5350411.09,25,Richmond Hill/Vaughan/King,direct
+5350411.12,25,Richmond Hill/Vaughan/King,direct
+5350411.15,25,Richmond Hill/Vaughan/King,direct
+5350411.16,25,Richmond Hill/Vaughan/King,direct
+5350411.17,25,Richmond Hill/Vaughan/King,direct
+5350411.18,25,Richmond Hill/Vaughan/King,direct
+5350411.19,25,Richmond Hill/Vaughan/King,direct
+5350411.21,25,Richmond Hill/Vaughan/King,direct
+5350411.22,25,Richmond Hill/Vaughan/King,direct
+5350411.23,25,Richmond Hill/Vaughan/King,direct
+5350411.24,25,Richmond Hill/Vaughan/King,direct
+5350411.25,25,Richmond Hill/Vaughan/King,direct
+5350411.26,25,Richmond Hill/Vaughan/King,direct
+5350411.27,25,Richmond Hill/Vaughan/King,direct
+5350411.28,25,Richmond Hill/Vaughan/King,direct
+5350411.29,25,Richmond Hill/Vaughan/King,direct
+5350411.30,25,Richmond Hill/Vaughan/King,direct
+5350412.01,25,Richmond Hill/Vaughan/King,direct
+5350412.02,25,Richmond Hill/Vaughan/King,direct
+5350412.04,25,Richmond Hill/Vaughan/King,direct
+5350412.06,25,Richmond Hill/Vaughan/King,direct
+5350412.08,25,Richmond Hill/Vaughan/King,direct
+5350412.10,25,Richmond Hill/Vaughan/King,direct
+5350412.11,25,Richmond Hill/Vaughan/King,direct
+5350412.12,25,Richmond Hill/Vaughan/King,direct
+5350412.13,25,Richmond Hill/Vaughan/King,direct
+5350412.14,25,Richmond Hill/Vaughan/King,direct
+5350412.15,25,Richmond Hill/Vaughan/King,direct
+5350412.18,25,Richmond Hill/Vaughan/King,direct
+5350412.19,25,Richmond Hill/Vaughan/King,direct
+5350412.20,25,Richmond Hill/Vaughan/King,direct
+5350412.21,25,Richmond Hill/Vaughan/King,direct
+5350412.22,25,Richmond Hill/Vaughan/King,direct
+5350412.24,25,Richmond Hill/Vaughan/King,direct
+5350412.25,25,Richmond Hill/Vaughan/King,direct
+5350412.26,25,Richmond Hill/Vaughan/King,direct
+5350413.01,25,Richmond Hill/Vaughan/King,direct
+5350413.02,25,Richmond Hill/Vaughan/King,direct
+5350420.03,25,Richmond Hill/Vaughan/King,direct
+5350420.05,25,Richmond Hill/Vaughan/King,direct
+5350420.06,25,Richmond Hill/Vaughan/King,direct
+5350420.08,25,Richmond Hill/Vaughan/King,direct
+5350420.09,25,Richmond Hill/Vaughan/King,direct
+5350420.10,25,Richmond Hill/Vaughan/King,direct
+5350420.11,25,Richmond Hill/Vaughan/King,direct
+5350420.13,25,Richmond Hill/Vaughan/King,direct
+5350420.14,25,Richmond Hill/Vaughan/King,direct
+5350420.15,25,Richmond Hill/Vaughan/King,direct
+5350421.01,25,Richmond Hill/Vaughan/King,direct
+5350421.04,25,Richmond Hill/Vaughan/King,direct
+5350421.05,25,Richmond Hill/Vaughan/King,direct
+5350421.06,25,Richmond Hill/Vaughan/King,direct
+5350421.07,25,Richmond Hill/Vaughan/King,direct
+5350422.02,25,Richmond Hill/Vaughan/King,direct
+5350422.03,25,Richmond Hill/Vaughan/King,direct
+5350422.04,25,Richmond Hill/Vaughan/King,direct
+5350422.05,25,Richmond Hill/Vaughan/King,direct
+5350422.06,25,Richmond Hill/Vaughan/King,direct
+5350423.01,25,Richmond Hill/Vaughan/King,direct
+5350423.02,25,Richmond Hill/Vaughan/King,direct
+5350424.04,25,Richmond Hill/Vaughan/King,direct
+5350424.05,25,Richmond Hill/Vaughan/King,direct
+5350424.07,25,Richmond Hill/Vaughan/King,direct
+5350424.08,25,Richmond Hill/Vaughan/King,direct
+5350424.09,25,Richmond Hill/Vaughan/King,direct
+5350424.10,25,Richmond Hill/Vaughan/King,direct
+5350424.11,25,Richmond Hill/Vaughan/King,direct
+5350424.13,25,Richmond Hill/Vaughan/King,direct
+5350424.14,25,Richmond Hill/Vaughan/King,direct
+5350424.15,25,Richmond Hill/Vaughan/King,direct
+5350424.16,25,Richmond Hill/Vaughan/King,direct
+5350430.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350430.05,26,"Aurora, Newmkt, Whit-St.",direct
+5350430.06,26,"Aurora, Newmkt, Whit-St.",direct
+5350430.07,26,"Aurora, Newmkt, Whit-St.",direct
+5350430.08,26,"Aurora, Newmkt, Whit-St.",direct
+5350431.01,26,"Aurora, Newmkt, Whit-St.",direct
+5350431.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350440.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350441.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350441.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350441.04,26,"Aurora, Newmkt, Whit-St.",direct
+5350442.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350442.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350442.04,26,"Aurora, Newmkt, Whit-St.",direct
+5350442.05,26,"Aurora, Newmkt, Whit-St.",direct
+5350442.06,26,"Aurora, Newmkt, Whit-St.",direct
+5350450.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350450.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350450.05,26,"Aurora, Newmkt, Whit-St.",direct
+5350450.06,26,"Aurora, Newmkt, Whit-St.",direct
+5350451.01,26,"Aurora, Newmkt, Whit-St.",direct
+5350451.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350451.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350451.05,26,"Aurora, Newmkt, Whit-St.",direct
+5350451.06,26,"Aurora, Newmkt, Whit-St.",direct
+5350451.07,26,"Aurora, Newmkt, Whit-St.",direct
+5350452.01,26,"Aurora, Newmkt, Whit-St.",direct
+5350452.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350452.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350452.05,26,"Aurora, Newmkt, Whit-St.",direct
+5350452.06,26,"Aurora, Newmkt, Whit-St.",direct
+5350452.07,26,"Aurora, Newmkt, Whit-St.",direct
+5350455.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350456.01,26,"Aurora, Newmkt, Whit-St.",direct
+5350456.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350456.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350460.01,25,Richmond Hill/Vaughan/King,direct
+5350460.02,25,Richmond Hill/Vaughan/King,direct
+5350461.01,25,Richmond Hill/Vaughan/King,direct
+5350461.02,25,Richmond Hill/Vaughan/King,direct
+5350470.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350471.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350472.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350473.01,26,"Aurora, Newmkt, Whit-St.",direct
+5350473.02,26,"Aurora, Newmkt, Whit-St.",direct
+5350473.03,26,"Aurora, Newmkt, Whit-St.",direct
+5350474.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350475.00,26,"Aurora, Newmkt, Whit-St.",direct
+5350500.01,18,Mississauga (South),direct
+5350500.02,18,Mississauga (South),direct
+5350501.01,18,Mississauga (South),direct
+5350501.02,18,Mississauga (South),direct
+5350502.01,18,Mississauga (South),direct
+5350502.02,18,Mississauga (South),direct
+5350503.00,18,Mississauga (South),direct
+5350504.00,18,Mississauga (South),direct
+5350505.01,18,Mississauga (South),direct
+5350505.02,18,Mississauga (South),direct
+5350506.00,18,Mississauga (South),direct
+5350507.00,18,Mississauga (South),direct
+5350508.00,18,Mississauga (South),direct
+5350509.01,18,Mississauga (South),direct
+5350509.02,18,Mississauga (South),direct
+5350510.00,18,Mississauga (South),direct
+5350511.01,18,Mississauga (South),direct
+5350511.02,18,Mississauga (South),direct
+5350512.00,18,Mississauga (South),direct
+5350513.01,18,Mississauga (South),direct
+5350513.02,18,Mississauga (South),direct
+5350513.03,18,Mississauga (South),direct
+5350513.04,18,Mississauga (South),direct
+5350514.01,18,Mississauga (South),direct
+5350514.02,18,Mississauga (South),direct
+5350515.01,18,Mississauga (South),direct
+5350515.02,18,Mississauga (South),direct
+5350516.01,19,Mississauga (Northwest),direct
+5350516.02,19,Mississauga (Northwest),direct
+5350516.03,19,Mississauga (Northwest),direct
+5350516.04,19,Mississauga (Northwest),direct
+5350516.05,19,Mississauga (Northwest),direct
+5350516.06,19,Mississauga (Northwest),direct
+5350516.08,19,Mississauga (Northwest),direct
+5350516.09,19,Mississauga (Northwest),direct
+5350516.11,19,Mississauga (Northwest),direct
+5350516.16,19,Mississauga (Northwest),direct
+5350516.17,19,Mississauga (Northwest),direct
+5350516.18,19,Mississauga (Northwest),direct
+5350516.20,19,Mississauga (Northwest),direct
+5350516.21,19,Mississauga (Northwest),direct
+5350516.22,19,Mississauga (Northwest),direct
+5350516.23,19,Mississauga (Northwest),direct
+5350516.24,19,Mississauga (Northwest),direct
+5350516.25,19,Mississauga (Northwest),direct
+5350516.26,19,Mississauga (Northwest),direct
+5350516.28,19,Mississauga (Northwest),direct
+5350516.29,19,Mississauga (Northwest),direct
+5350516.30,19,Mississauga (Northwest),direct
+5350516.31,19,Mississauga (Northwest),direct
+5350516.32,19,Mississauga (Northwest),direct
+5350516.37,19,Mississauga (Northwest),direct
+5350516.38,19,Mississauga (Northwest),direct
+5350516.39,19,Mississauga (Northwest),direct
+5350516.40,19,Mississauga (Northwest),direct
+5350516.41,19,Mississauga (Northwest),direct
+5350516.43,19,Mississauga (Northwest),direct
+5350516.44,19,Mississauga (Northwest),direct
+5350516.47,19,Mississauga (Northwest),direct
+5350516.48,19,Mississauga (Northwest),direct
+5350516.50,19,Mississauga (Northwest),direct
+5350516.51,19,Mississauga (Northwest),direct
+5350516.52,19,Mississauga (Northwest),direct
+5350516.53,19,Mississauga (Northwest),direct
+5350516.54,19,Mississauga (Northwest),direct
+5350516.55,19,Mississauga (Northwest),direct
+5350517.00,20,Mississauga (Northeast),direct
+5350518.00,20,Mississauga (Northeast),direct
+5350519.00,20,Mississauga (Northeast),direct
+5350520.01,20,Mississauga (Northeast),direct
+5350520.02,20,Mississauga (Northeast),direct
+5350520.05,20,Mississauga (Northeast),direct
+5350520.07,20,Mississauga (Northeast),direct
+5350520.08,20,Mississauga (Northeast),direct
+5350520.09,20,Mississauga (Northeast),direct
+5350520.11,20,Mississauga (Northeast),direct
+5350520.12,20,Mississauga (Northeast),direct
+5350521.01,20,Mississauga (Northeast),direct
+5350521.02,20,Mississauga (Northeast),direct
+5350521.03,20,Mississauga (Northeast),direct
+5350521.04,20,Mississauga (Northeast),direct
+5350521.05,20,Mississauga (Northeast),direct
+5350521.06,20,Mississauga (Northeast),direct
+5350522.00,20,Mississauga (Northeast),direct
+5350523.00,20,Mississauga (Northeast),direct
+5350524.01,20,Mississauga (Northeast),direct
+5350524.02,20,Mississauga (Northeast),direct
+5350525.01,20,Mississauga (Northeast),direct
+5350525.02,20,Mississauga (Northeast),direct
+5350526.01,20,Mississauga (Northeast),direct
+5350526.02,20,Mississauga (Northeast),direct
+5350527.02,20,Mississauga (Northeast),direct
+5350527.04,20,Mississauga (Northeast),direct
+5350527.05,20,Mississauga (Northeast),direct
+5350527.06,20,Mississauga (Northeast),direct
+5350527.07,20,Mississauga (Northeast),direct
+5350527.08,20,Mississauga (Northeast),direct
+5350527.09,20,Mississauga (Northeast),direct
+5350527.10,20,Mississauga (Northeast),direct
+5350527.11,20,Mississauga (Northeast),direct
+5350527.12,20,Mississauga (Northeast),direct
+5350527.13,20,Mississauga (Northeast),direct
+5350528.01,20,Mississauga (Northeast),direct
+5350528.11,20,Mississauga (Northeast),direct
+5350528.12,20,Mississauga (Northeast),direct
+5350528.13,20,Mississauga (Northeast),direct
+5350528.15,20,Mississauga (Northeast),direct
+5350528.16,20,Mississauga (Northeast),direct
+5350528.18,20,Mississauga (Northeast),direct
+5350528.19,20,Mississauga (Northeast),direct
+5350528.20,21,Brampton (West),direct
+5350528.21,21,Brampton (West),direct
+5350528.22,21,Brampton (West),direct
+5350528.24,20,Mississauga (Northeast),direct
+5350528.26,20,Mississauga (Northeast),direct
+5350528.31,21,Brampton (West),direct
+5350528.32,20,Mississauga (Northeast),direct
+5350528.33,20,Mississauga (Northeast),direct
+5350528.34,20,Mississauga (Northeast),direct
+5350528.35,20,Mississauga (Northeast),direct
+5350528.39,20,Mississauga (Northeast),direct
+5350528.40,20,Mississauga (Northeast),direct
+5350528.42,20,Mississauga (Northeast),direct
+5350528.43,20,Mississauga (Northeast),direct
+5350528.44,20,Mississauga (Northeast),direct
+5350528.45,20,Mississauga (Northeast),direct
+5350528.46,20,Mississauga (Northeast),direct
+5350528.47,20,Mississauga (Northeast),direct
+5350528.49,20,Mississauga (Northeast),direct
+5350528.50,21,Brampton (West),direct
+5350528.51,21,Brampton (West),direct
+5350528.52,21,Brampton (West),direct
+5350528.53,21,Brampton (West),direct
+5350528.54,20,Mississauga (Northeast),direct
+5350528.55,20,Mississauga (Northeast),direct
+5350528.56,20,Mississauga (Northeast),direct
+5350528.57,20,Mississauga (Northeast),direct
+5350528.58,20,Mississauga (Northeast),direct
+5350528.59,20,Mississauga (Northeast),direct
+5350528.60,20,Mississauga (Northeast),direct
+5350528.61,20,Mississauga (Northeast),direct
+5350528.62,20,Mississauga (Northeast),direct
+5350528.63,20,Mississauga (Northeast),direct
+5350529.01,20,Mississauga (Northeast),direct
+5350529.02,20,Mississauga (Northeast),direct
+5350530.01,20,Mississauga (Northeast),direct
+5350530.02,20,Mississauga (Northeast),direct
+5350531.01,20,Mississauga (Northeast),direct
+5350531.02,20,Mississauga (Northeast),direct
+5350532.01,20,Mississauga (Northeast),direct
+5350532.02,20,Mississauga (Northeast),direct
+5350540.01,18,Mississauga (South),direct
+5350540.02,18,Mississauga (South),direct
+5350550.01,19,Mississauga (Northwest),direct
+5350550.02,19,Mississauga (Northwest),direct
+5350560.00,22,Brampton (East),direct
+5350561.00,22,Brampton (East),direct
+5350562.02,22,Brampton (East),direct
+5350562.03,22,Brampton (East),direct
+5350562.04,22,Brampton (East),direct
+5350562.05,22,Brampton (East),direct
+5350562.06,22,Brampton (East),direct
+5350562.07,22,Brampton (East),direct
+5350562.08,22,Brampton (East),direct
+5350562.09,22,Brampton (East),direct
+5350562.11,22,Brampton (East),direct
+5350562.12,22,Brampton (East),direct
+5350562.13,22,Brampton (East),direct
+5350562.14,22,Brampton (East),direct
+5350562.15,22,Brampton (East),direct
+5350563.01,22,Brampton (East),direct
+5350563.02,22,Brampton (East),direct
+5350564.01,22,Brampton (East),direct
+5350564.02,22,Brampton (East),direct
+5350570.01,21,Brampton (West),direct
+5350570.02,21,Brampton (West),direct
+5350571.01,21,Brampton (West),direct
+5350571.02,21,Brampton (West),direct
+5350572.01,21,Brampton (West),direct
+5350572.04,21,Brampton (West),direct
+5350572.05,21,Brampton (West),direct
+5350572.07,21,Brampton (West),direct
+5350572.08,21,Brampton (West),direct
+5350572.09,21,Brampton (West),direct
+5350572.10,21,Brampton (West),direct
+5350573.03,21,Brampton (West),direct
+5350573.05,21,Brampton (West),direct
+5350573.06,21,Brampton (West),direct
+5350573.07,21,Brampton (West),direct
+5350573.09,21,Brampton (West),direct
+5350573.10,21,Brampton (West),direct
+5350573.11,21,Brampton (West),direct
+5350574.00,21,Brampton (West),direct
+5350575.01,21,Brampton (West),direct
+5350575.02,21,Brampton (West),direct
+5350575.03,21,Brampton (West),direct
+5350575.04,21,Brampton (West),direct
+5350575.05,21,Brampton (West),direct
+5350575.07,21,Brampton (West),direct
+5350575.08,21,Brampton (West),direct
+5350576.04,21,Brampton (West),direct
+5350576.05,21,Brampton (West),direct
+5350576.06,21,Brampton (West),direct
+5350576.07,21,Brampton (West),direct
+5350576.09,21,Brampton (West),direct
+5350576.16,22,Brampton (East),direct
+5350576.17,22,Brampton (East),direct
+5350576.20,22,Brampton (East),direct
+5350576.22,22,Brampton (East),direct
+5350576.29,21,Brampton (West),direct
+5350576.31,21,Brampton (West),direct
+5350576.33,21,Brampton (West),direct
+5350576.34,21,Brampton (West),direct
+5350576.43,21,Brampton (West),direct
+5350576.44,21,Brampton (West),direct
+5350576.45,22,Brampton (East),direct
+5350576.46,22,Brampton (East),direct
+5350576.47,22,Brampton (East),direct
+5350576.49,21,Brampton (West),direct
+5350576.50,21,Brampton (West),direct
+5350576.52,21,Brampton (West),direct
+5350576.53,21,Brampton (West),direct
+5350576.54,22,Brampton (East),direct
+5350576.55,22,Brampton (East),direct
+5350576.57,22,Brampton (East),direct
+5350576.59,22,Brampton (East),direct
+5350576.62,22,Brampton (East),direct
+5350576.63,22,Brampton (East),direct
+5350576.65,22,Brampton (East),direct
+5350576.66,22,Brampton (East),direct
+5350576.68,22,Brampton (East),direct
+5350576.69,22,Brampton (East),direct
+5350576.73,22,Brampton (East),direct
+5350576.74,22,Brampton (East),direct
+5350576.75,22,Brampton (East),direct
+5350576.76,21,Brampton (West),direct
+5350576.77,21,Brampton (West),direct
+5350576.78,22,Brampton (East),direct
+5350576.79,22,Brampton (East),direct
+5350576.80,21,Brampton (West),direct
+5350576.81,21,Brampton (West),direct
+5350576.82,22,Brampton (East),direct
+5350576.83,22,Brampton (East),direct
+5350576.84,22,Brampton (East),direct
+5350576.85,22,Brampton (East),direct
+5350576.86,22,Brampton (East),direct
+5350576.87,22,Brampton (East),direct
+5350576.88,22,Brampton (East),direct
+5350576.89,22,Brampton (East),direct
+5350576.90,21,Brampton (West),direct
+5350576.91,21,Brampton (West),direct
+5350576.92,22,Brampton (East),direct
+5350576.93,22,Brampton (East),direct
+5350576.94,22,Brampton (East),direct
+5350576.95,22,Brampton (East),direct
+5350576.96,22,Brampton (East),direct
+5350576.97,22,Brampton (East),direct
+5350576.98,21,Brampton (West),direct
+5350576.99,21,Brampton (West),direct
+5350577.00,21,Brampton (West),direct
+5350577.01,21,Brampton (West),direct
+5350577.02,21,Brampton (West),direct
+5350577.03,21,Brampton (West),direct
+5350577.04,21,Brampton (West),direct
+5350577.05,21,Brampton (West),direct
+5350577.06,21,Brampton (West),direct
+5350577.07,21,Brampton (West),direct
+5350577.08,21,Brampton (West),direct
+5350577.09,21,Brampton (West),direct
+5350585.02,24,Caledon,direct
+5350585.03,24,Caledon,direct
+5350585.05,24,Caledon,direct
+5350585.07,24,Caledon,direct
+5350585.08,24,Caledon,direct
+5350585.09,24,Caledon,direct
+5350585.10,24,Caledon,direct
+5350586.02,24,Caledon,direct
+5350586.03,24,Caledon,direct
+5350586.04,24,Caledon,direct
+5350586.05,24,Caledon,direct
+5350587.01,24,Caledon,direct
+5350587.02,24,Caledon,direct
+5350600.01,23,Oakville,direct
+5350600.02,23,Oakville,direct
+5350601.00,23,Oakville,direct
+5350602.00,23,Oakville,direct
+5350603.00,23,Oakville,direct
+5350604.00,23,Oakville,direct
+5350605.00,23,Oakville,direct
+5350606.00,23,Oakville,direct
+5350607.00,23,Oakville,direct
+5350608.00,23,Oakville,direct
+5350609.00,23,Oakville,direct
+5350610.03,23,Oakville,direct
+5350610.04,23,Oakville,direct
+5350610.05,23,Oakville,direct
+5350610.06,23,Oakville,direct
+5350611.00,23,Oakville,direct
+5350612.01,23,Oakville,direct
+5350612.03,23,Oakville,direct
+5350612.05,23,Oakville,direct
+5350612.08,23,Oakville,direct
+5350612.10,23,Oakville,direct
+5350612.11,23,Oakville,direct
+5350612.12,23,Oakville,direct
+5350612.13,23,Oakville,direct
+5350612.14,23,Oakville,direct
+5350612.15,23,Oakville,direct
+5350612.18,23,Oakville,direct
+5350612.19,23,Oakville,direct
+5350612.20,23,Oakville,direct
+5350612.21,23,Oakville,direct
+5350612.22,23,Oakville,direct
+5350612.23,23,Oakville,direct
+5350612.25,23,Oakville,direct
+5350612.26,23,Oakville,direct
+5350612.27,23,Oakville,direct
+5350612.28,23,Oakville,direct
+5350612.29,23,Oakville,direct
+5350613.01,23,Oakville,direct
+5350613.03,23,Oakville,direct
+5350613.04,23,Oakville,direct
+5350614.01,23,Oakville,direct
+5350614.02,23,Oakville,direct
+5350615.00,23,Oakville,direct
+5350620.05,29,Milton/Halton Hills,direct
+5350620.06,29,Milton/Halton Hills,direct
+5350620.07,29,Milton/Halton Hills,direct
+5350620.09,29,Milton/Halton Hills,direct
+5350620.13,29,Milton/Halton Hills,direct
+5350620.14,29,Milton/Halton Hills,direct
+5350620.15,29,Milton/Halton Hills,direct
+5350620.16,29,Milton/Halton Hills,direct
+5350620.17,29,Milton/Halton Hills,direct
+5350620.18,29,Milton/Halton Hills,direct
+5350620.19,29,Milton/Halton Hills,direct
+5350620.20,29,Milton/Halton Hills,direct
+5350620.21,29,Milton/Halton Hills,direct
+5350620.22,29,Milton/Halton Hills,direct
+5350620.23,29,Milton/Halton Hills,direct
+5350620.24,29,Milton/Halton Hills,direct
+5350620.25,29,Milton/Halton Hills,direct
+5350620.26,29,Milton/Halton Hills,direct
+5350620.27,29,Milton/Halton Hills,direct
+5350620.28,29,Milton/Halton Hills,direct
+5350620.29,29,Milton/Halton Hills,direct
+5350621.00,29,Milton/Halton Hills,direct
+5350622.00,29,Milton/Halton Hills,direct
+5350623.00,29,Milton/Halton Hills,direct
+5350624.00,29,Milton/Halton Hills,direct
+5350625.00,29,Milton/Halton Hills,direct
+5350626.00,29,Milton/Halton Hills,direct
+5350630.00,29,Milton/Halton Hills,direct
+5350631.02,29,Milton/Halton Hills,direct
+5350631.03,29,Milton/Halton Hills,direct
+5350631.04,29,Milton/Halton Hills,direct
+5350632.00,29,Milton/Halton Hills,direct
+5350633.00,29,Milton/Halton Hills,direct
+5350634.01,29,Milton/Halton Hills,direct
+5350634.02,29,Milton/Halton Hills,direct
+5350635.00,29,Milton/Halton Hills,direct
+5350636.00,29,Milton/Halton Hills,direct
+5350637.00,29,Milton/Halton Hills,direct
+5350638.00,29,Milton/Halton Hills,direct
+5350639.00,29,Milton/Halton Hills,direct
+5350800.01,28,Pickering/Ajax/Uxbridge,direct
+5350800.02,28,Pickering/Ajax/Uxbridge,direct
+5350801.01,28,Pickering/Ajax/Uxbridge,direct
+5350801.02,28,Pickering/Ajax/Uxbridge,direct
+5350802.01,12,Scarborough (East),direct
+5350802.02,12,Scarborough (East),direct
+5350803.03,28,Pickering/Ajax/Uxbridge,direct
+5350803.04,28,Pickering/Ajax/Uxbridge,direct
+5350803.05,28,Pickering/Ajax/Uxbridge,direct
+5350803.06,28,Pickering/Ajax/Uxbridge,direct
+5350804.01,28,Pickering/Ajax/Uxbridge,direct
+5350804.05,28,Pickering/Ajax/Uxbridge,direct
+5350804.06,28,Pickering/Ajax/Uxbridge,direct
+5350804.07,28,Pickering/Ajax/Uxbridge,direct
+5350804.08,28,Pickering/Ajax/Uxbridge,direct
+5350804.10,28,Pickering/Ajax/Uxbridge,direct
+5350804.11,28,Pickering/Ajax/Uxbridge,direct
+5350804.12,28,Pickering/Ajax/Uxbridge,direct
+5350804.13,28,Pickering/Ajax/Uxbridge,direct
+5350805.04,28,Pickering/Ajax/Uxbridge,direct
+5350805.06,28,Pickering/Ajax/Uxbridge,direct
+5350805.09,28,Pickering/Ajax/Uxbridge,direct
+5350805.10,28,Pickering/Ajax/Uxbridge,direct
+5350805.16,28,Pickering/Ajax/Uxbridge,direct
+5350805.17,28,Pickering/Ajax/Uxbridge,direct
+5350805.18,28,Pickering/Ajax/Uxbridge,direct
+5350805.19,28,Pickering/Ajax/Uxbridge,direct
+5350805.20,28,Pickering/Ajax/Uxbridge,direct
+5350805.21,28,Pickering/Ajax/Uxbridge,direct
+5350805.22,28,Pickering/Ajax/Uxbridge,direct
+5350805.23,28,Pickering/Ajax/Uxbridge,direct
+5350805.24,28,Pickering/Ajax/Uxbridge,direct
+5350805.25,28,Pickering/Ajax/Uxbridge,direct
+5350805.26,28,Pickering/Ajax/Uxbridge,direct
+5350805.27,28,Pickering/Ajax/Uxbridge,direct
+5350806.00,28,Pickering/Ajax/Uxbridge,direct
+5350807.00,28,Pickering/Ajax/Uxbridge,direct
+5350810.01,28,Pickering/Ajax/Uxbridge,direct
+5350810.02,28,Pickering/Ajax/Uxbridge,direct
+5350810.03,28,Pickering/Ajax/Uxbridge,direct
+5350810.04,28,Pickering/Ajax/Uxbridge,direct
+5350810.05,28,Pickering/Ajax/Uxbridge,direct
+5350811.00,28,Pickering/Ajax/Uxbridge,direct
+5350812.00,28,Pickering/Ajax/Uxbridge,direct
+5350820.03,28,Pickering/Ajax/Uxbridge,direct
+5350820.04,28,Pickering/Ajax/Uxbridge,direct
+5350820.05,28,Pickering/Ajax/Uxbridge,direct
+5350820.06,28,Pickering/Ajax/Uxbridge,direct
+5350820.07,28,Pickering/Ajax/Uxbridge,direct
+5350830.00,28,Pickering/Ajax/Uxbridge,direct
+5350831.01,28,Pickering/Ajax/Uxbridge,direct
+5350831.02,28,Pickering/Ajax/Uxbridge,direct
+5350832.00,28,Pickering/Ajax/Uxbridge,direct
+5320001.00,02,South Ward,direct
+5320002.01,02,South Ward,parent
+5320002.02,02,South Ward,parent
+5320002.03,02,South Ward,parent
+5320003.01,02,South Ward,parent
+5320003.02,02,South Ward,parent
+5320004.01,02,South Ward,parent
+5320004.02,02,South Ward,parent
+5320005.00,02,South Ward,direct
+5320006.00,02,South Ward,direct
+5320007.00,02,South Ward,direct
+5320008.01,02,South Ward,parent
+5320008.02,02,South Ward,parent
+5320008.03,02,South Ward,parent
+5320008.05,02,South Ward,parent
+5320008.06,02,South Ward,parent
+5320008.08,02,South Ward,parent
+5320008.09,02,South Ward,parent
+5320009.01,02,South Ward,direct
+5320009.02,02,South Ward,direct
+5320012.01,01,North Ward,parent
+5320012.02,01,North Ward,parent
+5320013.00,01,North Ward,direct
+5320014.01,01,North Ward,parent
+5320014.02,01,North Ward,parent
+5320015.02,01,North Ward,parent
+5320015.03,01,North Ward,parent
+5320015.04,01,North Ward,parent
+5320016.04,01,North Ward,parent
+5320016.05,01,North Ward,parent
+5320016.06,01,North Ward,parent
+5320016.07,01,North Ward,parent
+5320016.08,01,North Ward,parent
+5320101.02,01,North Ward,parent
+5320101.03,01,North Ward,parent
+5320101.04,01,North Ward,parent
+5320101.05,01,North Ward,parent
+5320101.06,01,North Ward,parent

@@ -30,7 +30,7 @@ type MapPayload = {
     };
     geography_type: "municipality" | "census_tract";
     data_quality: {
-      metric_status: "official" | "estimated" | "mixed";
+      metric_status: "official" | "estimated" | "mixed" | "zone";
       label: string;
     };
   };
@@ -469,6 +469,20 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(panel).toContainText("CMHC parent tract");
   });
 
+  test("census tract CMHC rent varies by survey zone, not flat per city", async ({ request }) => {
+    const response = await request.get(
+      `${API_BASE}/api/map-data?metric=average_rent_total&type=census_tract&detail=display`
+    );
+    expect(response.ok()).toBeTruthy();
+    const payload = (await response.json()) as MapPayload;
+
+    expect(payload.metadata.data_quality.metric_status).toBe("zone");
+
+    const toronto = payload.features.filter((f) => f.properties.name?.includes("Toronto census tract"));
+    const values = new Set(toronto.map((f) => (f.properties as Record<string, unknown>).value));
+    expect(values.size).toBeGreaterThan(5);
+  });
+
   test("a combined-zone municipality discloses its shared CMHC survey zone", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
@@ -515,7 +529,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(footer).toContainText("CMHC");
   });
 
-  test("CMHC rate metric in tract mode is labeled inherited, not allocated", async ({ page }) => {
+  test("CMHC rate metric in tract mode shows survey-zone badge", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Census tracts" }).click();
@@ -525,10 +539,8 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.getByLabel("Map metric").selectOption("average_rent_total");
     await expect(map).toHaveAttribute("data-metric", "average_rent_total");
 
-    // The badge must explain that the rent is the inherited municipal value
-    // (so identical values across a municipality's tracts are not seen as a bug).
     const badge = page.getByTestId("data-quality-badge").first();
-    await expect(badge).toContainText(/inherited|municipal/i);
+    await expect(badge).toContainText(/survey-zone/i);
     await expect(badge).not.toContainText(/allocation/i);
   });
 
