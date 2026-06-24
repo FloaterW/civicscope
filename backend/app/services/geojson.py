@@ -70,35 +70,49 @@ def simplify_geometry(geometry: dict[str, Any], tolerance: float) -> dict[str, A
 
 
 def _simplify_ring(ring: Ring, tolerance: float) -> Ring:
-    if len(ring) <= 5:
+    if len(ring) <= 20:
         return ring
 
     is_closed = ring[0] == ring[-1]
     working_ring = ring[:-1] if is_closed else ring
-    simplified = _radial_distance_simplify(working_ring, tolerance)
+    simplified = _douglas_peucker(working_ring, tolerance)
 
     if len(simplified) < 3:
-        simplified = working_ring[:3]
+        return ring
     if is_closed and simplified[0] != simplified[-1]:
         simplified = [*simplified, simplified[0]]
     return simplified
 
 
-def _radial_distance_simplify(points: Ring, tolerance: float) -> Ring:
+def _douglas_peucker(points: Ring, tolerance: float) -> Ring:
     if len(points) <= 2:
         return points
 
-    tolerance_sq = tolerance * tolerance
-    simplified = [points[0]]
-    previous = points[0]
+    max_dist = 0.0
+    max_index = 0
+    start = points[0]
+    end = points[-1]
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    line_len_sq = dx * dx + dy * dy
 
-    for point in points[1:]:
-        if ((point[0] - previous[0]) ** 2 + (point[1] - previous[1]) ** 2) >= tolerance_sq:
-            simplified.append(point)
-            previous = point
+    for i in range(1, len(points) - 1):
+        if line_len_sq == 0:
+            dist = ((points[i][0] - start[0]) ** 2 + (points[i][1] - start[1]) ** 2) ** 0.5
+        else:
+            t = max(0.0, min(1.0, ((points[i][0] - start[0]) * dx + (points[i][1] - start[1]) * dy) / line_len_sq))
+            proj_x = start[0] + t * dx
+            proj_y = start[1] + t * dy
+            dist = ((points[i][0] - proj_x) ** 2 + (points[i][1] - proj_y) ** 2) ** 0.5
+        if dist > max_dist:
+            max_dist = dist
+            max_index = i
 
-    if simplified[-1] != points[-1]:
-        simplified.append(points[-1])
-    return simplified
+    if max_dist > tolerance:
+        left = _douglas_peucker(points[: max_index + 1], tolerance)
+        right = _douglas_peucker(points[max_index:], tolerance)
+        return left[:-1] + right
+
+    return [points[0], points[-1]]
 
 
