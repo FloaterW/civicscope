@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:analyze": "ANALYZE=true next build",
+    "build:analyze": "cross-env ANALYZE=true next build",
     "clean:next": "node scripts/clean-next-cache.mjs",
     "demo:video": "node scripts/capture-demo-video.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
@@ -32,6 +32,7 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "^15.5.18",
     "postcss": "^8.4.49",

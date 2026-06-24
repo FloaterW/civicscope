@@ -82,8 +82,10 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
     const a = document.createElement("a");
     a.href = url;
     a.download = `civicscope-${geography.geoid}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }, [geography, metrics, cmhcMetrics, cmhcYear]);
   const hasAnySupplyData =
     cmhcMetrics?.housing_starts_total != null ||
@@ -422,7 +424,7 @@ function MetricLine({
         )}
         {cmhcSource === "estimated" && (
           <span
-            data-testid="estimated-flag"
+            data-testid="cmhc-estimated-flag"
             className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
             title="Estimated by allocating the parent municipality's total by renter-household share."
           >

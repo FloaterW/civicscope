@@ -7,6 +7,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://civicscope-gold.vercel.app"),
   title: "CivicScope — GTA Housing Affordability Monitor",
   description:
     "Interactive dashboard mapping rent burden, income, and CMHC housing data for 25 GTA municipalities and 1,334 census tracts.",

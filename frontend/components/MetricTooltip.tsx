@@ -1,7 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 const metricDefinitions: Record<string, { term: string; definition: string; source: string }> = {
   rent_burden_pct: {
@@ -103,9 +103,14 @@ export function MetricTooltip({ metricKey }: { metricKey: string }) {
 
 function InfoTooltip({ term, definition, source }: { term: string; definition: string; source: string }) {
   const [open, setOpen] = useState(false);
+  const [clickLocked, setClickLocked] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const tooltipId = useId();
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    setClickLocked(false);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -127,16 +132,25 @@ function InfoTooltip({ term, definition, source }: { term: string; definition: s
     <div ref={ref} className="relative inline-flex">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onClick={() => {
+          if (clickLocked) {
+            close();
+          } else {
+            setOpen(true);
+            setClickLocked(true);
+          }
+        }}
+        onMouseEnter={() => { if (!clickLocked) setOpen(true); }}
+        onMouseLeave={() => { if (!clickLocked) setOpen(false); }}
         className="inline-flex items-center justify-center rounded-full text-civic-muted transition hover:text-civic-teal focus:outline-none focus:ring-2 focus:ring-civic-teal focus:ring-offset-1"
         aria-label={`What is ${term}?`}
+        aria-describedby={open ? tooltipId : undefined}
       >
         <Info className="h-3.5 w-3.5" />
       </button>
       {open && (
         <div
+          id={tooltipId}
           role="tooltip"
           className="absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 rounded-lg border border-civic-line bg-civic-panel p-3 shadow-lg"
         >

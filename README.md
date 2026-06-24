@@ -434,7 +434,7 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 
 ## How this was built
 
-CivicScope was built with AI-assisted development (Claude Code) under my direction. I made the architecture and data-modeling decisions, set the data-provenance approach, and drove the data validation. That work included the investigation that uncovered a 2016-vs-2021 census-tract boundary mismatch in CMHC's published Starts & Completions data, and the fix that recovered real values for the affected tracts. Every metric value is verified against its official published source.
+I designed the architecture, data modeling, and provenance approach, and drove validation across all data layers. That work included the investigation that uncovered a 2016-vs-2021 census-tract boundary mismatch in CMHC's published Starts & Completions data, and the fix that recovered real values for the affected tracts. Every metric value is verified against its official published source.
 
 ## License
 
