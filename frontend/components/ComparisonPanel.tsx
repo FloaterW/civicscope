@@ -1,5 +1,7 @@
 "use client";
 
+import { Download } from "lucide-react";
+import { useCallback } from "react";
 import {
   Bar,
   BarChart,
@@ -21,7 +23,6 @@ type Props = {
   metric: MetricKey;
   geographyLevel: GeographyLevel;
   loading: boolean;
-  /** Override the year shown in the badge (e.g. CMHC year). */
   displayYear?: number;
 };
 
@@ -41,6 +42,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
         return {
           geoid: item.geoid,
           name: chartLabel(item.name, item.type, item.geoid),
+          fullName: item.name,
           value: rawValue,
           rawValue,
         };
@@ -51,25 +53,68 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   const minValue = values.length ? Math.min(...values) : 0;
   const maxValue = values.length ? Math.max(...values) : 0;
 
+  const handleExportCsv = useCallback(() => {
+    if (!comparison) return;
+    const metricLabel = getMetricLabel(metric);
+    const rows = [["Area", "Geoid", metricLabel, ...(isCmhc ? [] : ["Rent-to-income ratio"])]];
+    for (const item of comparison.items) {
+      const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, unknown>;
+      const val = allMetrics[metric];
+      const row = [
+        item.name,
+        item.geoid,
+        val != null ? String(val) : "",
+        ...(isCmhc ? [] : [item.metrics.rent_to_income_ratio != null ? String(item.metrics.rent_to_income_ratio) : ""])
+      ];
+      rows.push(row);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `civicscope-${metric}-${geographyLevel}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [comparison, metric, geographyLevel, isCmhc]);
+
   return (
     <div data-testid="comparison-panel" className="p-4">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-civic-ink">Comparison</h2>
           <p className="text-xs text-civic-muted">
             {getMetricLabel(metric)} across {comparisonNouns[geographyLevel]}
           </p>
         </div>
-        <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-          {displayYear ?? comparison?.year ?? "2021"}
-        </span>
+        <div className="flex items-center gap-2">
+          {hasChartData && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              aria-label="Export comparison data as CSV"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Export CSV
+            </button>
+          )}
+          <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
+            {displayYear ?? comparison?.year ?? "2021"}
+          </span>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="h-72 rounded-md border border-civic-line bg-slate-50 p-3">
+        <div className="h-72 rounded-md border border-civic-line bg-civic-subtle p-3">
           {loading && !hasChartData ? (
-            <div className="grid h-full place-items-center text-sm text-civic-muted">
-              Loading comparison...
+            <div className="flex h-full flex-col items-center justify-center gap-2">
+              <div className="skeleton h-4 w-48" />
+              <div className="flex w-full items-end justify-center gap-3 pt-4">
+                {[0.6, 0.85, 0.45, 0.7, 0.55].map((h, i) => (
+                  <div key={i} className="skeleton w-10" style={{ height: `${h * 140}px` }} />
+                ))}
+              </div>
             </div>
           ) : !hasChartData ? (
             <div className="grid h-full place-items-center text-sm text-civic-muted">
@@ -78,15 +123,21 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                <CartesianGrid stroke="#d8dee6" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} />
-                <YAxis tick={{ fontSize: 12 }} tickLine={false} width={54} />
+                <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} width={54} />
                 <Tooltip
                   formatter={(value, _name, item) => [
                     formatMetric(metric, item.payload.rawValue),
                     getMetricLabel(metric)
                   ]}
-                  labelStyle={{ color: "#18212f" }}
+                  contentStyle={{
+                    background: "var(--civic-panel)",
+                    border: "1px solid var(--civic-line)",
+                    borderRadius: "6px",
+                    color: "var(--civic-ink)"
+                  }}
+                  labelStyle={{ color: "var(--civic-ink)" }}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64}>
                   {chartData.map((item) => (
@@ -99,7 +150,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                     dataKey="value"
                     position="top"
                     formatter={(v: number) => formatMetric(metric, v)}
-                    style={{ fontSize: 11, fill: "#18212f" }}
+                    style={{ fontSize: 11, fill: "var(--chart-label)" }}
                   />
                 </Bar>
               </BarChart>
@@ -109,7 +160,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
 
         <div className="overflow-hidden rounded-md border border-civic-line">
           <table className="w-full border-collapse text-sm">
-            <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-civic-muted">
+            <thead className="bg-civic-subtle text-left text-xs uppercase tracking-wide text-civic-muted">
               <tr>
                 <th className="px-3 py-2 font-semibold">Area</th>
                 <th className="px-3 py-2 font-semibold">{getMetricLabel(metric)}</th>

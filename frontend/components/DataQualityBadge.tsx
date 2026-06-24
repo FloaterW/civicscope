@@ -6,9 +6,7 @@ import type { GeographyLevel } from "@/types";
 
 type Props = {
   geographyLevel: GeographyLevel;
-  /** When supplied (from API metadata), overrides the default label. */
   dataQualityLabel?: string;
-  /** "estimated"/"mixed" use amber; "zone" uses teal (real CMHC zone data). */
   metricStatus?: "official" | "estimated" | "mixed" | "zone";
 };
 
@@ -18,18 +16,18 @@ const qualityCopy: Record<
 > = {
   municipality: {
     label: "Official municipal metrics",
-    tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
     icon: BadgeCheck
   },
   census_tract: {
     label: "Official tract metrics",
-    tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
     icon: BadgeCheck
   }
 };
 
-const estimatedTone = "border-amber-200 bg-amber-50 text-amber-900";
-const zoneTone = "border-teal-200 bg-teal-50 text-teal-900";
+const estimatedTone = "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300";
+const zoneTone = "border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300";
 
 export function DataQualityBadge({ geographyLevel, dataQualityLabel, metricStatus }: Props) {
   const quality = qualityCopy[geographyLevel];

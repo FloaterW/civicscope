@@ -17,7 +17,7 @@ const options: Array<{ value: GeographyLevel; label: string }> = [
 export function GeographyLevelSelector({ value, onChange }: Props) {
   return (
     <div
-      className="flex items-center gap-1 rounded-md border border-civic-line bg-white p-1 shadow-panel"
+      className="flex items-center gap-1 rounded-md border border-civic-line bg-civic-panel p-1 shadow-panel"
       aria-label="Geography level"
     >
       <Layers className="ml-2 h-4 w-4 text-civic-muted" aria-hidden="true" />
@@ -30,8 +30,8 @@ export function GeographyLevelSelector({ value, onChange }: Props) {
             onClick={() => onChange(option.value)}
             className={`h-8 rounded px-3 text-sm font-medium transition ${
               isActive
-                ? "bg-civic-teal text-white"
-                : "text-civic-muted hover:bg-slate-50 hover:text-civic-ink"
+                ? "bg-civic-teal text-white dark:text-slate-900"
+                : "text-civic-muted hover:bg-civic-subtle hover:text-civic-ink"
             }`}
             aria-pressed={isActive}
           >

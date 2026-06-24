@@ -443,7 +443,7 @@ test.describe("CivicScope dashboard regressions", () => {
     // ...but the badge belongs ONLY to the Housing Construction section. The
     // census "Household & Housing Profile" fields are Statistics Canada values
     // and must NOT be mislabeled "CMHC tract data" (regression).
-    const censusSection = panel.locator("div", { hasText: "Household & Housing Profile" }).first();
+    const censusSection = panel.locator("[data-section='census']");
     await expect(censusSection.getByTestId("official-flag")).toHaveCount(0);
   });
 
