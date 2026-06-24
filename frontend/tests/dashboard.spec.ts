@@ -252,12 +252,9 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const select = page.getByLabel("Map metric");
     const optgroups = select.locator("optgroup");
-    // Census Profile, CMHC Rental Market, and a separate group for the two
-    // metrics CMHC does not supply (turnover / availability).
-    await expect(optgroups).toHaveCount(3);
+    await expect(optgroups).toHaveCount(2);
     await expect(optgroups.nth(0)).toHaveAttribute("label", "Census Profile");
     await expect(optgroups.nth(1)).toHaveAttribute("label", "CMHC Rental Market");
-    await expect(optgroups.nth(2)).toHaveAttribute("label", "Not surveyed (no data)");
 
     await select.selectOption("vacancy_rate");
     await expect(page.getByText("Vacancy rate by municipality")).toBeVisible();
@@ -545,17 +542,14 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(badge).not.toContainText(/allocation/i);
   });
 
-  test("a metric with no data shows an explicit empty state on the map", async ({ page }) => {
+  test("metric dropdown does not include unsupported metrics", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Census tracts" }).click();
-    const map = page.getByTestId("civic-map");
-    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
-
-    // turnover_rate is not collected in this dataset -> empty, not silently blank.
-    await page.getByLabel("Map metric").selectOption("turnover_rate");
-    await expect(map).toHaveAttribute("data-empty", "true", { timeout: 30000 });
-    await expect(page.getByTestId("map-empty-state")).toContainText("No data available");
+    const select = page.getByLabel("Map metric");
+    const options = select.locator("option");
+    const texts = await options.allTextContents();
+    expect(texts).not.toContain("Turnover rate");
+    expect(texts).not.toContain("Availability rate");
   });
 
   test("search with no matches shows a no-results message", async ({ page }) => {

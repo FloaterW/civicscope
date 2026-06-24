@@ -84,16 +84,15 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {[...heroCards, ...subCards].map((card, index) => {
+        {[...heroCards, ...subCards].map((card) => {
           const Icon = card.icon;
-          const isHero = index < heroCards.length;
           return (
             <div
               key={card.label}
-              className={`rounded-md border border-civic-line bg-civic-subtle p-3 ${isHero ? "border-l-[3px] border-l-civic-teal" : ""}`}
+              className="rounded-md border border-civic-line border-l-[3px] border-l-civic-teal bg-civic-subtle p-3"
             >
               <div className="flex items-center gap-1.5 text-xs font-medium text-civic-muted">
-                <Icon className={`h-3.5 w-3.5 shrink-0 ${isHero ? "text-civic-teal" : ""}`} aria-hidden="true" />
+                <Icon className="h-3.5 w-3.5 shrink-0 text-civic-teal" aria-hidden="true" />
                 {card.label}
                 <MetricTooltip metricKey={card.metricKey} />
               </div>

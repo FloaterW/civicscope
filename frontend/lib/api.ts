@@ -21,13 +21,6 @@ export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: s
   { key: "average_rent_total", label: "Average rent (CMHC)", shortLabel: "CMHC Rent", group: "CMHC Rental Market" },
   { key: "housing_starts_total", label: "Housing starts", shortLabel: "Starts", group: "CMHC Rental Market" },
   { key: "housing_completions", label: "Completions", shortLabel: "Compl.", group: "CMHC Rental Market" },
-  { key: "transit_score", label: "Transit access score", shortLabel: "Transit", group: "Transit Accessibility" },
-  { key: "transit_route_count", label: "Transit routes nearby", shortLabel: "Routes", group: "Transit Accessibility" },
-  // CMHC's RMS summary export does not include turnover or availability, so we
-  // have no values for them anywhere. Kept selectable but grouped apart so the
-  // empty result reads as "not in this dataset" rather than a broken map.
-  { key: "turnover_rate", label: "Turnover rate", shortLabel: "Turnover", group: "Not surveyed (no data)" },
-  { key: "availability_rate", label: "Availability rate", shortLabel: "Avail.", group: "Not surveyed (no data)" },
 ];
 
 export const CMHC_METRIC_KEYS: Set<MetricKey> = new Set([

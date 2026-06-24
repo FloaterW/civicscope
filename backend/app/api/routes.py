@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import csv
+import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, load_only
 
@@ -30,6 +33,25 @@ router = APIRouter(prefix="/api", tags=["civic data"])
 
 DEFAULT_GEOGRAPHY_TYPE = "municipality"
 SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
+
+_transit_routes_cache: dict[str, Any] | None = None
+
+
+def _load_transit_routes() -> dict[str, Any]:
+    global _transit_routes_cache
+    if _transit_routes_cache is not None:
+        return _transit_routes_cache
+    path = files("app.data").joinpath("transit_routes.geojson")
+    if path.is_file():
+        _transit_routes_cache = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        _transit_routes_cache = {"type": "FeatureCollection", "features": []}
+    return _transit_routes_cache
+
+
+@router.get("/transit-routes")
+def get_transit_routes() -> JSONResponse:
+    return JSONResponse(_load_transit_routes())
 
 # Count-based CMHC metrics are municipality-level totals. In census tract views
 # they are proportionally allocated by renter-household share and labeled as

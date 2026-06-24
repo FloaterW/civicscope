@@ -214,8 +214,6 @@ Supported metrics:
 - `units_under_construction`
 - `unabsorbed_units`
 - `rental_universe`
-- `turnover_rate`
-- `availability_rate`
 
 Aliases such as `rent_burden`, `income`, `rent`, and `growth` are accepted by the backend. CMHC metrics accept a `year` query parameter (2018–2025); census metrics are a single 2021 vintage and ignore `year`.
 
@@ -234,7 +232,9 @@ It also includes 1,334 packaged census tract features assigned to those municipa
 CMHC data is stored at municipality level, with two refinements for census tracts:
 
 - **Starts & Completions:** real CMHC census-tract values where published (1,244 of 1,334 tracts, ~93%), labeled `official` and validated against CMHC's published CMA totals during ETL. Toronto-CMA tracts match CMHC 1:1. For Oshawa/Hamilton, where CMHC still publishes on the pre-2021 (coarser) tract boundaries, a 2021 child tract inherits its real parent tract's value: `official` where the parent recorded zero, or `estimated_parent` (allocated among siblings by renter share, conserving the parent total exactly) where it was non-zero. Tracts with no CMHC data at all keep a municipal-share `estimated` allocation.
-- **Rate metrics** (vacancy, average rent, turnover, availability): not published at tract level, so inherited unchanged from the parent municipality and labeled as inherited.
+- **Rate metrics** (vacancy, average rent): not published at tract level, so inherited unchanged from the parent municipality and labeled as inherited.
+
+> **Note:** Turnover rate and availability rate are defined in the CMHC schema but CMHC's RMS summary export does not include values for them. These metrics are not exposed in the UI and contain no data. They may be populated in a future release if CMHC makes this data available.
 
 Current and planned sources:
 

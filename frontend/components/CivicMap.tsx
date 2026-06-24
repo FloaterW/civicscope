@@ -1,9 +1,9 @@
 "use client";
 
 import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { formatMetric, getMetricLabel } from "@/lib/api";
+import { API_BASE, formatMetric, getMetricLabel } from "@/lib/api";
 import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
 import { buildTooltipHtml, escapeHtml, safeJsonParse } from "@/lib/tooltip";
 import type { GeographyLevel, MapData, MapFeature, MetricFieldStatus, MetricKey, MetricQuality, MetricValues } from "@/types";
@@ -25,6 +25,9 @@ const selectedFillLayerId = "civic-geographies-selected-fill";
 const lineLayerId = "civic-geographies-line";
 const selectedLineLayerId = "civic-geographies-selected";
 const placeCircleLayerId = "gta-reference-places-circle";
+const transitSourceId = "transit-routes";
+const transitLineLayerId = "transit-routes-line";
+const transitLabelLayerId = "transit-routes-label";
 
 const referencePlaces = {
   type: "FeatureCollection",
@@ -58,10 +61,39 @@ const DARK_TILES = [
 const LIGHT_BG = "#eef2ed";
 const DARK_BG = "#0f172a";
 
+type TransitFilters = {
+  ttc_subway: boolean;
+  ttc_other: boolean;
+  go_transit: boolean;
+  miway: boolean;
+  durham_rt: boolean;
+};
+
+const TRANSIT_LAYERS = [
+  { key: "ttc_subway" as const, label: "TTC Subway", color: "#C23030", indent: true },
+  { key: "ttc_other" as const, label: "TTC Bus / Streetcar", color: "#888888", indent: true },
+  { key: "go_transit" as const, label: "GO Transit", color: "#5C8A4D" },
+  { key: "miway" as const, label: "MiWay", color: "#8C7356" },
+  { key: "durham_rt" as const, label: "Durham RT", color: "#7A6B8C" },
+] as const;
+
+const ALL_OFF: TransitFilters = { ttc_subway: false, ttc_other: false, go_transit: false, miway: false, durham_rt: false };
+const ALL_ON: TransitFilters = { ttc_subway: true, ttc_other: true, go_transit: true, miway: true, durham_rt: true };
+
+function buildTransitFilter(filters: TransitFilters): FilterSpecification | undefined {
+  const active = Object.entries(filters).filter(([, v]) => v).map(([k]) => k);
+  if (active.length === 0) return ["==", "transit_category", "__none__"];
+  if (active.length === Object.keys(filters).length) return undefined;
+  if (active.length === 1) return ["==", "transit_category", active[0]];
+  return ["in", "transit_category", ...active] as unknown as FilterSpecification;
+}
+
 export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const mapReadyRef = useRef(false);
+  const [transitOpen, setTransitOpen] = useState(false);
+  const [transitFilters, setTransitFilters] = useState<TransitFilters>({ ...ALL_OFF });
   const onSelectRef = useRef(onSelect);
   const popupRef = useRef<Popup | null>(null);
   // The hover handler is registered once at init; read the live metric from a
@@ -78,6 +110,20 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   const dataIsEmpty = Boolean(
     data && data.metadata.domain.min === null && data.metadata.domain.max === null
   );
+
+  const anyTransitOn = Object.values(transitFilters).some(Boolean);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current || !map.getLayer(transitLineLayerId)) return;
+    map.setLayoutProperty(transitLineLayerId, "visibility", anyTransitOn ? "visible" : "none");
+    const f = buildTransitFilter(transitFilters);
+    if (f) {
+      map.setFilter(transitLineLayerId, f);
+    } else {
+      map.setFilter(transitLineLayerId, null);
+    }
+  }, [transitFilters, anyTransitOn]);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -125,6 +171,10 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
             [placesSourceId]: {
               type: "geojson",
               data: referencePlaces as never
+            },
+            [transitSourceId]: {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] } as never
             }
           },
           layers: [
@@ -205,6 +255,26 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
                 "circle-stroke-color": "#117c78",
                 "circle-stroke-width": 2
               }
+            },
+            {
+              id: transitLineLayerId,
+              type: "line",
+              source: transitSourceId,
+              layout: {
+                "line-cap": "round",
+                "line-join": "round",
+                visibility: "none"
+              },
+              paint: {
+                "line-color": ["get", "color"],
+                "line-width": [
+                  "interpolate", ["linear"], ["zoom"],
+                  7, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 2, 0.8],
+                  10, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 4, 2],
+                  12, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 5.5, 3]
+                ],
+                "line-opacity": ["case", ["==", ["get", "transit_category"], "ttc_subway"], 0.9, 0.65]
+              } as never
             }
           ]
         }
@@ -232,6 +302,15 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       map.on("load", () => {
         mapReadyRef.current = true;
         fitToDataBounds(map, initialData, false);
+        fetch(`${API_BASE}/api/transit-routes`)
+          .then((r) => r.json())
+          .then((geojson) => {
+            const src = map.getSource(transitSourceId);
+            if (src && "setData" in src) {
+              (src as { setData: (d: never) => void }).setData(geojson as never);
+            }
+          })
+          .catch(() => {});
       });
 
       map.on("click", fillLayerId, (event) => {
@@ -266,6 +345,24 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       });
 
       map.on("mouseleave", fillLayerId, () => {
+        map.getCanvas().style.cursor = "";
+        popup.remove();
+      });
+
+      map.on("mousemove", transitLineLayerId, (event) => {
+        map.getCanvas().style.cursor = "pointer";
+        const feature = event.features?.[0];
+        if (!feature) { popup.remove(); return; }
+        const p = feature.properties ?? {};
+        const name = escapeHtml(String(p.route_long_name || p.route_name || ""));
+        const agency = escapeHtml(String(p.agency || ""));
+        const type = escapeHtml(String(p.route_type || ""));
+        popup.setLngLat(event.lngLat).setHTML(
+          `<div style="font-size:12px;line-height:1.4"><strong>${agency}</strong><br/>${p.route_name ? `Route ${escapeHtml(String(p.route_name))} — ` : ""}${name}<br/><span style="color:#6b7280">${type}</span></div>`
+        ).addTo(map);
+      });
+
+      map.on("mouseleave", transitLineLayerId, () => {
         map.getCanvas().style.cursor = "";
         popup.remove();
       });
@@ -390,7 +487,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         </div>
       )}
       {data && loading && loadedMetric !== metric && (
-        <div className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel/95 px-3 py-2 text-xs font-medium text-civic-ink shadow-panel">
+        <div className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs font-medium text-civic-ink shadow-panel backdrop-blur-sm">
           Updating map...
         </div>
       )}
@@ -398,7 +495,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         <div
           data-testid="map-empty-state"
           role="status"
-          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-civic-panel/95 px-3 py-2 text-center text-xs text-civic-muted shadow-panel"
+          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-center text-xs text-civic-muted shadow-panel backdrop-blur-sm"
         >
           No data available for {getMetricLabel(metric)} in this dataset.
         </div>
@@ -407,7 +504,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       {data && legend && (
         <div
           data-testid="map-legend"
-          className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel/95 px-3 py-2 text-xs shadow-panel"
+          className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
         >
           <div className="mb-1.5 font-semibold text-civic-ink">{getMetricLabel(metric)}</div>
           {legend.flat || legend.stops.length < 2 ? (
@@ -440,6 +537,108 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
               })}
             </ul>
           )}
+        </div>
+      )}
+      {data && (
+        <div className="absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1.5">
+          {transitOpen && (
+            <div className="animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm">
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <span className="font-semibold text-civic-ink">Transit Lines</span>
+                <button
+                  type="button"
+                  className="text-[10px] text-civic-muted hover:text-civic-ink"
+                  onClick={() => {
+                    const allOn = Object.values(transitFilters).every(Boolean);
+                    setTransitFilters({ ...(allOn ? ALL_OFF : ALL_ON) });
+                  }}
+                >
+                  {Object.values(transitFilters).every(Boolean) ? "Clear all" : "Select all"}
+                </button>
+              </div>
+              <fieldset className="space-y-1.5">
+                <legend className="sr-only">Transit line filters</legend>
+                <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-civic-muted">TTC</div>
+                {TRANSIT_LAYERS.filter((l) => l.key.startsWith("ttc")).map((layer) => (
+                  <label key={layer.key} className="flex cursor-pointer items-center gap-2 text-civic-muted hover:text-civic-ink">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={transitFilters[layer.key]}
+                      onChange={() => setTransitFilters((prev) => ({ ...prev, [layer.key]: !prev[layer.key] }))}
+                    />
+                    <span
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white"
+                      style={transitFilters[layer.key] ? { backgroundColor: layer.color } : undefined}
+                    >
+                      {transitFilters[layer.key] && (
+                        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M2.5 6l2.5 2.5 4.5-5" /></svg>
+                      )}
+                    </span>
+                    <span className="h-0.5 w-3 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
+                    {layer.label.replace("TTC ", "")}
+                  </label>
+                ))}
+                <div className="mb-1 mt-2.5 text-[10px] font-medium uppercase tracking-wider text-civic-muted">Regional</div>
+                {TRANSIT_LAYERS.filter((l) => !l.key.startsWith("ttc")).map((layer) => (
+                  <label key={layer.key} className="flex cursor-pointer items-center gap-2 text-civic-muted hover:text-civic-ink">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={transitFilters[layer.key]}
+                      onChange={() => setTransitFilters((prev) => ({ ...prev, [layer.key]: !prev[layer.key] }))}
+                    />
+                    <span
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white"
+                      style={transitFilters[layer.key] ? { backgroundColor: layer.color } : undefined}
+                    >
+                      {transitFilters[layer.key] && (
+                        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M2.5 6l2.5 2.5 4.5-5" /></svg>
+                      )}
+                    </span>
+                    <span className="h-0.5 w-3 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
+                    {layer.label}
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (!transitOpen) {
+                setTransitOpen(true);
+                if (!anyTransitOn) setTransitFilters({ ...ALL_ON });
+              } else {
+                setTransitOpen(false);
+                setTransitFilters({ ...ALL_OFF });
+              }
+            }}
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel transition-colors ${
+              anyTransitOn
+                ? "border-civic-teal bg-civic-teal text-white"
+                : "border-civic-line bg-civic-panel text-civic-muted hover:text-civic-ink"
+            }`}
+            aria-pressed={anyTransitOn}
+            title={transitOpen ? "Hide transit lines" : "Show transit lines"}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5"
+            >
+              <rect x="4" y="3" width="16" height="18" rx="2" />
+              <path d="M12 3v18" />
+              <path d="M4 9h16" />
+              <path d="M4 15h16" />
+            </svg>
+            Transit
+          </button>
         </div>
       )}
     </div>
