@@ -1,7 +1,7 @@
 "use client";
 
 import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { formatMetric, getMetricLabel } from "@/lib/api";
 import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
@@ -39,6 +39,24 @@ const referencePlaces = {
     { type: "Feature", geometry: { type: "Point", coordinates: [-79.8711, 43.3255] }, properties: { name: "Burlington" } }
   ]
 };
+
+function isDarkMode(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.classList.contains("dark");
+}
+
+const LIGHT_TILES = [
+  "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+  "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+  "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+];
+const DARK_TILES = [
+  "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+];
+const LIGHT_BG = "#eef2ed";
+const DARK_BG = "#0f172a";
 
 export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -83,6 +101,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         return;
       }
 
+      const dark = isDarkMode();
       const map = new maplibregl.Map({
         container: containerRef.current,
         center: [-79.45, 43.78],
@@ -95,11 +114,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
           sources: {
             [basemapSourceId]: {
               type: "raster",
-              tiles: [
-                "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-                "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-                "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
-              ],
+              tiles: dark ? DARK_TILES : LIGHT_TILES,
               tileSize: 256,
               attribution: "OpenStreetMap contributors, CARTO"
             },
@@ -117,7 +132,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
               id: "background",
               type: "background",
               paint: {
-                "background-color": "#eef2ed"
+                "background-color": dark ? DARK_BG : LIGHT_BG
               }
             },
             {
@@ -324,6 +339,28 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       );
     }
   }, [data, selectedGeoid]);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const map = mapRef.current;
+      if (!map || !mapReadyRef.current) return;
+      const dark = isDarkMode();
+      const source = map.getSource(basemapSourceId);
+      if (source && "setTiles" in source) {
+        (source as { setTiles: (tiles: string[]) => void }).setTiles(
+          dark ? DARK_TILES : LIGHT_TILES
+        );
+      }
+      if (map.getLayer("background")) {
+        map.setPaintProperty("background", "background-color", dark ? DARK_BG : LIGHT_BG);
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div

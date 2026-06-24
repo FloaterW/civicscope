@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, MousePointerClick, X } from "lucide-react";
+import { Download, MapPin, MousePointerClick, X } from "lucide-react";
+import { useCallback } from "react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
 import type {
@@ -14,6 +15,7 @@ import type {
 } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
+import { MetricTooltip } from "./MetricTooltip";
 
 type Props = {
   geography: Geography | null;
@@ -49,6 +51,40 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
   const hasAnyRentalData = cmhcMetrics ? rentalMarketMetrics.some((m) => cmhcMetrics[m.key] != null) : false;
+
+  const handleExportCsv = useCallback(() => {
+    if (!geography || !metrics) return;
+    const rows: string[][] = [["Metric", "Value", "Source"]];
+    const add = (label: string, value: string | number | null | undefined, source: string) => {
+      rows.push([label, value != null ? String(value) : "", source]);
+    };
+    add("Median household income", metrics.median_income, "2021 Census");
+    add("Median rent", metrics.median_rent, "2021 Census");
+    add("Rent burden", metrics.rent_burden_pct, "2021 Census");
+    add("Population growth", metrics.population_growth_pct, "2021 Census");
+    add("Population", metrics.population, "2021 Census");
+    add("Affordability index", metrics.affordability_index, "2021 Census");
+    if (cmhcMetrics) {
+      for (const m of rentalMarketMetrics) {
+        const v = cmhcMetrics[m.key];
+        if (v != null && typeof v === "number") add(m.label, v, `CMHC RMS ${cmhcYear ?? ""}`);
+      }
+      for (const m of rentByUnitMetrics) {
+        const v = cmhcMetrics[m.key];
+        if (v != null && typeof v === "number") add(m.label, v, `CMHC RMS ${cmhcYear ?? ""}`);
+      }
+      if (cmhcMetrics.housing_starts_total != null) add("Housing starts", cmhcMetrics.housing_starts_total, `CMHC ${cmhcYear ?? ""}`);
+      if (cmhcMetrics.housing_completions != null) add("Housing completions", cmhcMetrics.housing_completions, `CMHC ${cmhcYear ?? ""}`);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `civicscope-${geography.geoid}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [geography, metrics, cmhcMetrics, cmhcYear]);
   const hasAnySupplyData =
     cmhcMetrics?.housing_starts_total != null ||
     cmhcMetrics?.housing_completions != null ||
@@ -79,14 +115,25 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           </div>
         </div>
         {geography && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="rounded-md border border-civic-line p-2 text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
-            aria-label="Clear selected geography"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              aria-label="Export geography data as CSV"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded-md border border-civic-line p-2 text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              aria-label="Clear selected geography"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -96,12 +143,12 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           <div className="mt-4" data-section="census">
             <SectionHeader title="Household & Housing Profile" period="2021 Census" />
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} status={quality?.median_income} />
-              <MetricLine label="Median rent" value={formatMetric("median_rent", metrics?.median_rent)} status={quality?.median_rent} />
-              <MetricLine label="Rent burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} status={quality?.rent_burden_pct} />
-              <MetricLine label="Pop. growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} status={quality?.population_growth_pct} />
-              <MetricLine label="Population" value={formatMetric("population", metrics?.population)} status={quality?.population} />
-              <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} status={quality?.affordability_index} />
+              <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} status={quality?.median_income} metricKey="median_income" />
+              <MetricLine label="Median rent" value={formatMetric("median_rent", metrics?.median_rent)} status={quality?.median_rent} metricKey="median_rent" />
+              <MetricLine label="Rent burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} status={quality?.rent_burden_pct} metricKey="rent_burden_pct" />
+              <MetricLine label="Pop. growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} status={quality?.population_growth_pct} metricKey="population_growth_pct" />
+              <MetricLine label="Population" value={formatMetric("population", metrics?.population)} status={quality?.population} metricKey="population" />
+              <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} status={quality?.affordability_index} metricKey="affordability_index" />
             </div>
             {quality?.rent_burden_pct === "estimated" && (
               <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-400">
@@ -144,11 +191,13 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                       label="Starts"
                       value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)}
                       cmhcSource={cmhcSourceFor(cmhcMetrics.starts_source, geographyLevel)}
+                      metricKey="housing_starts_total"
                     />
                     <MetricLine
                       label="Completions"
                       value={formatMetric("housing_completions", cmhcMetrics.housing_completions)}
                       cmhcSource={cmhcSourceFor(cmhcMetrics.completions_source, geographyLevel)}
+                      metricKey="housing_completions"
                     />
                     <MetricLine label="Under const." value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
                     <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
@@ -232,7 +281,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       {marketFields.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 text-sm">
           {marketFields.map((m) => (
-            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} />
+            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} metricKey={m.metricKey} />
           ))}
           {hasUniverse && (
             <MetricLine
@@ -318,16 +367,21 @@ function MetricLine({
   label,
   value,
   status,
-  cmhcSource
+  cmhcSource,
+  metricKey
 }: {
   label: string;
   value: string;
   status?: MetricFieldStatus;
   cmhcSource?: CmhcCountSource;
+  metricKey?: string;
 }) {
   return (
     <div className="rounded-md border border-civic-line bg-civic-panel px-3 py-2">
-      <span className="block text-xs text-civic-muted">{label}</span>
+      <span className="flex items-center gap-1 text-xs text-civic-muted">
+        {label}
+        {metricKey && <MetricTooltip metricKey={metricKey} />}
+      </span>
       <span className="mt-1 block text-base font-semibold text-civic-ink">
         {value}
         {status === "estimated" && (

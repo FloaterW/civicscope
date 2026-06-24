@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { formatMetric } from "@/lib/api";
 import type { GeographyLevel, Summary } from "@/types";
+import { MetricTooltip } from "./MetricTooltip";
 
 type Props = {
   summary: Summary | null;
@@ -26,11 +27,13 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const heroCards = useMemo(() => [
     {
       label: "Rent burden",
+      metricKey: "rent_burden_pct",
       value: formatMetric("rent_burden_pct", summary?.rent_burden_pct),
       icon: Percent
     },
     {
       label: "Affordability",
+      metricKey: "affordability_index",
       value: formatMetric("affordability_index", summary?.affordability_index),
       icon: Gauge
     }
@@ -38,21 +41,25 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const subCards = useMemo(() => [
     {
       label: "Median income",
+      metricKey: "median_income",
       value: formatMetric("median_income", summary?.median_income),
       icon: WalletCards
     },
     {
       label: "Median rent",
+      metricKey: "median_rent",
       value: formatMetric("median_rent", summary?.median_rent),
       icon: Home
     },
     {
       label: "Rent-to-income",
+      metricKey: "rent_to_income_ratio",
       value: formatMetric("rent_to_income_ratio", summary?.rent_to_income_ratio),
       icon: TrendingUp
     },
     {
       label: "Population",
+      metricKey: "population",
       value: formatMetric("population", summary?.population),
       icon: Users
     }
@@ -77,32 +84,18 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {heroCards.map((card) => {
+        {[...heroCards, ...subCards].map((card, index) => {
           const Icon = card.icon;
+          const isHero = index < heroCards.length;
           return (
             <div
               key={card.label}
-              className="rounded-md border border-civic-line border-l-4 border-l-civic-teal bg-civic-surface p-3"
+              className={`rounded-md border border-civic-line bg-civic-subtle p-3 ${isHero ? "border-l-[3px] border-l-civic-teal" : ""}`}
             >
-              <div className="flex items-center gap-2 text-xs font-medium text-civic-muted">
-                <Icon className="h-4 w-4 shrink-0 text-civic-teal" aria-hidden="true" />
+              <div className="flex items-center gap-1.5 text-xs font-medium text-civic-muted">
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${isHero ? "text-civic-teal" : ""}`} aria-hidden="true" />
                 {card.label}
-              </div>
-              <div className="mt-1 min-h-9 text-3xl font-semibold tracking-tight text-civic-ink">
-                {loading ? <Skeleton className="h-9 w-24" /> : card.value}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {subCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div key={card.label} className="min-h-[70px] rounded-md border border-civic-line bg-civic-subtle p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-civic-muted">
-                <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {card.label}
+                <MetricTooltip metricKey={card.metricKey} />
               </div>
               <div className="mt-1 min-h-6 text-lg font-semibold text-civic-ink">
                 {loading ? <Skeleton className="h-6 w-16" /> : card.value}

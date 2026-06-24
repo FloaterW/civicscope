@@ -45,3 +45,13 @@ class Settings:
 
 
 settings = Settings()
+
+
+def validate_environment() -> list[str]:
+    """Return warnings for missing or unusual configuration."""
+    warnings: list[str] = []
+    if settings.app_env == "production" and settings.force_reseed:
+        warnings.append("FORCE_RESEED is enabled in production — data will be rewritten on every restart")
+    if settings.app_env == "production" and "localhost" in str(settings.cors_origins):
+        warnings.append("CORS_ORIGINS includes localhost in production")
+    return warnings

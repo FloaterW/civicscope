@@ -1,4 +1,4 @@
-.PHONY: up down logs backend-dev frontend-dev backend-test frontend-build frontend-e2e db-upgrade seed load-geo load-geo-seed load-census-url load-census-official load-census-seed load-census clean
+.PHONY: up down logs backend-dev frontend-dev test lint build backend-test frontend-test frontend-build frontend-e2e db-upgrade seed load-geo load-geo-seed load-census-url load-census-official load-census-seed load-census clean
 
 up:
 	docker compose up --build
@@ -9,14 +9,30 @@ down:
 logs:
 	docker compose logs -f
 
+# --- Development ---
+
 backend-dev:
 	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 frontend-dev:
 	cd frontend && npm run dev
 
+# --- Testing ---
+
+test: backend-test frontend-test
+	@echo "All tests passed."
+
+lint:
+	cd frontend && npm run typecheck && npm run lint
+
+build:
+	cd frontend && npm run build
+
 backend-test:
 	cd backend && pytest
+
+frontend-test:
+	cd frontend && npm run test:unit
 
 frontend-build:
 	cd frontend && npm run typecheck && npm run build

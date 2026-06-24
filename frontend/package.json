@@ -5,10 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:analyze": "ANALYZE=true next build",
     "clean:next": "node scripts/clean-next-cache.mjs",
     "demo:video": "node scripts/capture-demo-video.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "start": "next start",
+    "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint ."
@@ -22,7 +24,9 @@
     "recharts": "^2.15.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/eslintrc": "^3.3.5",
+    "@next/bundle-analyzer": "^16.2.9",
     "@playwright/test": "^1.59.1",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
@@ -32,6 +36,7 @@
     "eslint-config-next": "^15.5.18",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.9"
   }
 }

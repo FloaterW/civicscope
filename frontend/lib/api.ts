@@ -44,7 +44,6 @@ export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      cache: "no-store",
       signal
     });
   } catch (error) {

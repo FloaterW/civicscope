@@ -4,6 +4,7 @@ A geospatial analytics dashboard for exploring housing affordability, income, an
 
 [![CI](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml/badge.svg)](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![API Docs](https://img.shields.io/badge/API-OpenAPI%20Docs-009688)](https://civicscope.onrender.com/docs)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.11x-009688)
 ![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-316192)
@@ -349,34 +350,35 @@ docker compose exec db psql -U civicscope -d civicscope -c "SELECT version_num F
 
 ## Testing
 
-Backend:
+Run everything:
 
 ```bash
-cd backend
-pytest
+make test          # backend pytest + frontend vitest
+make lint          # typecheck + eslint
+make frontend-e2e  # Playwright browser tests (needs backend running)
 ```
 
-Frontend:
+Or individually:
 
 ```bash
-cd frontend
-npm run typecheck
-npm run lint
-npm run build
+cd backend && pytest                   # 113 backend tests
+cd frontend && npm run test:unit       # 20 Vitest unit tests
+cd frontend && npm run test:e2e        # 35 Playwright e2e tests (incl. axe-core a11y audit)
+cd frontend && npm run typecheck       # TypeScript strict mode
+cd frontend && npm run lint            # ESLint
 ```
 
-Browser regression tests:
+**Test coverage highlights:**
 
-```bash
-cd frontend
-npx playwright install chromium
-npm run test:e2e
-```
+- **113 backend tests** covering API endpoints, provenance flags, CMHC allocation logic, metric calculations, and data validation
+- **35 Playwright e2e tests** covering map rendering, metric selection, search, comparison, data quality badges, and accessibility
+- **20 Vitest unit tests** for metric formatting, labeling, and CMHC metric classification
+- **axe-core WCAG 2.0 AA audit** runs in CI — zero critical or serious violations
+- **Rate limiting** at 60 req/min per IP via slowapi
 
-The Playwright suite expects the backend API to be running at `NEXT_PUBLIC_API_URL` or `http://127.0.0.1:8000`.
-It starts a separate Next.js test server on port `3101` by default so it does not conflict with the normal local dashboard port. To run against an already-running dashboard (e.g. the Docker frontend on `3102`), pass `PLAYWRIGHT_PORT=3102`.
+The Playwright suite expects the backend API running at `NEXT_PUBLIC_API_URL` or `http://127.0.0.1:8000`. It starts its own Next.js server on port `3101`. To run against Docker, pass `PLAYWRIGHT_PORT=3102`.
 
-Continuous integration (`.github/workflows/ci.yml`) runs backend `pytest`, frontend typecheck/lint/build, and the Playwright suite against a freshly-seeded backend. It runs on every branch push and pull request, so regressions are caught before they reach `main`.
+CI (`.github/workflows/ci.yml`) runs backend pytest, frontend typecheck/lint/build, Vitest unit tests, and Playwright e2e against a freshly-seeded backend on every push and PR.
 
 Screenshot generation:
 
@@ -408,6 +410,18 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 - Designed ETL-ready civic data workflows for Statistics Canada municipal and census tract boundary loading, Census Profile metric normalization, PostGIS geometry indexing, and GeoJSON API delivery for interactive map visualizations.
 - Engineered a field-level data-provenance model that ingests real CMHC census-tract data validated against the agency's own published totals, and labels every metric `official` / `estimated` / `unavailable` so the UI never presents an estimate as fact.
 - Implemented production-style API, database, CI (GitHub Actions gating every push), testing, and Docker workflows for a public-sector analytics dashboard used to compare housing affordability across regions.
+
+## Performance & Security
+
+- **Next.js standalone output** with tree-shaking; heavy components (`ComparisonPanel`, `DetailPanel`) are code-split via `next/dynamic`
+- **Tailwind CSS** (zero-runtime CSS-in-JS); no client-side style injection overhead
+- **GZip compression** on all API responses via Starlette middleware
+- **HTTP caching** — `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` on census data endpoints (2021 data is immutable)
+- **Geometry simplification** — map GeoJSON is simplified server-side (radial distance) and rounded to 5 decimal places, reducing payload ~60% vs. raw StatCan boundaries
+- **PostGIS spatial indexing** — GiST index on `geographies.geom` for efficient spatial queries
+- **Rate limiting** — 60 requests/minute per IP via slowapi
+- **Security headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, CORS locked to configured origins
+- **Bundle analysis** available via `npm run build:analyze` (`@next/bundle-analyzer`)
 
 ## Current Limitations
 

@@ -1,21 +1,32 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import logging
+
 from app.api.routes import router as api_router
-from app.core.config import settings
+from app.core.config import settings, validate_environment
 from app.db.init_db import init_db
 from app.db.session import SessionLocal, get_db
 from app.services.seed import seed_cmhc_data, seed_cmhc_tract_data, seed_demo_data
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
 
 def create_app(auto_initialize: bool = True) -> FastAPI:
+    logger = logging.getLogger("civicscope")
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        for warning in validate_environment():
+            logger.warning(warning)
         if auto_initialize:
             init_db()
             if settings.seed_on_startup:
@@ -38,6 +49,9 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -46,6 +60,15 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
         allow_headers=["Accept", "Accept-Language", "Content-Type"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    CACHEABLE_PREFIXES = ("/api/map-data", "/api/summary", "/api/compare", "/api/metrics")
+
+    @app.middleware("http")
+    async def cache_control(request: Request, call_next):
+        response: Response = await call_next(request)
+        if request.method == "GET" and request.url.path.startswith(CACHEABLE_PREFIXES):
+            response.headers.setdefault("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
+        return response
 
     @app.get("/health", tags=["system"])
     def health(db: Session = Depends(get_db)):

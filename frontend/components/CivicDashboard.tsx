@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, ChevronUp, Database, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getComparison,
@@ -22,9 +22,18 @@ import type {
   Summary
 } from "@/types";
 
-import { ComparisonPanel } from "./ComparisonPanel";
+import dynamic from "next/dynamic";
+
+const ComparisonPanel = dynamic(
+  () => import("./ComparisonPanel").then((m) => m.ComparisonPanel),
+  { ssr: false }
+);
+const DetailPanel = dynamic(
+  () => import("./DetailPanel").then((m) => m.DetailPanel),
+  { ssr: false }
+);
+
 import { DataQualityBadge } from "./DataQualityBadge";
-import { DetailPanel } from "./DetailPanel";
 import { GeographyLevelSelector } from "./GeographyLevelSelector";
 import { MetricSelector } from "./MetricSelector";
 import { CivicMap } from "./CivicMap";
@@ -70,6 +79,8 @@ export function CivicDashboard() {
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [comparisonLoading, setComparisonLoading] = useState(true);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [searchHighlight, setSearchHighlight] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
   const isCmhc = isCmhcMetric(metric);
@@ -239,6 +250,7 @@ export function CivicDashboard() {
       searchGeographies(search, geographyLevel, controller.signal)
         .then((payload) => {
           setSearchResults(payload.items);
+          setSearchHighlight(-1);
           setSearchLoading(false);
         })
         .catch((err: unknown) => {
@@ -274,25 +286,71 @@ export function CivicDashboard() {
     setMobilePanelOpen(true);
   }
 
+  const selectSearchResult = useCallback(
+    (geography: Geography) => {
+      setSelected(geography);
+      setSearch(geography.name);
+      setSearchHighlight(-1);
+      const feature = mapData?.features.find(
+        (f) => f.properties.geoid === geography.geoid
+      );
+      setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
+      setSelectedCmhcYear(feature?.properties.cmhc_year);
+      setMobilePanelOpen(true);
+    },
+    [mapData]
+  );
+
+  const visibleResults = searchResults.slice(0, 8);
+  const searchOpen =
+    visibleResults.length > 0 && Boolean(search.trim()) && search !== selected?.name;
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (!searchOpen) return;
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        setSearchHighlight((i) => (i < visibleResults.length - 1 ? i + 1 : 0));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        setSearchHighlight((i) => (i > 0 ? i - 1 : visibleResults.length - 1));
+        break;
+      case "Enter":
+        event.preventDefault();
+        if (searchHighlight >= 0 && searchHighlight < visibleResults.length) {
+          selectSearchResult(visibleResults[searchHighlight]);
+        }
+        break;
+      case "Escape":
+        event.preventDefault();
+        setSearch("");
+        setSearchResults([]);
+        setSearchHighlight(-1);
+        searchInputRef.current?.blur();
+        break;
+    }
+  }
+
   return (
     <main data-testid="dashboard-root" className="min-h-screen bg-civic-surface">
       <header className="border-b border-civic-line bg-civic-panel">
-        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-civic-teal text-white dark:text-slate-900">
-              <Database className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-civic-teal">
-                CivicScope
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-civic-teal text-white dark:text-slate-900">
+                <Database className="h-3.5 w-3.5" aria-hidden="true" />
               </div>
-              <h1 className="text-2xl font-semibold leading-tight text-civic-ink">
-                Greater Toronto Housing Affordability Monitor
-              </h1>
-              <p className="mt-0.5 text-sm text-civic-muted">
-                Rent burden, income, and CMHC housing data for 25 GTA municipalities and 1,334 census tracts.
-              </p>
+              <span className="text-xs font-semibold uppercase tracking-wider text-civic-teal">
+                CivicScope
+              </span>
             </div>
+            <h1 className="text-xl font-semibold leading-tight text-civic-ink lg:text-2xl">
+              Greater Toronto Housing Affordability Monitor
+            </h1>
+            <p className="text-xs text-civic-muted lg:text-sm">
+              Rent burden, income, and CMHC housing data for 25 GTA municipalities and 1,334 census tracts.
+            </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <div className="relative w-full sm:w-80">
@@ -301,42 +359,47 @@ export function CivicDashboard() {
                 aria-hidden="true"
               />
               <input
+                ref={searchInputRef}
                 value={search}
                 onChange={(event) => {
                   const next = event.target.value;
                   setSearch(next);
+                  setSearchHighlight(-1);
                   if (next.trim()) {
                     setSearchLoading(true);
                   }
                 }}
+                onKeyDown={handleSearchKeyDown}
                 placeholder={geographyLabel.search}
                 data-testid="geography-search"
                 role="combobox"
                 aria-label="Search geographies"
-                aria-expanded={searchResults.length > 0 && Boolean(search.trim()) && search !== selected?.name}
+                aria-expanded={searchOpen}
                 aria-controls="geography-search-results"
                 aria-autocomplete="list"
+                aria-activedescendant={
+                  searchOpen && searchHighlight >= 0
+                    ? `search-option-${visibleResults[searchHighlight]?.geoid}`
+                    : undefined
+                }
                 className="h-10 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2"
               />
-              {searchResults.length > 0 && search.trim() && search !== selected?.name && (
+              {searchOpen && (
                 <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-civic-panel shadow-panel">
-                  {searchResults.slice(0, 8).map((geography) => (
+                  {visibleResults.map((geography, index) => (
                     <button
                       key={geography.geoid}
+                      id={`search-option-${geography.geoid}`}
                       type="button"
                       role="option"
-                      aria-selected={selected?.geoid === geography.geoid}
-                      onClick={() => {
-                        setSelected(geography);
-                        setSearch(geography.name);
-                        const feature = mapData?.features.find(
-                          (f) => f.properties.geoid === geography.geoid
-                        );
-                        setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
-                        setSelectedCmhcYear(feature?.properties.cmhc_year);
-                        setMobilePanelOpen(true);
-                      }}
-                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition hover:bg-civic-subtle"
+                      aria-selected={index === searchHighlight}
+                      onClick={() => selectSearchResult(geography)}
+                      onMouseEnter={() => setSearchHighlight(index)}
+                      className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition ${
+                        index === searchHighlight
+                          ? "bg-civic-teal/10 dark:bg-civic-teal/20"
+                          : "hover:bg-civic-subtle"
+                      }`}
                     >
                       <span className="font-medium text-civic-ink">{geography.name}</span>
                       <span className="text-xs text-civic-muted">{geography.geoid}</span>
@@ -355,6 +418,11 @@ export function CivicDashboard() {
                     : `No ${geographyLabel.plural} match "${search.trim()}".`}
                 </div>
               )}
+              <div className="sr-only" aria-live="polite" aria-atomic="true">
+                {searchOpen
+                  ? `${visibleResults.length} result${visibleResults.length === 1 ? "" : "s"} available. Use arrow keys to navigate.`
+                  : ""}
+              </div>
             </div>
             <GeographyLevelSelector value={geographyLevel} onChange={handleGeographyLevelChange} />
             <MetricSelector value={metric} onChange={setMetric} />

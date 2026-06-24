@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -588,6 +589,20 @@ test.describe("CivicScope dashboard regressions", () => {
     const map = page.getByTestId("civic-map");
     await expect(map).toHaveAttribute("role", "region");
     await expect(map).toHaveAttribute("aria-label", /map of .+ by/i);
+  });
+
+  test("no critical or serious accessibility violations on initial load", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+    const results = await new AxeBuilder({ page })
+      .exclude("[data-testid='map-canvas-host']")
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    const serious = results.violations.filter(
+      (v) => v.impact === "critical" || v.impact === "serious"
+    );
+    expect(serious, `Accessibility violations: ${JSON.stringify(serious, null, 2)}`).toHaveLength(0);
   });
 });
 
