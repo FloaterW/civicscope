@@ -16,7 +16,7 @@ from app.api.routes import router as api_router
 from app.core.config import settings, validate_environment
 from app.db.init_db import init_db
 from app.db.session import SessionLocal, get_db
-from app.services.seed import seed_cmhc_data, seed_cmhc_tract_data, seed_demo_data
+from app.services.seed import seed_cmhc_data, seed_cmhc_tract_data, seed_demo_data, seed_transit_scores
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
@@ -36,6 +36,7 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
                     seed_demo_data(db, force=settings.force_reseed)
                     seed_cmhc_data(db, force=settings.force_reseed)
                     seed_cmhc_tract_data(db, force=settings.force_reseed)
+                    seed_transit_scores(db, force=settings.force_reseed)
                 except Exception:
                     db.rollback()
                     raise

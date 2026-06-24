@@ -87,6 +87,18 @@ const metricDefinitions: Record<string, { term: string; definition: string; sour
     definition:
       "The total count of private purpose-built rental units in structures with three or more units, as surveyed by CMHC. Excludes condos rented in the secondary market, social housing not captured in the survey frame, and rented single/semi-detached homes.",
     source: "CMHC Rental Market Survey (RMS), Housing Market Information Portal"
+  },
+  transit_score: {
+    term: "Transit access score",
+    definition:
+      "A 0-100 index measuring transit service density near each census tract. Counts unique transit routes (bus, rail, streetcar) within 800m of the tract boundary, then normalizes across all GTA tracts using decile clamping. Higher scores indicate more transit options.",
+    source: "Derived from GTFS static feeds: TTC, GO Transit, MiWay, Brampton Transit, Durham Region Transit"
+  },
+  transit_route_count: {
+    term: "Transit routes nearby",
+    definition:
+      "The number of unique transit routes with at least one stop within 800m of the census tract boundary. Includes bus, streetcar, subway, and commuter rail routes from all GTA transit agencies.",
+    source: "Derived from GTFS static feeds: TTC, GO Transit, MiWay, Brampton Transit, Durham Region Transit"
   }
 };
 

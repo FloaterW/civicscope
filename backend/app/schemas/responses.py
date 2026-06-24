@@ -22,6 +22,8 @@ class MetricResponse(BaseModel):
     dwellings_apt_low_rise: int | None = None
     dwellings_apt_high_rise: int | None = None
     owner_households: int | None = None
+    transit_route_count: int | None = None
+    transit_score: float | None = None
     data_quality: dict[str, str] | None = None
 
     model_config = ConfigDict(from_attributes=True)

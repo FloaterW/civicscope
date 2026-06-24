@@ -24,7 +24,9 @@ export type MetricKey =
   | "housing_starts_apartment"
   | "housing_completions"
   | "units_under_construction"
-  | "unabsorbed_units";
+  | "unabsorbed_units"
+  | "transit_route_count"
+  | "transit_score";
 
 export type GeoJsonGeometry = {
   type: string;
@@ -64,6 +66,8 @@ export type MetricValues = {
   dwellings_apt_low_rise: number | null;
   dwellings_apt_high_rise: number | null;
   owner_households: number | null;
+  transit_route_count: number | null;
+  transit_score: number | null;
   /** Field-level provenance flags (official / estimated / unavailable / low_confidence). */
   data_quality?: MetricQuality;
 };

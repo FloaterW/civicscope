@@ -301,6 +301,54 @@ def _cmhc_tract_content_changed(
     return db_fp != seed_fp
 
 
+def load_transit_scores() -> list[dict[str, Any]]:
+    path = files("app.data").joinpath("transit_scores.csv")
+    if not path.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    for row in csv.DictReader(path.read_text(encoding="utf-8").splitlines()):
+        def _float(key: str, row=row) -> float | None:
+            v = (row.get(key) or "").strip()
+            if not v:
+                return None
+            return float(v)
+        def _int(key: str, row=row) -> int | None:
+            v = (row.get(key) or "").strip()
+            if not v:
+                return None
+            return int(v)
+        rows.append({
+            "geoid": row["geoid"].strip(),
+            "transit_route_count": _int("transit_route_count"),
+            "transit_score": _float("transit_score"),
+        })
+    return rows
+
+
+def seed_transit_scores(db: Session, force: bool = False) -> int:
+    """Load precomputed transit scores from transit_scores.csv into the metrics table."""
+    seed_rows = load_transit_scores()
+    if not seed_rows:
+        return 0
+    existing = db.query(Metric).filter(Metric.transit_score.isnot(None)).count()
+    if existing and not force:
+        return 0
+    count = 0
+    for r in seed_rows:
+        updated = (
+            db.query(Metric)
+            .filter(Metric.geoid == r["geoid"])
+            .update({
+                Metric.transit_route_count: r["transit_route_count"],
+                Metric.transit_score: r["transit_score"],
+            })
+        )
+        count += updated
+    db.flush()
+    db.commit()
+    return count
+
+
 def seed_cmhc_tract_data(db: Session, force: bool = False) -> int:
     """Load real census-tract SCSS values from cmhc_ct_metrics.csv.
 

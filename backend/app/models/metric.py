@@ -32,4 +32,7 @@ class Metric(Base):
     dwellings_apt_high_rise: Mapped[int | None] = mapped_column(Integer, nullable=True)
     owner_households: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    transit_route_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    transit_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     geography = relationship("Geography", back_populates="metrics")

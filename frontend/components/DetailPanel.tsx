@@ -47,6 +47,15 @@ const cmhcCopy: Record<GeographyLevel, string> = {
     "The map shows GTA census tracts with CMHC Rental Market Survey data (inherited from parent municipality). Select a tract to inspect local values."
 };
 
+const transitCopy: Record<GeographyLevel, string> = {
+  municipality:
+    "Transit scores are available at the census tract level. Switch to tract view to see transit accessibility.",
+  census_tract:
+    "The map shows GTA census tracts scored by transit accessibility using GTFS schedule data from GTA transit agencies."
+};
+
+const TRANSIT_METRIC_KEYS = new Set(["transit_score", "transit_route_count"]);
+
 export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
@@ -76,6 +85,8 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
       if (cmhcMetrics.housing_starts_total != null) add("Housing starts", cmhcMetrics.housing_starts_total, `CMHC ${cmhcYear ?? ""}`);
       if (cmhcMetrics.housing_completions != null) add("Housing completions", cmhcMetrics.housing_completions, `CMHC ${cmhcYear ?? ""}`);
     }
+    if (metrics.transit_score != null) add("Transit access score", metrics.transit_score, "GTFS");
+    if (metrics.transit_route_count != null) add("Transit routes nearby", metrics.transit_route_count, "GTFS");
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -223,6 +234,28 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
             </div>
           )}
 
+          {/* Transit Accessibility */}
+          {metrics?.transit_score != null && (
+            <div className="mt-4">
+              <SectionHeader title="Transit Accessibility" note="GTFS" />
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <MetricLine
+                  label="Access score"
+                  value={formatMetric("transit_score", metrics.transit_score)}
+                  metricKey="transit_score"
+                />
+                <MetricLine
+                  label="Routes nearby"
+                  value={formatMetric("transit_route_count", metrics.transit_route_count)}
+                  metricKey="transit_route_count"
+                />
+              </div>
+              <p className="mt-2 text-xs leading-5 text-civic-muted">
+                Unique transit routes within 800m of tract boundary. Score normalized 0-100 across GTA tracts.
+              </p>
+            </div>
+          )}
+
           <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
             {geography.geometry_source}
           </div>
@@ -235,7 +268,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           <div>
             <p className="text-sm font-medium text-civic-ink">{emptyCopy[geographyLevel]}</p>
             <p className="mt-1 max-w-xs text-xs leading-5 text-civic-muted">
-              {isCmhcMetric(metric) ? cmhcCopy[geographyLevel] : censusCopy[geographyLevel]}
+              {TRANSIT_METRIC_KEYS.has(metric) ? transitCopy[geographyLevel] : isCmhcMetric(metric) ? cmhcCopy[geographyLevel] : censusCopy[geographyLevel]}
             </p>
           </div>
         </div>

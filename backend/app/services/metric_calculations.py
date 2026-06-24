@@ -22,6 +22,11 @@ CMHC_METRICS = {
     "unabsorbed_units",
 }
 
+TRANSIT_METRICS = {
+    "transit_route_count",
+    "transit_score",
+}
+
 VALID_METRICS = {
     "median_income",
     "median_rent",
@@ -30,7 +35,7 @@ VALID_METRICS = {
     "population_growth_pct",
     "affordability_index",
     "rent_to_income_ratio",
-} | CMHC_METRICS
+} | CMHC_METRICS | TRANSIT_METRICS
 
 METRIC_ALIASES = {
     "income": "median_income",
@@ -48,6 +53,9 @@ METRIC_ALIASES = {
     "turnover": "turnover_rate",
     "availability": "availability_rate",
     "universe": "rental_universe",
+    # Transit aliases
+    "transit": "transit_score",
+    "routes": "transit_route_count",
 }
 
 
@@ -162,6 +170,8 @@ def build_metric_quality(row: Any) -> dict[str, str]:
         "rent_burden_pct": rent_burden_status,
         "population_growth_pct": growth_status,
         "affordability_index": present(row.affordability_index),
+        "transit_score": present(getattr(row, "transit_score", None)),
+        "transit_route_count": present(getattr(row, "transit_route_count", None)),
     }
 
 

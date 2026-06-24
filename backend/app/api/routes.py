@@ -14,6 +14,7 @@ from app.schemas.responses import GeographiesListResponse, GeographyResponse
 from app.services.geojson import compact_geometry
 from app.services.metric_calculations import (
     CMHC_METRICS,
+    TRANSIT_METRICS,
     VALID_METRICS,
     build_metric_quality,
     is_cmhc_metric,
@@ -181,6 +182,8 @@ def serialize_metric(metric: Metric) -> dict[str, Any]:
         "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
         "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
         "owner_households": metric.owner_households,
+        "transit_route_count": metric.transit_route_count,
+        "transit_score": metric.transit_score,
         "data_quality": build_metric_quality(metric),
     }
 
@@ -749,7 +752,7 @@ def get_map_data(
         "domain": domain,
         "geography_type": normalized_type,
         "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key),
-        "source": map_data_source(normalized_type, cmhc=cmhc),
+        "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "available_years": available_cmhc_years(db),
     }
 
@@ -829,7 +832,17 @@ def map_geometry(geometry: dict[str, Any], detail: str, geography_type: str | No
     return geometry
 
 
-def map_data_source(geography_type: str | None, cmhc: bool = False) -> str:
+def is_transit_metric(metric_key: str) -> bool:
+    return metric_key in TRANSIT_METRICS
+
+
+def map_data_source(geography_type: str | None, cmhc: bool = False, metric_key: str | None = None) -> str:
+    if metric_key and is_transit_metric(metric_key):
+        return (
+            "GTFS schedule data from TTC, GO Transit, MiWay, Brampton Transit, "
+            "and Durham Region Transit. Unique routes counted within 800m of each "
+            "census tract boundary."
+        )
     if cmhc:
         return (
             "CMHC Rental Market Survey and Starts & Completions Survey data "
@@ -898,6 +911,16 @@ def data_quality(
             "description": (
                 "CMHC Rental Market Survey data "
                 "from the Housing Market Information Portal."
+            ),
+        }
+    if metric_key is not None and metric_key in TRANSIT_METRICS:
+        return {
+            "metric_status": "official",
+            "label": "GTFS transit accessibility",
+            "description": (
+                "Transit score derived from GTFS schedule data published by TTC, GO Transit, "
+                "MiWay, Brampton Transit, and Durham Region Transit. Unique routes within 800m "
+                "of each census tract boundary are counted and normalized to a 0-100 score."
             ),
         }
     if geography_type == "census_tract":
