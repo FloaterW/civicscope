@@ -40,23 +40,25 @@ GTFS_FEEDS: dict[str, str] = {
 }
 
 BUFFER_METERS = 800
+MIN_AGENCIES = 3  # fail-closed: require ≥3 agencies to produce valid scores
 
 
-def download_feed(agency: str, url: str) -> Path:
+def download_feed(agency: str, url: str) -> tuple[Path, bool]:
+    """Download a GTFS feed. Returns (path, success)."""
     GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     dest = GTFS_CACHE_DIR / f"{agency}.zip"
     if dest.exists():
         print(f"  [cache hit] {agency}")
-        return dest
+        return dest, True
     print(f"  Downloading {agency} GTFS feed...")
     try:
         with urlopen(url, timeout=60) as resp:
             dest.write_bytes(resp.read())
         print(f"  [ok] {agency} ({dest.stat().st_size / 1024:.0f} KB)")
+        return dest, True
     except Exception as e:
-        print(f"  [skip] {agency}: {e}")
-        return dest
-    return dest
+        print(f"  [FAIL] {agency}: {e}", file=sys.stderr)
+        return dest, False
 
 
 def parse_gtfs_stop_routes(zip_path: Path) -> dict[tuple[float, float], set[str]]:
@@ -267,6 +269,11 @@ def main() -> None:
     parser.add_argument("--skip-download", action="store_true", help="Use cached GTFS zips")
     parser.add_argument("--generate-csv", action="store_true", help="Write CSV instead of updating DB")
     parser.add_argument("--db-url", default=None, help="Database URL (default: from env/settings)")
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow writing results even when agency coverage is below the minimum threshold.",
+    )
     args = parser.parse_args()
 
     db_url = args.db_url or os.environ.get(
@@ -278,18 +285,45 @@ def main() -> None:
 
     if not args.skip_download:
         print("\n1. Downloading GTFS feeds...")
+        failed_agencies: list[str] = []
         for agency, url in GTFS_FEEDS.items():
-            download_feed(agency, url)
+            _, ok = download_feed(agency, url)
+            if not ok:
+                failed_agencies.append(agency)
+        if failed_agencies:
+            print(f"\n  Failed agencies: {', '.join(failed_agencies)}", file=sys.stderr)
     else:
         print("\n1. Using cached GTFS feeds")
+        failed_agencies = []
 
     print("\n2. Parsing stop-route relationships...")
     all_feeds: dict[str, dict[tuple[float, float], set[str]]] = {}
+    agencies_with_data: list[str] = []
     for agency in GTFS_FEEDS:
         zip_path = GTFS_CACHE_DIR / f"{agency}.zip"
         stops = parse_gtfs_stop_routes(zip_path)
         print(f"  {agency}: {len(stops)} stops")
         all_feeds[agency] = stops
+        if stops:
+            agencies_with_data.append(agency)
+
+    # Fail-closed: require minimum agency coverage
+    print(f"\n  Agencies with data: {len(agencies_with_data)}/{len(GTFS_FEEDS)}")
+    if len(agencies_with_data) < MIN_AGENCIES:
+        if args.allow_partial:
+            print(
+                f"WARNING: Only {len(agencies_with_data)} agencies produced data "
+                f"(minimum {MIN_AGENCIES}) but --allow-partial was set; proceeding.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"ABORTING: Only {len(agencies_with_data)} agencies produced data "
+                f"(minimum {MIN_AGENCIES}). Re-run with --allow-partial to force. "
+                f"No files were written.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     merged = merge_stop_routes(all_feeds)
     total_routes = set()

@@ -429,7 +429,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
           [maxLng, maxLat]
         ],
         {
-          padding: 96,
+          padding: { top: 80, right: 80, bottom: 120, left: 80 },
           maxZoom: data?.metadata.geography_type === "census_tract" ? 11.35 : 9.15,
           duration: 650
         }

@@ -67,13 +67,16 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
     CACHEABLE_PREFIXES = ("/api/map-data", "/api/summary", "/api/compare", "/api/metrics")
 
     @app.middleware("http")
-    async def cache_control(request: Request, call_next):
+    async def security_and_cache_headers(request: Request, call_next):
         response: Response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Frame-Options", "DENY")
         if request.method == "GET" and request.url.path.startswith(CACHEABLE_PREFIXES):
             response.headers.setdefault("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
         return response
 
-    @app.get("/health", tags=["system"])
+    @app.api_route("/health", methods=["GET", "HEAD"], tags=["system"])
     def health(db: Session = Depends(get_db)):
         try:
             db.execute(text("SELECT 1"))

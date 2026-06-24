@@ -56,6 +56,8 @@ def test_tract_metrics_expose_field_level_provenance(client):
         "rent_burden_pct",
         "population_growth_pct",
         "affordability_index",
+        "transit_score",
+        "transit_route_count",
     }
     assert expected_keys <= set(quality)
     for status in quality.values():
@@ -299,3 +301,22 @@ def test_health_reports_database_status(client):
     payload = response.json()
     assert payload["database"] == "ok"
     assert payload["service"] == "civicscope-api"
+
+
+def test_health_supports_head(client):
+    response = client.head("/health")
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+def test_api_responses_include_security_headers(client):
+    response = client.get("/health")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
+def test_api_security_headers_on_data_endpoints(client):
+    response = client.get("/api/summary")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"

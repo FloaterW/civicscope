@@ -45,6 +45,8 @@ export type MetricQuality = {
   rent_burden_pct?: MetricFieldStatus;
   population_growth_pct?: MetricFieldStatus;
   affordability_index?: MetricFieldStatus;
+  transit_score?: MetricFieldStatus;
+  transit_route_count?: MetricFieldStatus;
 };
 
 export type MetricValues = {

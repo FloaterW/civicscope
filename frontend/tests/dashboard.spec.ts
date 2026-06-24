@@ -577,6 +577,36 @@ test.describe("CivicScope dashboard regressions", () => {
     );
   });
 
+  test("selecting Toronto via search sets map selected state", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    await page.getByTestId("geography-search").fill("Toronto");
+    await page.getByRole("option").filter({ hasText: "3520005" }).click();
+
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    // After selection animation settles, the map should still show data
+    await expect(map).toHaveAttribute("data-feature-count", "25");
+  });
+
+  test("selecting a census tract sets map selected state", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    await page.getByTestId("geography-search").fill("5350092.00");
+    const result = page.getByRole("option").filter({ hasText: "5350092.00" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350092.00");
+    await expect(page.getByTestId("detail-panel")).toContainText("census tract");
+  });
+
   test("map exposes an accessible region label", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");

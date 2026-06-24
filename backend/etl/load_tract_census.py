@@ -55,6 +55,7 @@ CHARACTERISTIC_IDS = {
 CHARACTERISTIC_TO_FIELD = {v: k for k, v in CHARACTERISTIC_IDS.items()}
 
 BATCH_SIZE = 40  # DGUIDs per API request to avoid URL length limits
+MIN_COVERAGE_PCT = 80  # fail-closed: require ≥80% of requested tracts
 
 
 def ctuid_to_dguid(ctuid: str) -> str:
@@ -360,6 +361,11 @@ def main() -> None:
         default=PROJECT_ROOT / "app" / "data" / "statcan_ct_metrics.csv",
         help="Output CSV path (default: app/data/statcan_ct_metrics.csv).",
     )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow writing results even when coverage is below the minimum threshold.",
+    )
     args = parser.parse_args()
 
     if args.from_csv:
@@ -385,6 +391,24 @@ def main() -> None:
     has_pop = sum(1 for m in metrics if m.population is not None)
     has_burden = sum(1 for m in metrics if m.rent_burden_pct is not None)
     print(f"Coverage: income={has_income}, rent={has_rent}, population={has_pop}, burden={has_burden}")
+
+    # Fail-closed: refuse to write partial data unless explicitly opted in
+    coverage_pct = (len(metrics) / len(geoids) * 100) if geoids else 0
+    print(f"Tract coverage: {len(metrics)}/{len(geoids)} ({coverage_pct:.1f}%)")
+    if coverage_pct < MIN_COVERAGE_PCT:
+        if args.allow_partial:
+            print(
+                f"WARNING: Coverage {coverage_pct:.1f}% is below {MIN_COVERAGE_PCT}% "
+                f"threshold but --allow-partial was set; proceeding.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"ABORTING: Coverage {coverage_pct:.1f}% is below the {MIN_COVERAGE_PCT}% "
+                f"minimum. Re-run with --allow-partial to force. No files were written.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     if args.generate_csv:
         write_csv(metrics, args.output)
