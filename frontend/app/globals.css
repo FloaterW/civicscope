@@ -57,9 +57,13 @@ select {
   font: inherit;
 }
 
-.maplibregl-ctrl-bottom-left,
-.maplibregl-ctrl-bottom-right {
-  display: none;
+.maplibregl-ctrl-attrib {
+  color: var(--civic-muted);
+  font-family: inherit;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--civic-blue);
 }
 
 /* Hover tooltip — match the restrained civic panel styling. */

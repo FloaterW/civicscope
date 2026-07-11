@@ -540,7 +540,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         </div>
       )}
       {data && (
-        <div className="absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1.5">
+        <div className="absolute bottom-9 right-3 z-10 flex flex-col items-end gap-1.5">
           {transitOpen && (
             <div className="animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm">
               <div className="mb-2 flex items-center justify-between gap-4">

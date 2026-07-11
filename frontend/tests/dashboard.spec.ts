@@ -267,6 +267,16 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-geography-type", "census_tract");
   });
 
+  test("basemap attribution remains visible", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const attribution = page.locator(".maplibregl-ctrl-attrib");
+    await expect(attribution).toBeVisible({ timeout: 30000 });
+    await expect(attribution).toContainText("OpenStreetMap");
+    await expect(attribution).toContainText("CARTO");
+  });
+
   test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
