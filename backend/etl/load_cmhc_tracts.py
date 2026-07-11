@@ -255,9 +255,41 @@ def _load_seed_tracts() -> tuple[set[str], dict[str, int]]:
 #   estimated_parent  - allocated from a real CMHC parent tract (split estimate)
 # (A tract absent from this file keeps the API's municipal allocation, "estimated".)
 SOURCE_COLUMNS = {m: f"{m}_source" for m in METRICS}
+MIN_TRACT_COVERAGE_PCT = 90.0
 
 
-def generate_csv(years: list[int], output: Path) -> dict[str, Any]:
+def validate_generation_coverage(
+    all_tracts: set[str],
+    covered_tracts: set[str],
+    skipped_slices: list[tuple[str, str, int]],
+    expected_slice_count: int,
+    *,
+    allow_partial: bool = False,
+) -> dict[str, Any]:
+    coverage_pct = 100 * len(covered_tracts) / len(all_tracts) if all_tracts else 0.0
+    problems = []
+    if skipped_slices:
+        problems.append(f"{len(skipped_slices)}/{expected_slice_count} missing metric slices")
+    if coverage_pct < MIN_TRACT_COVERAGE_PCT:
+        problems.append(
+            f"tract coverage {coverage_pct:.1f}% is below {MIN_TRACT_COVERAGE_PCT:.1f}%"
+        )
+    if problems and not allow_partial:
+        raise ValueError(
+            "CMHC tract refresh failed coverage validation: " + "; ".join(problems)
+            + ". Re-run with --allow-partial only for diagnostic output."
+        )
+    return {
+        "coverage_pct": round(coverage_pct, 1),
+        "expected_slices": expected_slice_count,
+        "skipped_empty_slices": len(skipped_slices),
+        "partial": bool(problems),
+    }
+
+
+def generate_csv(
+    years: list[int], output: Path, *, allow_partial: bool = False
+) -> dict[str, Any]:
     our, renter = _load_seed_tracts()
     our_by_prefix: dict[str, list[str]] = {}
     for geoid in our:
@@ -281,10 +313,21 @@ def generate_csv(years: list[int], output: Path) -> dict[str, Any]:
                     rows.setdefault((geoid, year), {})[metric] = (val, source)
                     counts[source] += 1
 
+    covered = {g for (g, _y) in rows}
+    expected_slice_count = len(METRICS) * len(CMA_PREFIX) * len(years)
+    coverage = validate_generation_coverage(
+        our,
+        covered,
+        skipped_empty,
+        expected_slice_count,
+        allow_partial=allow_partial,
+    )
+
     fields = ["geoid", "year"]
     for m in METRICS:
         fields += [m, SOURCE_COLUMNS[m]]
-    with output.open("w", newline="", encoding="utf-8") as fh:
+    temporary_output = output.with_suffix(f"{output.suffix}.tmp")
+    with temporary_output.open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(fields)
         for (geoid, year), metrics in sorted(rows.items()):
@@ -293,15 +336,17 @@ def generate_csv(years: list[int], output: Path) -> dict[str, Any]:
                 val, source = metrics.get(m, (None, None))
                 cells += ["" if val is None else val, source or ""]
             w.writerow(cells)
+    temporary_output.replace(output)
 
-    covered = {g for (g, _y) in rows}
     return {
         "output": str(output),
         "data_rows": len(rows),
         "tracts_covered": len(covered),
-        "coverage_pct": round(100 * len(covered) / len(our), 1),
+        "coverage_pct": coverage["coverage_pct"],
+        "expected_slices": coverage["expected_slices"],
         "validated_slices": len(validated),
         "skipped_empty_slices": len(skipped_empty),
+        "partial": coverage["partial"],
         "metric_value_counts": counts,
         "years": years,
     }
@@ -324,6 +369,11 @@ def main() -> None:
     p.add_argument("--generate-csv", action="store_true")
     p.add_argument("--years", type=int, nargs="+", default=list(range(2018, 2025)))
     p.add_argument("--output", type=Path, default=PROJECT_ROOT / "app" / "data" / "cmhc_ct_metrics.csv")
+    p.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow diagnostic CSV output that fails coverage validation.",
+    )
     args = p.parse_args()
 
     if args.self_test:
@@ -331,7 +381,7 @@ def main() -> None:
         return
     if args.generate_csv:
         print("Fetching + validating real CMHC census-tract SCSS data from HMIP...", file=sys.stderr)
-        report = generate_csv(args.years, args.output)
+        report = generate_csv(args.years, args.output, allow_partial=args.allow_partial)
         print(json.dumps(report, indent=2))
         return
     p.error("--self-test or --generate-csv required")

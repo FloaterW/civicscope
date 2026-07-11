@@ -55,7 +55,15 @@ CHARACTERISTIC_IDS = {
 CHARACTERISTIC_TO_FIELD = {v: k for k, v in CHARACTERISTIC_IDS.items()}
 
 BATCH_SIZE = 40  # DGUIDs per API request to avoid URL length limits
-MIN_COVERAGE_PCT = 80  # fail-closed: require ≥80% of requested tracts
+MIN_COVERAGE_PCT = 99.0  # fail-closed: require nearly all requested tracts
+FIELD_MIN_COVERAGE_PCT = {
+    "population": 99.0,
+    "previous_population": 99.0,
+    "median_income": 99.0,
+    "median_rent": 98.0,
+    "renter_households": 99.0,
+    "rent_burden_pct": 95.0,
+}
 
 
 def ctuid_to_dguid(ctuid: str) -> str:
@@ -174,9 +182,50 @@ def fetch_all_tract_metrics(geoids: list[str]) -> list[TractMetric]:
     return sorted(all_metrics, key=lambda m: m.geoid)
 
 
+def validate_tract_coverage(
+    metrics: list[TractMetric],
+    geoids: list[str],
+    *,
+    allow_partial: bool = False,
+) -> dict[str, Any]:
+    """Validate row and field-level coverage before replacing official data."""
+    unique_geoids = {metric.geoid for metric in metrics}
+    row_coverage = 100 * len(unique_geoids) / len(geoids) if geoids else 0.0
+    duplicate_count = len(metrics) - len(unique_geoids)
+    field_coverage = {
+        field: (
+            100 * sum(getattr(metric, field) is not None for metric in metrics) / len(metrics)
+            if metrics
+            else 0.0
+        )
+        for field in FIELD_MIN_COVERAGE_PCT
+    }
+    problems = []
+    if row_coverage < MIN_COVERAGE_PCT:
+        problems.append(
+            f"row coverage {row_coverage:.1f}% is below {MIN_COVERAGE_PCT:.1f}%"
+        )
+    if duplicate_count:
+        problems.append(f"{duplicate_count} duplicate tract rows")
+    for field, minimum in FIELD_MIN_COVERAGE_PCT.items():
+        if field_coverage[field] < minimum:
+            problems.append(
+                f"{field} coverage {field_coverage[field]:.1f}% is below {minimum:.1f}%"
+            )
+    if problems and not allow_partial:
+        raise ValueError("; ".join(problems))
+    return {
+        "row_coverage_pct": round(row_coverage, 1),
+        "field_coverage_pct": {k: round(v, 1) for k, v in field_coverage.items()},
+        "duplicate_rows": duplicate_count,
+        "partial": bool(problems),
+    }
+
+
 def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
     """Write normalized CSV compatible with load_census.py --csv."""
-    with output_path.open("w", newline="", encoding="utf-8") as f:
+    temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
+    with temporary_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([
             "geoid", "year", "median_income", "median_rent",
@@ -203,6 +252,7 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
                 m.dwellings_apt_high_rise if m.dwellings_apt_high_rise is not None else "",
                 m.owner_households if m.owner_households is not None else "",
             ])
+    temporary_path.replace(output_path)
 
 
 def update_seed_with_official_metrics(
@@ -261,7 +311,11 @@ def update_seed_with_official_metrics(
         "fetched via the SDMX DF_CT dataflow.",
     ]
 
-    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    temporary_path = seed_path.with_suffix(f"{seed_path.suffix}.tmp")
+    temporary_path.write_text(
+        json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
+    )
+    temporary_path.replace(seed_path)
     return updated
 
 
@@ -320,7 +374,11 @@ def sync_seed_from_csv(seed_path: Path, csv_path: Path) -> int:
         "unavailable values are stored as null; rent burden is estimated from rent and "
         "income only as a clearly labeled fallback at serialization time.",
     ]
-    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    temporary_path = seed_path.with_suffix(f"{seed_path.suffix}.tmp")
+    temporary_path.write_text(
+        json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
+    )
+    temporary_path.replace(seed_path)
     return updated
 
 
@@ -392,23 +450,20 @@ def main() -> None:
     has_burden = sum(1 for m in metrics if m.rent_burden_pct is not None)
     print(f"Coverage: income={has_income}, rent={has_rent}, population={has_pop}, burden={has_burden}")
 
-    # Fail-closed: refuse to write partial data unless explicitly opted in
-    coverage_pct = (len(metrics) / len(geoids) * 100) if geoids else 0
-    print(f"Tract coverage: {len(metrics)}/{len(geoids)} ({coverage_pct:.1f}%)")
-    if coverage_pct < MIN_COVERAGE_PCT:
-        if args.allow_partial:
-            print(
-                f"WARNING: Coverage {coverage_pct:.1f}% is below {MIN_COVERAGE_PCT}% "
-                f"threshold but --allow-partial was set; proceeding.",
-                file=sys.stderr,
-            )
-        else:
-            print(
-                f"ABORTING: Coverage {coverage_pct:.1f}% is below the {MIN_COVERAGE_PCT}% "
-                f"minimum. Re-run with --allow-partial to force. No files were written.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    try:
+        coverage = validate_tract_coverage(
+            metrics, geoids, allow_partial=args.allow_partial
+        )
+    except ValueError as exc:
+        print(
+            f"ABORTING: {exc}. Re-run with --allow-partial only for diagnostic output. "
+            "No files were written.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"Coverage validation: {json.dumps(coverage, sort_keys=True)}")
+    if coverage["partial"]:
+        print("WARNING: writing partial tract data by explicit request.", file=sys.stderr)
 
     if args.generate_csv:
         write_csv(metrics, args.output)
