@@ -235,7 +235,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           )}
 
           {/* Transit Accessibility */}
-          {metrics?.transit_score != null && (
+          {geographyLevel === "census_tract" && metrics && (
             <div className="mt-4">
               <SectionHeader title="Transit Accessibility" note="GTFS" />
               <div className="grid grid-cols-2 gap-2 text-sm">

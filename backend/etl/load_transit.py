@@ -191,7 +191,7 @@ def compute_scores_postgis(
         result = db.execute(text("""
             SELECT g.geoid, COUNT(DISTINCT s.route_id) as route_count
             FROM geographies g
-            JOIN _gtfs_stops s ON ST_DWithin(
+            LEFT JOIN _gtfs_stops s ON ST_DWithin(
                 g.geom::geography,
                 s.geom::geography,
                 :buffer
@@ -205,6 +205,11 @@ def compute_scores_postgis(
         db.execute(text("DROP TABLE IF EXISTS _gtfs_stops"))
         db.commit()
 
+    return normalize_route_counts(counts)
+
+
+def normalize_route_counts(counts: dict[str, int]) -> dict[str, tuple[int, float]]:
+    """Normalize route counts while retaining tracts with zero nearby routes."""
     if not counts:
         return {}
 

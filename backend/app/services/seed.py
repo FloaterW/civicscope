@@ -326,24 +326,43 @@ def load_transit_scores() -> list[dict[str, Any]]:
 
 
 def seed_transit_scores(db: Session, force: bool = False) -> int:
-    """Load precomputed transit scores from transit_scores.csv into the metrics table."""
+    """Synchronize tract transit scores, including explicit zero-service tracts.
+
+    Older packaged CSVs contain only tracts reached by at least one route. Missing
+    tract rows therefore mean zero nearby routes, while a missing/empty CSV still
+    means the dataset is unavailable and leaves database values untouched.
+    """
     seed_rows = load_transit_scores()
     if not seed_rows:
         return 0
-    existing = db.query(Metric).filter(Metric.transit_score.isnot(None)).count()
-    if existing and not force:
+
+    seeded = {row["geoid"]: row for row in seed_rows}
+    tract_metrics = (
+        db.query(Metric)
+        .join(Geography, Geography.geoid == Metric.geoid)
+        .filter(Geography.type == "census_tract")
+        .all()
+    )
+
+    def expected(metric: Metric) -> tuple[int, float]:
+        row = seeded.get(metric.geoid)
+        if row is None:
+            return 0, 0.0
+        return int(row["transit_route_count"] or 0), float(row["transit_score"] or 0.0)
+
+    if not force and all(
+        metric.transit_route_count == expected(metric)[0]
+        and metric.transit_score == expected(metric)[1]
+        for metric in tract_metrics
+    ):
         return 0
+
     count = 0
-    for r in seed_rows:
-        updated = (
-            db.query(Metric)
-            .filter(Metric.geoid == r["geoid"])
-            .update({
-                Metric.transit_route_count: r["transit_route_count"],
-                Metric.transit_score: r["transit_score"],
-            })
-        )
-        count += updated
+    for metric in tract_metrics:
+        route_count, score = expected(metric)
+        metric.transit_route_count = route_count
+        metric.transit_score = score
+        count += 1
     db.flush()
     db.commit()
     return count

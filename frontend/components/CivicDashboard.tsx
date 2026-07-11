@@ -60,6 +60,8 @@ const geographyLabels: Record<GeographyLevel, { singular: string; plural: string
   }
 };
 
+const TRANSIT_METRICS = new Set<MetricKey>(["transit_score", "transit_route_count"]);
+
 export function CivicDashboard() {
   const [metric, setMetric] = useState<MetricKey>("rent_burden_pct");
   const [geographyLevel, setGeographyLevel] = useState<GeographyLevel>("municipality");
@@ -110,6 +112,13 @@ export function CivicDashboard() {
     setSearchResults([]);
     setSelectedCmhcMetrics(null);
     setSelectedCmhcYear(undefined);
+  }
+
+  function handleMetricChange(nextMetric: MetricKey) {
+    setMetric(nextMetric);
+    if (TRANSIT_METRICS.has(nextMetric) && geographyLevel !== "census_tract") {
+      handleGeographyLevelChange("census_tract");
+    }
   }
 
   useEffect(() => {
@@ -425,7 +434,7 @@ export function CivicDashboard() {
               </div>
             </div>
             <GeographyLevelSelector value={geographyLevel} onChange={handleGeographyLevelChange} />
-            <MetricSelector value={metric} onChange={setMetric} />
+            <MetricSelector value={metric} onChange={handleMetricChange} />
             <YearSelector
               value={displayYear}
               availableYears={isCmhc ? availableYears : [2021]}

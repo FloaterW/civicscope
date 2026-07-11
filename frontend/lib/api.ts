@@ -21,6 +21,8 @@ export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: s
   { key: "average_rent_total", label: "Average rent (CMHC)", shortLabel: "CMHC Rent", group: "CMHC Rental Market" },
   { key: "housing_starts_total", label: "Housing starts", shortLabel: "Starts", group: "CMHC Rental Market" },
   { key: "housing_completions", label: "Completions", shortLabel: "Compl.", group: "CMHC Rental Market" },
+  { key: "transit_score", label: "Transit access score", shortLabel: "Transit", group: "Transit Access" },
+  { key: "transit_route_count", label: "Transit routes nearby", shortLabel: "Routes", group: "Transit Access" },
 ];
 
 export const CMHC_METRIC_KEYS: Set<MetricKey> = new Set([

@@ -252,13 +252,19 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const select = page.getByLabel("Map metric");
     const optgroups = select.locator("optgroup");
-    await expect(optgroups).toHaveCount(2);
+    await expect(optgroups).toHaveCount(3);
     await expect(optgroups.nth(0)).toHaveAttribute("label", "Census Profile");
     await expect(optgroups.nth(1)).toHaveAttribute("label", "CMHC Rental Market");
+    await expect(optgroups.nth(2)).toHaveAttribute("label", "Transit Access");
 
     await select.selectOption("vacancy_rate");
     await expect(page.getByText("Vacancy rate by municipality")).toBeVisible();
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "vacancy_rate");
+
+    await select.selectOption("transit_score");
+    await expect(page.getByText("Transit access score by census tract")).toBeVisible();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "transit_score");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-geography-type", "census_tract");
   });
 
   test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
