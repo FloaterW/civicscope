@@ -24,7 +24,7 @@ STATCAN_CT_LAYER_URL = (
 DEFAULT_CMA_PREFIXES = ("535", "532", "537")
 GEOMETRY_SOURCE = (
     "Statistics Canada 2021 cartographic census tract boundary; filtered to GTA "
-    "municipalities by tract centroid. Metrics are estimated from the parent municipality."
+    "municipalities by tract centroid."
 )
 
 
@@ -54,21 +54,63 @@ def load_geojson(path_or_url: str | None = None) -> dict[str, Any]:
     return fetch_geojson(build_statcan_ct_query_url())
 
 
-def update_seed_file(seed_path: Path, source: str | None = None) -> int:
+def update_seed_file(
+    seed_path: Path,
+    source: str | None = None,
+    *,
+    replace_metrics_with_estimates: bool = False,
+) -> int:
+    """Refresh tract boundaries without silently replacing official metrics."""
     seed = json.loads(seed_path.read_text(encoding="utf-8"))
     tract_payload = load_geojson(source)
     tract_rows = build_tract_rows(seed["geographies"], tract_payload.get("features", []))
+
+    existing_tracts = {
+        item["geoid"]: item
+        for item in seed["geographies"]
+        if item.get("type") == "census_tract"
+    }
+    if not replace_metrics_with_estimates:
+        refreshed_geoids = {item["geoid"] for item in tract_rows}
+        missing_metrics = refreshed_geoids - set(existing_tracts)
+        missing_boundaries = set(existing_tracts) - refreshed_geoids
+        if missing_metrics or missing_boundaries:
+            raise ValueError(
+                "Tract boundary identifiers do not match the packaged metric rows "
+                f"(new={len(missing_metrics)}, missing={len(missing_boundaries)}). "
+                "Refresh official tract Census metrics before publishing the seed, or "
+                "pass --replace-metrics-with-estimates explicitly for demo-only data."
+            )
+
+        preserved_rows = []
+        geography_fields = (
+            "name", "type", "county", "state", "geometry", "bbox", "geometry_source"
+        )
+        for refreshed in tract_rows:
+            preserved = dict(existing_tracts[refreshed["geoid"]])
+            for field in geography_fields:
+                preserved[field] = refreshed[field]
+            preserved_rows.append(preserved)
+        tract_rows = preserved_rows
+
     seed["geographies"] = [
         item for item in seed["geographies"] if item.get("type") != "census_tract"
     ] + tract_rows
-    seed["metadata"]["source"] = "statistics_canada_2021_census_profile_csd_and_estimated_ct_seed"
-    seed["metadata"]["notes"] = [
-        "Municipal geometries are Statistics Canada 2021 cartographic census subdivision boundaries.",
-        "Municipal metrics are loaded from official Statistics Canada 2021 Census Profile characteristics.",
-        "Census tract geometries are official Statistics Canada 2021 cartographic tract boundaries filtered by centroid to the current GTA municipalities.",
-        "Packaged tract-level metrics are estimated from parent municipality values for offline demo use; replace with tract-level Census Profile metrics before publication-grade analysis.",
-    ]
-    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    seed["metadata"]["tract_geometry_source"] = GEOMETRY_SOURCE
+    seed["metadata"]["tract_geometry_refreshed_at"] = datetime.now(UTC).isoformat()
+    if replace_metrics_with_estimates:
+        seed["metadata"]["source"] = "statistics_canada_2021_census_profile_csd_and_estimated_ct_seed"
+        seed["metadata"]["notes"] = [
+            "Municipal geometries and metrics use official Statistics Canada 2021 sources.",
+            "Census tract geometries use official 2021 cartographic boundaries.",
+            "Census tract metrics are demo-only estimates derived from parent municipalities.",
+        ]
+
+    temporary_path = seed_path.with_suffix(f"{seed_path.suffix}.tmp")
+    temporary_path.write_text(
+        json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
+    )
+    temporary_path.replace(seed_path)
     return len(tract_rows)
 
 
@@ -323,7 +365,32 @@ def upsert_tracts(db, tract_rows: list[dict[str, Any]]) -> int:
     return count
 
 
-def load_tracts(source: str | None = None) -> int:
+def upsert_tract_geometries(db, tract_rows: list[dict[str, Any]]) -> int:
+    """Update boundary fields for existing tracts while preserving metric rows."""
+    from app.models import Geography
+
+    existing = {
+        row.geoid: row
+        for row in db.query(Geography).filter(Geography.type == "census_tract").all()
+    }
+    missing = [item["geoid"] for item in tract_rows if item["geoid"] not in existing]
+    if missing:
+        raise ValueError(
+            f"Boundary refresh contains {len(missing)} tracts without existing metrics. "
+            "Load official tract metrics first or explicitly replace metrics with estimates."
+        )
+
+    fields = ("name", "type", "county", "state", "geometry", "bbox", "geometry_source")
+    for item in tract_rows:
+        geography = existing[item["geoid"]]
+        for field in fields:
+            setattr(geography, field, item[field])
+    return len(tract_rows)
+
+
+def load_tracts(
+    source: str | None = None, *, replace_metrics_with_estimates: bool = False
+) -> int:
     from app.db.init_db import init_db
     from app.db.session import SessionLocal
     from app.models import ETLRun, Geography
@@ -356,12 +423,20 @@ def load_tracts(source: str | None = None) -> int:
             for geography in db.query(Geography).filter(Geography.type == "municipality").all()
         ]
         tract_rows = build_tract_rows(parent_rows, load_geojson(source).get("features", []))
-        row_count = upsert_tracts(db, tract_rows)
+        row_count = (
+            upsert_tracts(db, tract_rows)
+            if replace_metrics_with_estimates
+            else upsert_tract_geometries(db, tract_rows)
+        )
         db.flush()
         sync_geography_geoms(db)
         db.add(
             ETLRun(
-                source="statistics_canada_2021_ct_boundaries_estimated_metrics",
+                source=(
+                    "statistics_canada_2021_ct_boundaries_estimated_metrics"
+                    if replace_metrics_with_estimates
+                    else "statistics_canada_2021_ct_boundaries_geometry_only"
+                ),
                 status="success",
                 started_at=started_at,
                 completed_at=datetime.now(UTC),
@@ -374,7 +449,11 @@ def load_tracts(source: str | None = None) -> int:
         db.rollback()
         db.add(
             ETLRun(
-                source="statistics_canada_2021_ct_boundaries_estimated_metrics",
+                source=(
+                    "statistics_canada_2021_ct_boundaries_estimated_metrics"
+                    if replace_metrics_with_estimates
+                    else "statistics_canada_2021_ct_boundaries_geometry_only"
+                ),
                 status="failed",
                 started_at=started_at,
                 completed_at=datetime.now(UTC),
@@ -433,11 +512,16 @@ def load_tracts_from_seed(seed_path: Path | None = None) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Load GTA census tract boundaries with estimated metrics.")
+    parser = argparse.ArgumentParser(description="Refresh GTA census tract boundaries safely.")
     parser.add_argument("--print-url", action="store_true", help="Print the Statistics Canada CT query URL and exit.")
     parser.add_argument("--geojson", help="Path or URL to a Statistics Canada CT GeoJSON response.")
     parser.add_argument("--update-seed", action="store_true", help="Refresh packaged demo seed tract rows.")
     parser.add_argument("--from-seed", action="store_true", help="Load packaged seed tract rows into the database.")
+    parser.add_argument(
+        "--replace-metrics-with-estimates",
+        action="store_true",
+        help="Demo-only: replace tract metrics with parent-municipality estimates.",
+    )
     args = parser.parse_args()
 
     if args.print_url:
@@ -445,7 +529,11 @@ def main() -> None:
         return
 
     if args.update_seed:
-        row_count = update_seed_file(PROJECT_ROOT / "app" / "data" / "demo_seed.json", args.geojson)
+        row_count = update_seed_file(
+            PROJECT_ROOT / "app" / "data" / "demo_seed.json",
+            args.geojson,
+            replace_metrics_with_estimates=args.replace_metrics_with_estimates,
+        )
         print(f"Updated {row_count} packaged seed census tract rows.")
         return
 
@@ -454,7 +542,10 @@ def main() -> None:
         print(f"Loaded {row_count} packaged seed census tract rows.")
         return
 
-    row_count = load_tracts(args.geojson)
+    row_count = load_tracts(
+        args.geojson,
+        replace_metrics_with_estimates=args.replace_metrics_with_estimates,
+    )
     print(f"Loaded {row_count} census tract rows.")
 
 
