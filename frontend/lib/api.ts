@@ -37,6 +37,27 @@ export function isCmhcMetric(metric: MetricKey): boolean {
   return CMHC_METRIC_KEYS.has(metric);
 }
 
+export function mapDataCacheKey(
+  geographyLevel: GeographyLevel,
+  metric: MetricKey,
+  year?: number
+): string {
+  const family = isCmhcMetric(metric) ? `cmhc:${year ?? "latest"}` : "census";
+  return `${geographyLevel}:${family}`;
+}
+
+let transitRoutesPromise: Promise<unknown> | null = null;
+
+export function getTransitRoutes(): Promise<unknown> {
+  if (!transitRoutesPromise) {
+    transitRoutesPromise = fetchJson<unknown>("/api/transit-routes").catch((error) => {
+      transitRoutesPromise = null;
+      throw error;
+    });
+  }
+  return transitRoutesPromise;
+}
+
 export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {

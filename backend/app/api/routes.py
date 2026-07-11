@@ -776,6 +776,21 @@ def get_map_data(
         "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "available_years": available_cmhc_years(db),
+        "metric_catalog": {
+            candidate: {
+                "data_quality": data_quality(
+                    normalized_type,
+                    cmhc=is_cmhc_metric(candidate),
+                    metric_key=candidate,
+                ),
+                "source": map_data_source(
+                    normalized_type,
+                    cmhc=is_cmhc_metric(candidate),
+                    metric_key=candidate,
+                ),
+            }
+            for candidate in sorted(VALID_METRICS)
+        },
     }
 
     features = []

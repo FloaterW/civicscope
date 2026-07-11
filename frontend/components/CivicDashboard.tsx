@@ -9,6 +9,7 @@ import {
   getMetricLabel,
   getSummary,
   isCmhcMetric,
+  mapDataCacheKey,
   searchGeographies
 } from "@/lib/api";
 import type {
@@ -42,10 +43,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import { YearSelector } from "./YearSelector";
 
 const defaultCompareIds = ["3520005", "3521005", "3521010", "3519036", "3519028"];
-
-function mapCacheKey(level: GeographyLevel, metric: MetricKey, year?: number) {
-  return `${level}:${metric}:${year ?? "latest"}`;
-}
 
 const geographyLabels: Record<GeographyLevel, { singular: string; plural: string; search: string }> = {
   municipality: {
@@ -87,7 +84,7 @@ export function CivicDashboard() {
   const geographyLabel = geographyLabels[geographyLevel];
   const isCmhc = isCmhcMetric(metric);
   const requestedMapYear = isCmhc ? selectedYear : undefined;
-  const activeMapKey = mapCacheKey(geographyLevel, metric, requestedMapYear);
+  const activeMapKey = mapDataCacheKey(geographyLevel, metric, requestedMapYear);
   const mapData = mapDataByKey[activeMapKey] ?? null;
   const hasCachedMapData = Boolean(mapData);
   const displayYear = isCmhc ? (selectedYear ?? availableYears[availableYears.length - 1]) : 2021;
@@ -171,35 +168,6 @@ export function CivicDashboard() {
 
     return () => controller.abort();
   }, [activeMapKey, geographyLevel, hasCachedMapData, metric, requestedMapYear]);
-
-  useEffect(() => {
-    if (!mapData) {
-      return;
-    }
-    const inactiveLevel: GeographyLevel =
-      geographyLevel === "municipality" ? "census_tract" : "municipality";
-    const inactiveMapKey = mapCacheKey(inactiveLevel, metric, requestedMapYear);
-    if (mapDataByKey[inactiveMapKey]) {
-      return;
-    }
-
-    const controller = new AbortController();
-    getMapData(metric, inactiveLevel, controller.signal, requestedMapYear)
-      .then((mapPayload) => {
-        if (controller.signal.aborted) return;
-        setMapDataByKey((current) =>
-          current[inactiveMapKey]
-            ? current
-            : {
-                ...current,
-                [inactiveMapKey]: mapPayload
-              }
-        );
-      })
-      .catch(() => {});
-
-    return () => controller.abort();
-  }, [geographyLevel, mapData, mapDataByKey, metric, requestedMapYear]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -587,11 +555,14 @@ function applyMetricToMapData(data: MapData | null, metric: MetricKey): MapData 
     })
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
+  const catalogEntry = data.metadata.metric_catalog?.[metric];
   return {
     ...data,
     metadata: {
       ...data.metadata,
       metric,
+      data_quality: catalogEntry?.data_quality ?? data.metadata.data_quality,
+      source: catalogEntry?.source ?? data.metadata.source,
       domain: {
         min: values.length ? values.reduce((a, b) => Math.min(a, b), Infinity) : null,
         max: values.length ? values.reduce((a, b) => Math.max(a, b), -Infinity) : null

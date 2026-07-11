@@ -64,6 +64,16 @@ def test_tract_metrics_expose_field_level_provenance(client):
         assert status in {"official", "estimated", "unavailable", "low_confidence"}
 
 
+def test_map_data_includes_metric_catalog_for_local_repaint(client):
+    payload = client.get("/api/map-data?metric=rent_burden&type=census_tract").json()
+    catalog = payload["metadata"]["metric_catalog"]
+
+    assert catalog["median_income"]["data_quality"]["metric_status"] == "official"
+    assert catalog["rent_burden_pct"]["data_quality"]["metric_status"] == "mixed"
+    assert catalog["transit_score"]["data_quality"]["metric_status"] == "official"
+    assert "GTFS" in catalog["transit_score"]["source"]
+
+
 def test_tract_missing_value_is_unavailable_not_fabricated(client):
     response = client.get("/api/map-data?metric=median_rent&type=census_tract&detail=display")
     features = response.json()["features"]

@@ -3,7 +3,7 @@
 import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { API_BASE, formatMetric, getMetricLabel } from "@/lib/api";
+import { formatMetric, getMetricLabel, getTransitRoutes } from "@/lib/api";
 import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
 import { buildTooltipHtml, escapeHtml, safeJsonParse } from "@/lib/tooltip";
 import type { GeographyLevel, MapData, MapFeature, MetricFieldStatus, MetricKey, MetricQuality, MetricValues } from "@/types";
@@ -302,8 +302,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       map.on("load", () => {
         mapReadyRef.current = true;
         fitToDataBounds(map, initialData, false);
-        fetch(`${API_BASE}/api/transit-routes`)
-          .then((r) => r.json())
+        getTransitRoutes()
           .then((geojson) => {
             const src = map.getSource(transitSourceId);
             if (src && "setData" in src) {

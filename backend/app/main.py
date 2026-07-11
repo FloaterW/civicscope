@@ -64,7 +64,13 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    CACHEABLE_PREFIXES = ("/api/map-data", "/api/summary", "/api/compare", "/api/metrics")
+    CACHEABLE_PREFIXES = (
+        "/api/map-data",
+        "/api/summary",
+        "/api/compare",
+        "/api/metrics",
+        "/api/transit-routes",
+    )
 
     @app.middleware("http")
     async def security_and_cache_headers(request: Request, call_next):
@@ -72,7 +78,11 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        if request.method == "GET" and request.url.path.startswith(CACHEABLE_PREFIXES):
+        if (
+            request.method == "GET"
+            and response.status_code < 400
+            and request.url.path.startswith(CACHEABLE_PREFIXES)
+        ):
             response.headers.setdefault("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
         return response
 

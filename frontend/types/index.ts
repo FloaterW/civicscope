@@ -152,6 +152,15 @@ export type MapData = {
       description: string;
     };
     source: string;
+    metric_catalog?: Partial<
+      Record<
+        MetricKey,
+        {
+          data_quality: MapData["metadata"]["data_quality"];
+          source: string;
+        }
+      >
+    >;
   };
   features: MapFeature[];
 };
