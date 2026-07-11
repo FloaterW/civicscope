@@ -151,8 +151,8 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
     Catches both null->value (a newly populated field) and value->value drift
     (e.g. a corrected vacancy rate) where the row count is unchanged, so a stale
     Docker volume holding superseded CMHC values is re-seeded without a manual
-    FORCE_RESEED. All seed metrics are compared (one bulk DB read); seed fields
-    that are null/absent are skipped so the loader's defaults never false-trigger.
+    FORCE_RESEED. All seed metrics and nullable fields are compared in one bulk
+    read so value-to-null suppression corrections are applied as well.
     """
     if not seed_metrics:
         return False
@@ -165,6 +165,16 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
         ("vacancy_rate", "vacancy_rate"),
         ("average_rent_total", "average_rent_total"),
         ("average_rent_bachelor", "average_rent_bachelor"),
+        ("average_rent_1br", "average_rent_1br"),
+        ("average_rent_2br", "average_rent_2br"),
+        ("average_rent_3br_plus", "average_rent_3br_plus"),
+        ("turnover_rate", "turnover_rate"),
+        ("availability_rate", "availability_rate"),
+        ("rental_universe", "rental_universe"),
+        ("housing_starts_single", "housing_starts_single"),
+        ("housing_starts_semi", "housing_starts_semi"),
+        ("housing_starts_row", "housing_starts_row"),
+        ("housing_starts_apartment", "housing_starts_apartment"),
     ]
     db_rows = {(row.geoid, row.year): row for row in db.query(CmhcMetric).all()}
     for sample in seed_metrics:
@@ -173,22 +183,23 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
             return True
         for seed_key, db_attr in check_fields:
             seed_val = sample.get(seed_key)
-            if seed_val is None:
-                continue
             db_val = getattr(db_row, db_attr, None)
-            if db_val is None or abs(float(seed_val) - float(db_val)) > 0.5:
+            if _value_differs(seed_val, db_val):
                 return True
+        if bool(sample.get("rms_surveyed", False)) != bool(db_row.rms_surveyed):
+            return True
     return False
 
 
 def seed_cmhc_data(db: Session, force: bool = False) -> int:
     seed = load_cmhc_seed()
-    expected_count = len(seed["metrics"])
+    known_geoids = {row[0] for row in db.query(Geography.geoid).all()}
+    expected_count = sum(1 for row in seed["metrics"] if row["geoid"] in known_geoids)
     existing_count = db.query(CmhcMetric).count()
 
     # Auto-detect stale seed: trigger reseed if row count changed OR
     # if seed content has changed (e.g. new fields populated).
-    needs_reseed = force or (existing_count > 0 and existing_count < expected_count)
+    needs_reseed = force or existing_count != expected_count
     if not needs_reseed and existing_count > 0:
         needs_reseed = _seed_content_changed(db, seed["metrics"])
 
@@ -198,9 +209,6 @@ def seed_cmhc_data(db: Session, force: bool = False) -> int:
     if existing_count:
         db.query(CmhcMetric).delete()
         db.flush()
-
-    # Build set of known geoids for fast lookup
-    known_geoids = {row[0] for row in db.query(Geography.geoid).all()}
 
     row_count = 0
 

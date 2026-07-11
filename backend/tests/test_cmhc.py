@@ -31,6 +31,44 @@ def test_seed_cmhc_data_reseeds_when_a_value_changed(db_session):
     assert restored.vacancy_rate == official
 
 
+def test_seed_cmhc_data_reseeds_when_a_value_becomes_null(db_session):
+    seed = load_cmhc_seed()
+    target = next(m for m in seed["metrics"] if m.get("vacancy_rate") is None)
+    row = (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == target["geoid"], CmhcMetric.year == target["year"])
+        .one()
+    )
+    row.vacancy_rate = 12.3
+    db_session.commit()
+
+    reseeded = seed_cmhc_data(db_session)
+    assert reseeded > 0
+
+    restored = (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == target["geoid"], CmhcMetric.year == target["year"])
+        .one()
+    )
+    assert restored.vacancy_rate is None
+
+
+def test_seed_cmhc_data_removes_rows_no_longer_in_seed(db_session):
+    geoid = load_cmhc_seed()["metrics"][0]["geoid"]
+    db_session.add(CmhcMetric(geoid=geoid, year=2099, rms_surveyed=False))
+    db_session.commit()
+
+    reseeded = seed_cmhc_data(db_session)
+
+    assert reseeded > 0
+    assert (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == geoid, CmhcMetric.year == 2099)
+        .one_or_none()
+        is None
+    )
+
+
 def test_cmhc_metric_creation(db_session):
     metric = CmhcMetric(
         geoid="3520005",
