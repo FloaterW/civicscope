@@ -321,6 +321,20 @@ test.describe("CivicScope dashboard regressions", () => {
     ).toBeTruthy();
   });
 
+  test("theme switching keeps civic layers above every basemap fill and line", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const mapHost = page.getByTestId("map-canvas-host");
+    await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
+    await expect(mapHost).toHaveAttribute("data-map-theme", "light");
+
+    await page.getByRole("button", { name: "Toggle color theme" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(mapHost).toHaveAttribute("data-map-theme", "dark");
+    await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
+  });
+
   test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
@@ -814,6 +828,7 @@ async function blockExternalMapAssets(page: Page) {
         contentType: "application/json",
         body: JSON.stringify({
           version: 8,
+          glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
           sources: {
             "openfreemap-attribution": {
               type: "geojson",
@@ -828,10 +843,22 @@ async function blockExternalMapAssets(page: Page) {
               paint: { "background-color": "#eef2ed" }
             },
             {
+              id: "early-symbol",
+              type: "symbol",
+              source: "openfreemap-attribution",
+              layout: { "text-field": "" }
+            },
+            {
               id: "openfreemap-attribution-layer",
               type: "circle",
               source: "openfreemap-attribution",
               paint: { "circle-opacity": 0 }
+            },
+            {
+              id: "top-label",
+              type: "symbol",
+              source: "openfreemap-attribution",
+              layout: { "text-field": "" }
             }
           ]
         })

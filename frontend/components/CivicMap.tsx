@@ -28,6 +28,14 @@ const selectedLineLayerId = "civic-geographies-selected";
 const placeCircleLayerId = "gta-reference-places-circle";
 const transitSourceId = "transit-routes";
 const transitLineLayerId = "transit-routes-line";
+const CIVIC_LAYER_IDS = new Set([
+  fillLayerId,
+  selectedFillLayerId,
+  lineLayerId,
+  selectedLineLayerId,
+  placeCircleLayerId,
+  transitLineLayerId
+]);
 
 const referencePlaces = {
   type: "FeatureCollection",
@@ -93,6 +101,26 @@ function applyTransitFilterState(map: MapLibreMap, filters: TransitFilters) {
   map.setFilter(transitLineLayerId, buildTransitFilter(filters) ?? null);
 }
 
+function firstLabelAboveBasemap(map: MapLibreMap): string | undefined {
+  const layers = map.getStyle().layers;
+  let lastNonSymbolIndex = -1;
+  layers.forEach((layer, index) => {
+    if (layer.type !== "symbol") lastNonSymbolIndex = index;
+  });
+  return layers.slice(lastNonSymbolIndex + 1).find((layer) => layer.type === "symbol")?.id;
+}
+
+function civicLayersAreAboveBasemap(map: MapLibreMap): boolean {
+  const layers = map.getStyle().layers;
+  const civicFillIndex = layers.findIndex((layer) => layer.id === fillLayerId);
+  const lastBasemapNonSymbolIndex = layers.reduce(
+    (last, layer, index) =>
+      layer.type !== "symbol" && !CIVIC_LAYER_IDS.has(layer.id) ? index : last,
+    -1
+  );
+  return civicFillIndex > lastBasemapNonSymbolIndex;
+}
+
 function addCivicLayers(
   map: MapLibreMap,
   data: MapData,
@@ -113,7 +141,10 @@ function addCivicLayers(
     });
   }
 
-  const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+  // Some basemap styles interleave early symbol layers with later road/land
+  // layers. Insert before the first label *after* every non-symbol basemap
+  // layer so civic polygons cannot be painted underneath the basemap.
+  const firstSymbolLayer = firstLabelAboveBasemap(map);
   if (!map.getLayer(fillLayerId)) {
     map.addLayer(
       {
@@ -303,9 +334,20 @@ export function CivicMap({
           transitRoutesRef.current
         );
         applyTransitFilterState(map, transitFiltersRef.current);
+        containerRef.current?.setAttribute(
+          "data-civic-layer-order",
+          civicLayersAreAboveBasemap(map) ? "valid" : "invalid"
+        );
+        containerRef.current?.setAttribute("data-map-theme", themeRef.current);
         mapReadyRef.current = true;
       };
       map.on("style.load", handleStyleLoad);
+
+      map.on("styleimagemissing", ({ id }) => {
+        if (!map.hasImage(id)) {
+          map.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
+        }
+      });
 
       map.on("error", (event) => {
         const mapError = event.error;
@@ -474,8 +516,11 @@ export function CivicMap({
       if (themeRef.current === theme) return;
       themeRef.current = theme;
       mapReadyRef.current = false;
+      containerRef.current?.setAttribute("data-civic-layer-order", "loading");
       popupRef.current?.remove();
-      map.setStyle(BASEMAP_STYLES[theme]);
+      // Force a full style lifecycle. URL-to-URL diffing can complete without a
+      // new map-level style.load event, leaving custom sources absent.
+      map.setStyle(BASEMAP_STYLES[theme], { diff: false });
     });
     observer.observe(document.documentElement, {
       attributes: true,
@@ -542,7 +587,12 @@ export function CivicMap({
           No data available for {getMetricLabel(metric)} in this dataset.
         </div>
       )}
-      <div ref={containerRef} data-testid="map-canvas-host" className="h-full w-full" />
+      <div
+        ref={containerRef}
+        data-testid="map-canvas-host"
+        data-civic-layer-order="loading"
+        className="h-full w-full"
+      />
       {data && legend && (
         <div
           data-testid="map-legend"
@@ -776,7 +826,12 @@ function colorExpression(data: MapData): unknown[] {
     "case",
     ["==", ["get", "value"], null],
     NULL_COLOR,
-    ["interpolate", ["linear"], ["to-number", ["get", "value"]], ...interpolateStops]
+    [
+      "interpolate",
+      ["linear"],
+      ["to-number", ["get", "value"], stops[0].value],
+      ...interpolateStops
+    ]
   ];
 }
 
