@@ -4,8 +4,14 @@ import type {
   CmhcRmsSource,
   GeographyLevel,
   MetricFieldStatus,
-  MetricValues
+  MetricValues,
+  TransitSnapshot
 } from "@/types";
+import {
+  transitAgencyNames,
+  transitMetricStatus,
+  transitSnapshotDate
+} from "@/lib/transit";
 
 export const CSV_HEADERS = ["Metric", "Value", "Period", "Source", "Method", "Status"];
 
@@ -79,7 +85,8 @@ export function buildGeographyExportRows(
   geographyLevel: GeographyLevel,
   metrics: MetricValues,
   cmhcMetrics?: CmhcMetricValues | null,
-  cmhcYear?: number
+  cmhcYear?: number,
+  transitSnapshot?: TransitSnapshot
 ): string[][] {
   const rows: Row[] = [];
   const quality = metrics.data_quality;
@@ -183,7 +190,7 @@ export function buildGeographyExportRows(
     "Current packaged GTFS snapshot",
     "Agency-published GTFS schedules",
     "Unique routes within 800m, normalized across GTA tracts",
-    metrics.data_quality?.transit_score ?? "unavailable"
+    transitMetricStatus(metrics.data_quality?.transit_score, transitSnapshot)
   );
   add(
     "Transit routes nearby",
@@ -191,8 +198,17 @@ export function buildGeographyExportRows(
     "Current packaged GTFS snapshot",
     "Agency-published GTFS schedules",
     "Unique scheduled routes with a stop within 800m",
-    metrics.data_quality?.transit_route_count ?? "unavailable"
+    transitMetricStatus(metrics.data_quality?.transit_route_count, transitSnapshot)
   );
+
+  rows.push([
+    "Transit snapshot coverage",
+    transitSnapshot?.coverage_status ?? "unknown",
+    transitSnapshotDate(transitSnapshot),
+    `Included agencies: ${transitAgencyNames(transitSnapshot?.included_agencies)}`,
+    `Missing agencies: ${transitAgencyNames(transitSnapshot?.missing_agencies)}`,
+    transitSnapshot?.coverage_status ?? "unknown"
+  ]);
 
   return [CSV_HEADERS, ...rows];
 }

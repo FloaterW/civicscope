@@ -748,6 +748,10 @@ def get_map_data(
         "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "available_years": available_cmhc_years(db),
+        # All non-CMHC metrics share one client-side map payload. Keep the small
+        # transit manifest on every response so local metric repainting never
+        # loses the coverage disclosure.
+        "transit_snapshot": load_transit_manifest(),
         "metric_catalog": {
             candidate: {
                 "data_quality": data_quality(
@@ -764,9 +768,6 @@ def get_map_data(
             for candidate in sorted(VALID_METRICS)
         },
     }
-    if is_transit_metric(metric_key):
-        metadata["transit_snapshot"] = load_transit_manifest()
-
     features = []
     for geography, row in records:
         props: dict[str, Any] = {

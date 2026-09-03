@@ -265,6 +265,11 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByText("Transit access score by census tract")).toBeVisible();
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "transit_score");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-geography-type", "census_tract");
+    const coverage = page.getByTestId("transit-coverage-notice");
+    await expect(coverage).toContainText("Partial transit snapshot");
+    await expect(coverage).toContainText("TTC");
+    await expect(coverage).toContainText("Not included: Brampton Transit");
+    await expect(page.getByText(/all GTA transit agencies/i)).toHaveCount(0);
   });
 
   test("basemap attribution remains visible", async ({ page }) => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildGeographyExportRows, CSV_HEADERS, rowsToCsv } from "@/lib/csv-export";
-import type { CmhcMetricValues, MetricValues } from "@/types";
+import type { CmhcMetricValues, MetricValues, TransitSnapshot } from "@/types";
 
 const metrics = {
   year: 2021,
@@ -44,6 +44,14 @@ const cmhc = {
   other_rms_source: "inherited_municipality"
 } as CmhcMetricValues;
 
+const transitSnapshot: TransitSnapshot = {
+  schema_version: 1,
+  packaged_at: "2026-06-24T11:48:17-04:00",
+  coverage_status: "partial",
+  included_agencies: [{ id: "ttc", name: "TTC" }],
+  missing_agencies: [{ id: "brampton", name: "Brampton Transit" }]
+};
+
 describe("buildGeographyExportRows", () => {
   it("exports explicit periods, methods, and statuses", () => {
     const rows = buildGeographyExportRows("census_tract", metrics, cmhc, 2023);
@@ -72,9 +80,25 @@ describe("buildGeographyExportRows", () => {
   });
 
   it("preserves genuine transit zeros as derived values", () => {
-    const rows = buildGeographyExportRows("census_tract", metrics);
+    const rows = buildGeographyExportRows(
+      "census_tract",
+      metrics,
+      undefined,
+      undefined,
+      transitSnapshot
+    );
     expect(rows.find((row) => row[0] === "Transit routes nearby")?.[1]).toBe("0");
-    expect(rows.find((row) => row[0] === "Transit routes nearby")?.[5]).toBe("derived");
+    expect(rows.find((row) => row[0] === "Transit routes nearby")?.[5]).toBe(
+      "derived (partial coverage)"
+    );
+    expect(rows.find((row) => row[0] === "Transit snapshot coverage")).toEqual([
+      "Transit snapshot coverage",
+      "partial",
+      "2026-06-24",
+      "Included agencies: TTC",
+      "Missing agencies: Brampton Transit",
+      "partial"
+    ]);
   });
 });
 

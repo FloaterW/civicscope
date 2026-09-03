@@ -97,8 +97,8 @@ const metricDefinitions: Record<string, { term: string; definition: string; sour
   transit_route_count: {
     term: "Transit routes nearby",
     definition:
-      "The number of unique transit routes with at least one stop within 800m of the census tract boundary. Includes bus, streetcar, subway, and commuter rail routes from all GTA transit agencies.",
-    source: "Derived from agency-published GTFS static feeds; current agency coverage is disclosed in the API snapshot metadata"
+      "The number of unique transit routes in the packaged agency snapshot with at least one stop within 800m of the census tract boundary.",
+    source: "Derived from agency-published GTFS static feeds; included and missing agencies are disclosed beside the map"
   }
 };
 

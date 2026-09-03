@@ -5,6 +5,11 @@ import { useCallback } from "react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
 import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
+import {
+  transitAgencyNames,
+  transitCoverageLabel,
+  transitSnapshotDate
+} from "@/lib/transit";
 import type {
   CmhcCountSource,
   CmhcMetricValues,
@@ -12,7 +17,8 @@ import type {
   GeographyLevel,
   MetricFieldStatus,
   MetricKey,
-  MetricValues
+  MetricValues,
+  TransitSnapshot
 } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
@@ -26,6 +32,7 @@ type Props = {
   cmhcYear?: number;
   dataQualityLabel?: string;
   metricStatus?: "official" | "derived" | "estimated" | "mixed" | "zone";
+  transitSnapshot?: TransitSnapshot;
   onClear: () => void;
 };
 
@@ -52,12 +59,12 @@ const transitCopy: Record<GeographyLevel, string> = {
   municipality:
     "Transit scores are available at the census tract level. Switch to tract view to see transit accessibility.",
   census_tract:
-    "The map shows GTA census tracts scored by transit accessibility using GTFS schedule data from GTA transit agencies."
+    "The map shows GTA census tracts scored by transit accessibility using the disclosed packaged GTFS snapshot."
 };
 
 const TRANSIT_METRIC_KEYS = new Set(["transit_score", "transit_route_count"]);
 
-export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, onClear }: Props) {
+export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
   const hasAnyRentalData = cmhcMetrics ? rentalMarketMetrics.some((m) => cmhcMetrics[m.key] != null) : false;
@@ -65,7 +72,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
   const handleExportCsv = useCallback(() => {
     if (!geography || !metrics) return;
     const csv = rowsToCsv(
-      buildGeographyExportRows(geographyLevel, metrics, cmhcMetrics, cmhcYear)
+      buildGeographyExportRows(geographyLevel, metrics, cmhcMetrics, cmhcYear, transitSnapshot)
     );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -76,7 +83,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [geography, geographyLevel, metrics, cmhcMetrics, cmhcYear]);
+  }, [geography, geographyLevel, metrics, cmhcMetrics, cmhcYear, transitSnapshot]);
   const hasAnySupplyData =
     cmhcMetrics?.housing_starts_total != null ||
     cmhcMetrics?.housing_completions != null ||
@@ -233,6 +240,12 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
               </div>
               <p className="mt-2 text-xs leading-5 text-civic-muted">
                 Unique transit routes within 800m of tract boundary. Score normalized 0-100 across GTA tracts.
+              </p>
+              <p data-testid="transit-detail-coverage" className="mt-2 text-xs leading-5 text-civic-ink">
+                {transitCoverageLabel(transitSnapshot)}. Included: {transitAgencyNames(transitSnapshot?.included_agencies)}.
+                {transitSnapshot?.missing_agencies.length
+                  ? ` Not included: ${transitAgencyNames(transitSnapshot.missing_agencies)}.`
+                  : ""} Snapshot date: {transitSnapshotDate(transitSnapshot)}.
               </p>
             </div>
           )}

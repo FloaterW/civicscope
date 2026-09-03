@@ -12,6 +12,7 @@ import {
   mapDataCacheKey,
   searchGeographies
 } from "@/lib/api";
+import { isTransitMetric } from "@/lib/transit";
 import type {
   CmhcMetricValues,
   CompareResponse,
@@ -40,6 +41,7 @@ import { MetricSelector } from "./MetricSelector";
 import { CivicMap } from "./CivicMap";
 import { SummaryCards } from "./SummaryCards";
 import { ThemeToggle } from "./ThemeToggle";
+import { TransitCoverageNotice } from "./TransitCoverageNotice";
 import { YearSelector } from "./YearSelector";
 
 const defaultCompareIds = ["3520005", "3521005", "3521010", "3519036", "3519028"];
@@ -56,8 +58,6 @@ const geographyLabels: Record<GeographyLevel, { singular: string; plural: string
     search: "Search tract, municipality, or ID"
   }
 };
-
-const TRANSIT_METRICS = new Set<MetricKey>(["transit_score", "transit_route_count"]);
 
 type RequestState<T> = {
   key: string;
@@ -86,6 +86,7 @@ export function CivicDashboard() {
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
   const isCmhc = isCmhcMetric(metric);
+  const isTransit = isTransitMetric(metric);
   const requestedMapYear = isCmhc ? selectedYear : undefined;
   const activeMapKey = mapDataCacheKey(geographyLevel, metric, requestedMapYear);
   const mapData = mapDataByKey[activeMapKey] ?? null;
@@ -135,7 +136,7 @@ export function CivicDashboard() {
 
   function handleMetricChange(nextMetric: MetricKey) {
     setMetric(nextMetric);
-    if (TRANSIT_METRICS.has(nextMetric) && geographyLevel !== "census_tract") {
+    if (isTransitMetric(nextMetric) && geographyLevel !== "census_tract") {
       handleGeographyLevelChange("census_tract");
     }
   }
@@ -452,6 +453,9 @@ export function CivicDashboard() {
               <p className="text-xs text-civic-muted">
                 {getMetricLabel(metric)} by {geographyLabel.singular}
               </p>
+              {isTransit ? (
+                <TransitCoverageNotice snapshot={visibleMapData?.metadata.transit_snapshot} />
+              ) : null}
               {geographyLevel === "census_tract" &&
                 visibleMapData?.metadata.data_quality?.label?.includes("survey-zone") && (
                   <p className="mt-1 max-w-prose text-xs leading-5 text-teal-700 dark:text-teal-400">
@@ -522,6 +526,7 @@ export function CivicDashboard() {
             cmhcYear={selectedCmhcYear}
             dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
             metricStatus={visibleMapData?.metadata.data_quality?.metric_status}
+            transitSnapshot={visibleMapData?.metadata.transit_snapshot}
             onClear={() => {
               setSelected(null);
             }}
@@ -536,6 +541,7 @@ export function CivicDashboard() {
             loading={comparisonLoading && !comparison}
             displayYear={isCmhc ? displayYear : undefined}
             isUserSelection={Boolean(selectedGeoid)}
+            transitSnapshot={visibleMapData?.metadata.transit_snapshot}
           />
         </section>
       </div>

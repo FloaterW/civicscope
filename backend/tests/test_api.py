@@ -91,6 +91,11 @@ def test_map_data_includes_metric_catalog_for_local_repaint(client):
     assert catalog["rent_burden_pct"]["data_quality"]["metric_status"] == "mixed"
     assert catalog["transit_score"]["data_quality"]["metric_status"] == "derived"
     assert "GTFS" in catalog["transit_score"]["source"]
+    assert payload["metadata"]["transit_snapshot"]["coverage_status"] == "partial"
+    assert {
+        agency["id"]
+        for agency in payload["metadata"]["transit_snapshot"]["missing_agencies"]
+    } == {"brampton"}
 
 
 def test_transit_snapshot_discloses_actual_agency_coverage(client):

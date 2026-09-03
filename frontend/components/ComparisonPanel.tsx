@@ -17,7 +17,8 @@ import {
 import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
 import { rowsToCsv } from "@/lib/csv-export";
 import { rampColorForValue } from "@/lib/colors";
-import type { CompareResponse, GeographyLevel, MetricKey } from "@/types";
+import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
+import type { CompareResponse, GeographyLevel, MetricKey, TransitSnapshot } from "@/types";
 
 type Props = {
   comparison: CompareResponse | null;
@@ -26,6 +27,7 @@ type Props = {
   loading: boolean;
   displayYear?: number;
   isUserSelection?: boolean;
+  transitSnapshot?: TransitSnapshot;
 };
 
 const defaultComparisonNouns: Record<GeographyLevel, string> = {
@@ -33,8 +35,9 @@ const defaultComparisonNouns: Record<GeographyLevel, string> = {
   census_tract: "the most populous census tracts"
 };
 
-export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false }: Props) {
+export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot }: Props) {
   const isCmhc = isCmhcMetric(metric);
+  const isTransit = isTransitMetric(metric);
   const comparisonRows =
     comparison?.items
       .map((item) => {
@@ -62,7 +65,17 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   const handleExportCsv = useCallback(() => {
     if (!comparison) return;
     const metricLabel = getMetricLabel(metric);
-    const rows = [["Area", "Geoid", metricLabel, "Status", ...(isCmhc ? [] : ["Rent-to-income ratio"])]];
+    const transitHeaders = isTransit
+      ? ["Transit coverage", "Included agencies", "Missing agencies", "Snapshot date"]
+      : [];
+    const rows = [[
+      "Area",
+      "Geoid",
+      metricLabel,
+      "Status",
+      ...transitHeaders,
+      ...(isCmhc ? [] : ["Rent-to-income ratio"])
+    ]];
     for (const item of comparison.items) {
       const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, unknown>;
       const val = allMetrics[metric];
@@ -71,6 +84,14 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
         item.geoid,
         val != null ? String(val) : "",
         val != null ? "available" : "unavailable",
+        ...(isTransit
+          ? [
+              transitSnapshot?.coverage_status ?? "unknown",
+              transitAgencyNames(transitSnapshot?.included_agencies),
+              transitAgencyNames(transitSnapshot?.missing_agencies),
+              transitSnapshotDate(transitSnapshot)
+            ]
+          : []),
         ...(isCmhc ? [] : [item.metrics.rent_to_income_ratio != null ? String(item.metrics.rent_to_income_ratio) : ""])
       ];
       rows.push(row);
@@ -85,7 +106,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
     a.click();
     document.body.removeChild(a);
     window.setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [comparison, metric, geographyLevel, isCmhc]);
+  }, [comparison, metric, geographyLevel, isCmhc, isTransit, transitSnapshot]);
 
   return (
     <div data-testid="comparison-panel" className="p-4">

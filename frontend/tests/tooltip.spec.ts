@@ -85,3 +85,10 @@ test("rent burden definition does not equate the 30% threshold with core housing
   expect(definition?.definition).toContain("core housing need also considers");
   expect(definition?.definition).not.toContain("is considered in core housing need");
 });
+
+test("transit definition does not claim complete agency coverage", () => {
+  const definition = getMetricDefinition("transit_route_count");
+  expect(definition?.definition).toContain("packaged agency snapshot");
+  expect(definition?.definition).not.toContain("all GTA transit agencies");
+  expect(definition?.source).toContain("missing agencies");
+});
