@@ -29,7 +29,10 @@ const contentSecurityPolicy = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // Next.js 16.3 does not emit the server trace file when Vercel injects its
+  // build adapter, but standalone finalization still tries to read it. Vercel
+  // does not use the standalone bundle; keep it enabled for Docker/self-hosting.
+  output: process.env.VERCEL ? undefined : "standalone",
   reactStrictMode: true,
   headers: async () => [
     {
