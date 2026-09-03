@@ -55,3 +55,22 @@ def test_seeded_geographies_have_valid_postgis_geometry(postgis_engine):
     assert row_count > 0
     assert invalid_count == 0
     assert missing_count == 0
+
+
+def test_full_packaged_seed_populates_application_datasets(postgis_engine):
+    with postgis_engine.connect() as connection:
+        geography_count = connection.execute(text("SELECT COUNT(*) FROM geographies")).scalar_one()
+        metric_count = connection.execute(text("SELECT COUNT(*) FROM metrics")).scalar_one()
+        cmhc_count = connection.execute(text("SELECT COUNT(*) FROM cmhc_metrics")).scalar_one()
+        cmhc_tract_count = connection.execute(
+            text("SELECT COUNT(*) FROM cmhc_tract_metrics")
+        ).scalar_one()
+        transit_count = connection.execute(
+            text("SELECT COUNT(*) FROM metrics WHERE transit_score IS NOT NULL")
+        ).scalar_one()
+
+    assert geography_count > 0
+    assert metric_count > 0
+    assert cmhc_count > 0
+    assert cmhc_tract_count > 0
+    assert transit_count > 0
