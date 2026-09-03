@@ -706,6 +706,50 @@ test.describe("CivicScope dashboard regressions", () => {
     );
     expect(serious, `Accessibility violations: ${JSON.stringify(serious, null, 2)}`).toHaveLength(0);
   });
+
+  test("no critical or serious accessibility violations in a populated mobile transit state", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByLabel("Map metric").selectOption("transit_score");
+    await expect(page.getByTestId("transit-coverage-notice")).toContainText(
+      "Partial transit snapshot"
+    );
+    await page.getByTestId("geography-search").fill("5350001.00");
+    await page.getByRole("option").filter({ hasText: "5350001.00" }).click();
+
+    const detailsToggle = page.locator('button[aria-controls="summary-details-panel"]');
+    await detailsToggle.click();
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0001.00");
+    await page.getByRole("button", { name: "What is Transit access score?" }).first().click();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+
+    const lightResults = await new AxeBuilder({ page })
+      .exclude("[data-testid='map-canvas-host']")
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    const lightSerious = lightResults.violations.filter(
+      (violation) => violation.impact === "critical" || violation.impact === "serious"
+    );
+    expect(
+      lightSerious,
+      `Light-theme accessibility violations: ${JSON.stringify(lightSerious, null, 2)}`
+    ).toHaveLength(0);
+
+    await page.getByRole("button", { name: "Toggle color theme" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    const darkResults = await new AxeBuilder({ page })
+      .exclude("[data-testid='map-canvas-host']")
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    const darkSerious = darkResults.violations.filter(
+      (violation) => violation.impact === "critical" || violation.impact === "serious"
+    );
+    expect(
+      darkSerious,
+      `Dark-theme accessibility violations: ${JSON.stringify(darkSerious, null, 2)}`
+    ).toHaveLength(0);
+  });
 });
 
 function countCoordinatePairs(value: unknown): number {

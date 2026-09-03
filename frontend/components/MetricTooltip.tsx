@@ -168,7 +168,7 @@ function InfoTooltip({ term, definition, source }: { term: string; definition: s
         >
           <p className="text-xs font-semibold text-civic-ink">{term}</p>
           <p className="mt-1 text-xs leading-relaxed text-civic-muted">{definition}</p>
-          <p className="mt-2 text-[10px] italic text-civic-muted/70">{source}</p>
+          <p className="mt-2 text-[10px] italic text-civic-muted">{source}</p>
           <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-civic-line" />
         </div>
       )}

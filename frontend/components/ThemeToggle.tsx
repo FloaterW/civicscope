@@ -11,9 +11,12 @@ export function ThemeToggle() {
   }, []);
 
   function toggle() {
-    const next = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", next);
+    const root = document.documentElement;
+    const next = !root.classList.contains("dark");
+    root.classList.add("theme-changing");
+    root.classList.toggle("dark", next);
     localStorage.setItem("civicscope-theme", next ? "dark" : "light");
+    window.requestAnimationFrame(() => root.classList.remove("theme-changing"));
   }
 
   return (

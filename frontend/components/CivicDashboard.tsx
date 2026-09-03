@@ -512,7 +512,7 @@ export function CivicDashboard() {
           {selected ? selected.name : "Summary & Details"}
         </button>
 
-        <aside id="summary-details-panel" className={`flex flex-col gap-4 transition-all duration-300 xl:opacity-100 xl:max-h-none ${mobilePanelOpen ? "max-h-[5000px] opacity-100" : "max-h-0 overflow-hidden opacity-0 xl:max-h-none xl:overflow-visible"}`}>
+        <aside id="summary-details-panel" className={`flex flex-col gap-4 transition-[max-height] duration-300 xl:max-h-none ${mobilePanelOpen ? "max-h-[5000px]" : "max-h-0 overflow-hidden xl:max-h-none xl:overflow-visible"}`}>
           <SummaryCards
             summary={summary}
             geographyLevel={geographyLevel}
