@@ -135,6 +135,24 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(consoleErrors.filter((message) => !message.includes("Failed to load resource"))).toEqual([]);
   });
 
+  test("comparison tooltip is dismissed when the viewport changes", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    const chart = page.getByTestId("comparison-panel");
+    const bar = chart.locator(".recharts-bar-rectangle").first();
+    await expect(bar).toBeVisible();
+    await bar.hover();
+    await expect(chart.locator(".recharts-tooltip-wrapper")).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(chart.locator(".recharts-tooltip-wrapper")).toBeHidden();
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  });
+
   test("municipality search selects Toronto without losing local metrics", async ({ page }) => {
     await blockExternalMapAssets(page);
 

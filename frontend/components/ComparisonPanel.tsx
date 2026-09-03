@@ -1,7 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -36,6 +36,7 @@ const defaultComparisonNouns: Record<GeographyLevel, string> = {
 };
 
 export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot }: Props) {
+  const [chartTooltipActive, setChartTooltipActive] = useState(false);
   const isCmhc = isCmhcMetric(metric);
   const isTransit = isTransitMetric(metric);
   const comparisonRows =
@@ -156,12 +157,22 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               No comparison data available.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              onResize={() => setChartTooltipActive(false)}
+            >
+              <BarChart
+                data={chartData}
+                margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                onMouseMove={() => setChartTooltipActive(true)}
+                onMouseLeave={() => setChartTooltipActive(false)}
+              >
                 <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} width={54} />
                 <Tooltip
+                  active={chartTooltipActive}
                   formatter={(value, _name, item) => [
                     formatMetric(metric, item.payload.rawValue),
                     getMetricLabel(metric)
