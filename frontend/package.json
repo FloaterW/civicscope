@@ -8,11 +8,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/prepare-standalone.mjs",
     "build:analyze": "cross-env ANALYZE=true next build",
     "clean:next": "node scripts/clean-next-cache.mjs",
     "demo:video": "node scripts/capture-demo-video.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
-    "start": "next start",
+    "start": "node .next/standalone/server.js",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "next typegen && tsc --noEmit",
