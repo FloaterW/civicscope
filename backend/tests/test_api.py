@@ -363,6 +363,21 @@ def test_health_supports_head(client):
     assert response.content == b""
 
 
+def test_openapi_operation_ids_are_unique(client):
+    schema = client.get("/openapi.json").json()
+    operation_ids = [
+        operation["operationId"]
+        for path in schema["paths"].values()
+        for operation in path.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    ]
+
+    assert operation_ids
+    assert len(operation_ids) == len(set(operation_ids))
+    assert schema["paths"]["/health"]["get"]["operationId"] == "health_check"
+    assert "head" not in schema["paths"]["/health"]
+
+
 def test_api_responses_include_security_headers(client):
     response = client.get("/health")
     assert response.headers["X-Content-Type-Options"] == "nosniff"

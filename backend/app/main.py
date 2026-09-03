@@ -87,7 +87,8 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
             response.headers.setdefault("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
         return response
 
-    @app.api_route("/health", methods=["GET", "HEAD"], tags=["system"])
+    @app.get("/health", tags=["system"], operation_id="health_check")
+    @app.head("/health", tags=["system"], include_in_schema=False)
     def health(db: Session = Depends(get_db)):
         try:
             db.execute(text("SELECT 1"))
