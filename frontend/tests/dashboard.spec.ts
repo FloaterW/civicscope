@@ -635,6 +635,7 @@ test.describe("CivicScope dashboard regressions", () => {
 
   test("API failure is visible and retry restores the map", async ({ page }) => {
     await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/summary**`, (route) => route.abort("failed"));
     let failMap = true;
     await page.route(`${API_BASE}/api/map-data**`, async (route) => {
       if (failMap) {
@@ -646,6 +647,8 @@ test.describe("CivicScope dashboard regressions", () => {
 
     await page.goto("/");
     await expect(page.getByText("Map data is unavailable")).toBeVisible();
+    await expect(page.getByTestId("summary-panel")).toContainText("GTA data unavailable");
+    await expect(page.getByTestId("summary-panel")).not.toContainText("0 GTA municipalities");
 
     failMap = false;
     await page.getByRole("button", { name: "Retry map", exact: true }).click();
@@ -669,10 +672,13 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.goto("/");
 
     const toggle = page.getByRole("button", { name: "Summary & Details" });
+    const panel = page.locator("#summary-details-panel");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(toggle).toHaveAttribute("aria-controls", "summary-details-panel");
+    await expect(panel).toBeHidden();
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(panel).toBeVisible();
   });
 
   test("the no-results message does not block other controls", async ({ page }) => {
