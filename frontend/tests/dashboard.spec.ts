@@ -761,7 +761,8 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.getByRole("option").filter({ hasText: "5350001.00" }).click();
 
     const detailsToggle = page.locator('button[aria-controls="summary-details-panel"]');
-    await detailsToggle.click();
+    await expect(detailsToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#summary-details-panel")).toBeVisible();
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0001.00");
     await page.getByRole("button", { name: "What is Transit access score?" }).first().click();
     await expect(page.getByRole("tooltip")).toBeVisible();

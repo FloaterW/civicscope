@@ -425,7 +425,7 @@ function MetricLine({
         {status === "estimated" && (
           <span
             data-testid="estimated-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
+            className="ml-1 align-middle text-xs font-medium text-amber-700 dark:text-amber-400"
             title="Estimated fallback; Statistics Canada value suppressed."
           >
             est.
@@ -443,7 +443,7 @@ function MetricLine({
         {status === "low_confidence" && (
           <span
             data-testid="low-confidence-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
+            className="ml-1 align-middle text-xs font-medium text-amber-700 dark:text-amber-400"
             title="Derived off a very small base population; low confidence."
           >
             &#x26A0;
@@ -461,7 +461,7 @@ function MetricLine({
         {cmhcSource === "estimated_parent" && (
           <span
             data-testid="parent-est-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
+            className="ml-1 align-middle text-xs font-medium text-amber-700 dark:text-amber-400"
             title="Allocated from CMHC's real parent tract (a 2016 tract that split in 2021); a closer estimate than the municipal allocation, but still an estimate."
           >
             est. (CMHC parent tract)
@@ -470,7 +470,7 @@ function MetricLine({
         {cmhcSource === "estimated" && (
           <span
             data-testid="cmhc-estimated-flag"
-            className="ml-1 align-middle text-xs font-medium text-amber-600 dark:text-amber-400"
+            className="ml-1 align-middle text-xs font-medium text-amber-700 dark:text-amber-400"
             title="Estimated by allocating the parent municipality's total by renter-household share."
           >
             est.
