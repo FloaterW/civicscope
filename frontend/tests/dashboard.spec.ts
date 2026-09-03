@@ -274,7 +274,10 @@ test.describe("CivicScope dashboard regressions", () => {
     const attribution = page.locator(".maplibregl-ctrl-attrib");
     await expect(attribution).toBeVisible({ timeout: 30000 });
     await expect(attribution).toContainText("OpenStreetMap");
-    await expect(attribution).toContainText("CARTO");
+    await expect(attribution).toContainText("OpenFreeMap");
+    expect(
+      await page.locator("canvas.maplibregl-canvas").getAttribute("aria-label")
+    ).toBeTruthy();
   });
 
   test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
@@ -713,6 +716,36 @@ function countCoordinatePairs(value: unknown): number {
 }
 
 async function blockExternalMapAssets(page: Page) {
-  await page.route("https://*.basemaps.cartocdn.com/**", (route) => route.abort());
-  await page.route("https://demotiles.maplibre.org/**", (route) => route.abort());
+  await page.route("https://tiles.openfreemap.org/**", async (route) => {
+    if (new URL(route.request().url()).pathname.startsWith("/styles/")) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 8,
+          sources: {
+            "openfreemap-attribution": {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] },
+              attribution: "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"
+            }
+          },
+          layers: [
+            {
+              id: "background",
+              type: "background",
+              paint: { "background-color": "#eef2ed" }
+            },
+            {
+              id: "openfreemap-attribution-layer",
+              type: "circle",
+              source: "openfreemap-attribution",
+              paint: { "circle-opacity": 0 }
+            }
+          ]
+        })
+      });
+      return;
+    }
+    await route.abort();
+  });
 }

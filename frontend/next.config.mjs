@@ -19,9 +19,9 @@ const contentSecurityPolicy = [
   "form-action 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.basemaps.cartocdn.com",
-  "font-src 'self' data: https://demotiles.maplibre.org",
-  `connect-src 'self' ${apiOrigin} https://*.basemaps.cartocdn.com https://demotiles.maplibre.org${isDevelopment ? " ws:" : ""}`,
+  "img-src 'self' data: blob: https://tiles.openfreemap.org",
+  "font-src 'self' data: https://tiles.openfreemap.org",
+  `connect-src 'self' ${apiOrigin} https://tiles.openfreemap.org${isDevelopment ? " ws:" : ""}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   ...(!isDevelopment ? ["upgrade-insecure-requests"] : [])
