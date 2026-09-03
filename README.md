@@ -367,17 +367,17 @@ make frontend-e2e  # Playwright browser tests (needs backend running)
 Or individually:
 
 ```bash
-cd backend && pytest                   # 157 passing tests; 2 PostGIS tests skip without a test database
+cd backend && pytest                   # 158 passing tests; 3 PostGIS tests skip without a test database
 cd frontend && npm run test:unit       # 31 Vitest unit tests
-cd frontend && npm run test:e2e        # 43 Playwright e2e tests (incl. axe-core a11y audit)
+cd frontend && npm run test:e2e        # 48 Playwright e2e tests (incl. axe-core a11y audit)
 cd frontend && npm run typecheck       # TypeScript strict mode
 cd frontend && npm run lint            # ESLint
 ```
 
 **Test coverage highlights:**
 
-- **157 backend tests** plus 2 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
-- **43 Playwright e2e tests** covering map rendering, metric selection, search, retry states, responsive controls, comparison, provenance, and accessibility
+- **158 backend tests** plus 3 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
+- **48 Playwright e2e tests** covering map rendering, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, and accessibility
 - **31 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
 - **axe-core WCAG 2.0 AA audit** runs in CI — zero critical or serious violations
 - **Rate limiting** at 60 req/min per IP via slowapi
