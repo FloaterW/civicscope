@@ -82,6 +82,7 @@ export function CivicDashboard() {
   const [retryKey, setRetryKey] = useState(0);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState(-1);
+  const [slowConnectionKey, setSlowConnectionKey] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const selectedGeoid = selected?.geoid;
   const geographyLabel = geographyLabels[geographyLevel];
@@ -106,6 +107,7 @@ export function CivicDashboard() {
   const mapRequestKey = `${activeMapKey}:${retryKey}`;
   const summaryRequestKey = `${geographyLevel}:${selectedGeoid ?? "all"}:${isCmhc ? selectedYear ?? "latest" : "census"}:${retryKey}`;
   const comparisonRequestKey = `${geographyLevel}:${comparisonIds.join(",")}:${isCmhc ? selectedYear ?? "latest" : "census"}:${retryKey}`;
+  const dataRequestKey = `${mapRequestKey}|${summaryRequestKey}|${comparisonRequestKey}`;
   const mapError = mapFailure?.key === mapRequestKey ? mapFailure.error : null;
   const mapLoading = !hasCachedMapData && !mapError;
   const summary = summaryState?.key === summaryRequestKey ? summaryState.data : null;
@@ -114,6 +116,7 @@ export function CivicDashboard() {
   const comparison = comparisonState?.key === comparisonRequestKey ? comparisonState.data : null;
   const comparisonError = comparisonState?.key === comparisonRequestKey ? comparisonState.error : null;
   const comparisonLoading = comparisonState?.key !== comparisonRequestKey;
+  const dataLoading = mapLoading || summaryLoading || comparisonLoading;
   const error = summaryError ?? comparisonError;
   const selectedFeature = selected
     ? mapData?.features.find((feature) => feature.properties.geoid === selected.geoid)
@@ -121,6 +124,12 @@ export function CivicDashboard() {
   const selectedCmhcMetrics: CmhcMetricValues | null =
     selectedFeature?.properties.cmhc_metrics ?? null;
   const selectedCmhcYear = selectedFeature?.properties.cmhc_year;
+
+  useEffect(() => {
+    if (!dataLoading) return;
+    const timer = window.setTimeout(() => setSlowConnectionKey(dataRequestKey), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [dataLoading, dataRequestKey]);
 
   function handleGeographyLevelChange(level: GeographyLevel) {
     if (level === geographyLevel) {
@@ -418,6 +427,19 @@ export function CivicDashboard() {
           </div>
         </div>
       </header>
+
+      {slowConnectionKey === dataRequestKey && dataLoading && !error && !mapError ? (
+        <div
+          data-testid="data-service-status"
+          role="status"
+          className="mx-auto mt-4 max-w-[1552px] rounded-lg border border-civic-line bg-civic-panel px-4 py-3 text-sm text-civic-ink shadow-panel"
+        >
+          <p className="font-semibold">Still connecting to the CivicScope data service…</p>
+          <p className="mt-1 text-xs text-civic-muted">
+            The first visit can take longer while the service starts. Data will appear automatically.
+          </p>
+        </div>
+      ) : null}
 
       {error && (
         <div

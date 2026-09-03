@@ -74,13 +74,15 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
         <div>
           <h2 className="text-sm font-semibold text-civic-ink">Summary</h2>
           <p className="text-xs text-civic-muted">
-            {summary?.region_count === 1
+            {loading && !summary
+              ? "Loading GTA data…"
+              : summary?.region_count === 1
               ? summary.selected_geographies[0]?.name
               : `${regionCount} ${summaryNouns[geographyLevel]}`}
           </p>
         </div>
         <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-          {summary?.year ?? "2021"}
+          {loading && !summary ? "—" : (summary?.year ?? "2021")}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">

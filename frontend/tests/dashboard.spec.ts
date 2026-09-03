@@ -135,6 +135,24 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(consoleErrors.filter((message) => !message.includes("Failed to load resource"))).toEqual([]);
   });
 
+  test("slow API startup shows an honest loading state instead of zero regions", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/**`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_800));
+      await route.continue();
+    });
+    await page.goto("/");
+
+    const summary = page.getByTestId("summary-panel");
+    await expect(summary).toContainText("Loading GTA data");
+    await expect(summary).not.toContainText("0 GTA municipalities");
+    await expect(page.getByTestId("data-service-status")).toContainText(
+      "Still connecting to the CivicScope data service"
+    );
+    await expect(summary).toContainText("25 GTA municipalities", { timeout: 15_000 });
+    await expect(page.getByTestId("data-service-status")).toHaveCount(0);
+  });
+
   test("comparison tooltip is dismissed when the viewport changes", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
