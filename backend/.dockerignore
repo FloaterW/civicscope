@@ -2,6 +2,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.db
+*.log
 .coverage
 .venv/
 .env
