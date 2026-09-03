@@ -1,5 +1,7 @@
 name: Keep Backend Alive
 
+permissions: {}
+
 on:
   schedule:
     # Ping every 14 minutes to prevent Render free-tier spin-down
@@ -11,11 +13,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping backend health endpoint
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://civicscope.onrender.com/health || echo "000")
-          echo "Health check returned HTTP $STATUS"
-          if [ "$STATUS" = "200" ]; then
-            echo "Backend is healthy"
-          else
-            echo "Backend returned non-200 status (may be waking up)"
-          fi
+        run: curl --fail-with-body --show-error --silent --retry 3 --retry-delay 10 --retry-all-errors https://civicscope.onrender.com/health

@@ -4,6 +4,7 @@ import { Download, MapPin, MousePointerClick, X } from "lucide-react";
 import { useCallback } from "react";
 
 import { formatMetric, isCmhcMetric } from "@/lib/api";
+import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
 import type {
   CmhcCountSource,
   CmhcMetricValues,
@@ -24,7 +25,7 @@ type Props = {
   cmhcMetrics?: CmhcMetricValues | null;
   cmhcYear?: number;
   dataQualityLabel?: string;
-  metricStatus?: "official" | "estimated" | "mixed" | "zone";
+  metricStatus?: "official" | "derived" | "estimated" | "mixed" | "zone";
   onClear: () => void;
 };
 
@@ -44,7 +45,7 @@ const cmhcCopy: Record<GeographyLevel, string> = {
   municipality:
     "The map shows GTA municipalities with CMHC Rental Market Survey data. Select a geography to inspect local values.",
   census_tract:
-    "The map shows GTA census tracts with CMHC Rental Market Survey data (inherited from parent municipality). Select a tract to inspect local values."
+    "The map shows CMHC survey-zone values, published tract construction counts, and clearly labeled fallbacks. Select a tract to inspect the source of each value."
 };
 
 const transitCopy: Record<GeographyLevel, string> = {
@@ -63,31 +64,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
 
   const handleExportCsv = useCallback(() => {
     if (!geography || !metrics) return;
-    const rows: string[][] = [["Metric", "Value", "Source"]];
-    const add = (label: string, value: string | number | null | undefined, source: string) => {
-      rows.push([label, value != null ? String(value) : "", source]);
-    };
-    add("Median household income", metrics.median_income, "2021 Census");
-    add("Median rent", metrics.median_rent, "2021 Census");
-    add("Rent burden", metrics.rent_burden_pct, "2021 Census");
-    add("Population growth", metrics.population_growth_pct, "2021 Census");
-    add("Population", metrics.population, "2021 Census");
-    add("Affordability index", metrics.affordability_index, "2021 Census");
-    if (cmhcMetrics) {
-      for (const m of rentalMarketMetrics) {
-        const v = cmhcMetrics[m.key];
-        if (v != null && typeof v === "number") add(m.label, v, `CMHC RMS ${cmhcYear ?? ""}`);
-      }
-      for (const m of rentByUnitMetrics) {
-        const v = cmhcMetrics[m.key];
-        if (v != null && typeof v === "number") add(m.label, v, `CMHC RMS ${cmhcYear ?? ""}`);
-      }
-      if (cmhcMetrics.housing_starts_total != null) add("Housing starts", cmhcMetrics.housing_starts_total, `CMHC ${cmhcYear ?? ""}`);
-      if (cmhcMetrics.housing_completions != null) add("Housing completions", cmhcMetrics.housing_completions, `CMHC ${cmhcYear ?? ""}`);
-    }
-    if (metrics.transit_score != null) add("Transit access score", metrics.transit_score, "GTFS");
-    if (metrics.transit_route_count != null) add("Transit routes nearby", metrics.transit_route_count, "GTFS");
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = rowsToCsv(
+      buildGeographyExportRows(geographyLevel, metrics, cmhcMetrics, cmhcYear)
+    );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -97,7 +76,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [geography, metrics, cmhcMetrics, cmhcYear]);
+  }, [geography, geographyLevel, metrics, cmhcMetrics, cmhcYear]);
   const hasAnySupplyData =
     cmhcMetrics?.housing_starts_total != null ||
     cmhcMetrics?.housing_completions != null ||
@@ -197,7 +176,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                 <div className="mt-4">
                   <SectionHeader
                     title="Housing Construction"
-                    period={cmhcYear ? `${cmhcYear} YTD` : undefined}
+                    period={cmhcYear ? `Calendar year ${cmhcYear}` : undefined}
                   />
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <MetricLine
@@ -229,7 +208,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           ) : (
             <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
               {geographyLevel === "census_tract"
-                ? "CMHC does not publish census tract-level data. Estimated values allocated from parent municipality."
+                ? "No CMHC value is available for this tract and year."
                 : "No CMHC survey coverage for this municipality."}
             </div>
           )}
@@ -242,11 +221,13 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                 <MetricLine
                   label="Access score"
                   value={formatMetric("transit_score", metrics.transit_score)}
+                  status={quality?.transit_score}
                   metricKey="transit_score"
                 />
                 <MetricLine
                   label="Routes nearby"
                   value={formatMetric("transit_route_count", metrics.transit_route_count)}
+                  status={quality?.transit_route_count}
                   metricKey="transit_route_count"
                 />
               </div>
@@ -311,7 +292,15 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       <SectionHeader
         title="Rental Market"
         period={cmhcYear ? `Oct ${cmhcYear} RMS` : undefined}
-        note={cmhcMetrics.allocated ? "municipal rates" : undefined}
+        note={
+          geographyLevel === "census_tract"
+            ? cmhcMetrics.survey_zone
+              ? "survey-zone vacancy and average rent; other fields use parent municipality"
+              : "parent-municipality values"
+            : cmhcMetrics.survey_zone
+              ? "shared survey-zone values"
+              : undefined
+        }
       />
       {marketFields.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -345,7 +334,8 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       {geographyLevel === "census_tract" && cmhcMetrics.survey_zone && marketFields.length > 0 && (
         <p data-testid="survey-zone-note" className="mt-2 text-xs leading-5 text-civic-muted">
           CMHC survey zone: <strong>{cmhcMetrics.survey_zone}</strong>.
-          Rent and vacancy reflect this zone&apos;s surveyed values.
+          Vacancy rate and average rent reflect this zone&apos;s surveyed values; bedroom rents,
+          availability, turnover, and counts use the labeled parent-municipality fallback.
         </p>
       )}
     </div>
@@ -426,6 +416,15 @@ function MetricLine({
             title="Estimated fallback; Statistics Canada value suppressed."
           >
             est.
+          </span>
+        )}
+        {status === "derived" && (
+          <span
+            data-testid="derived-flag"
+            className="ml-1 align-middle text-xs font-medium text-indigo-600 dark:text-indigo-400"
+            title="Calculated from published source values; not separately published by the source agency."
+          >
+            derived
           </span>
         )}
         {status === "low_confidence" && (

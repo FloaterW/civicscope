@@ -17,6 +17,11 @@ services:
         value: "false"
       - key: CORS_ORIGINS
         sync: false
+      # Render terminates public traffic at its proxy; trust its forwarded client address.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: RATE_LIMIT
+        value: 60/minute
 
 databases:
   - name: civicscope-db

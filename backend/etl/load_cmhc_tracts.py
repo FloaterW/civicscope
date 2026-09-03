@@ -380,6 +380,12 @@ def main() -> None:
         _self_test()
         return
     if args.generate_csv:
+        canonical_output = PROJECT_ROOT / "app" / "data" / "cmhc_ct_metrics.csv"
+        if args.allow_partial and args.output.resolve() == canonical_output.resolve():
+            p.error(
+                "--allow-partial requires an explicit noncanonical --output path; "
+                "partial diagnostics cannot replace the packaged CSV."
+            )
         print("Fetching + validating real CMHC census-tract SCSS data from HMIP...", file=sys.stderr)
         report = generate_csv(args.years, args.output, allow_partial=args.allow_partial)
         print(json.dumps(report, indent=2))

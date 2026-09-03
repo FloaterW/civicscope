@@ -15,11 +15,15 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import io
+import json
 import math
 import os
 import sys
+import time
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -39,24 +43,47 @@ GTFS_FEEDS: dict[str, str] = {
     "durham": "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip",
 }
 
+AGENCY_NAMES = {
+    "ttc": "TTC",
+    "miway": "MiWay",
+    "go_transit": "GO Transit",
+    "brampton": "Brampton Transit",
+    "durham": "Durham Region Transit",
+}
+
 BUFFER_METERS = 800
-MIN_AGENCIES = 3  # fail-closed: require ≥3 agencies to produce valid scores
+MIN_AGENCIES = len(GTFS_FEEDS)
+DEFAULT_CACHE_MAX_AGE_HOURS = 24.0
+CANONICAL_SCORES_PATH = PROJECT_ROOT / "app" / "data" / "transit_scores.csv"
+CANONICAL_MANIFEST_PATH = PROJECT_ROOT / "app" / "data" / "transit_manifest.json"
 
 
-def download_feed(agency: str, url: str) -> tuple[Path, bool]:
+def download_feed(
+    agency: str,
+    url: str,
+    *,
+    force: bool = False,
+    max_age_hours: float = DEFAULT_CACHE_MAX_AGE_HOURS,
+) -> tuple[Path, bool]:
     """Download a GTFS feed. Returns (path, success)."""
     GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     dest = GTFS_CACHE_DIR / f"{agency}.zip"
-    if dest.exists():
-        print(f"  [cache hit] {agency}")
-        return dest, True
+    if dest.exists() and not force:
+        age_hours = (time.time() - dest.stat().st_mtime) / 3600
+        if age_hours <= max_age_hours:
+            print(f"  [cache hit] {agency} ({age_hours:.1f}h old)")
+            return dest, True
+        print(f"  [cache stale] {agency} ({age_hours:.1f}h old); refreshing")
     print(f"  Downloading {agency} GTFS feed...")
+    temporary = dest.with_suffix(".zip.download")
     try:
         with urlopen(url, timeout=60) as resp:
-            dest.write_bytes(resp.read())
+            temporary.write_bytes(resp.read())
+        temporary.replace(dest)
         print(f"  [ok] {agency} ({dest.stat().st_size / 1024:.0f} KB)")
         return dest, True
     except Exception as e:
+        temporary.unlink(missing_ok=True)
         print(f"  [FAIL] {agency}: {e}", file=sys.stderr)
         return dest, False
 
@@ -239,13 +266,75 @@ def normalize_route_counts(counts: dict[str, int]) -> dict[str, tuple[int, float
 
 
 def write_csv(scores: dict[str, tuple[int, float]], path: Path) -> None:
-    with open(path, "w", newline="") as f:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(f"{path.suffix}.tmp")
+    with temporary.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["geoid", "transit_route_count", "transit_score"])
         for geoid in sorted(scores):
             count, score = scores[geoid]
             w.writerow([geoid, count, score])
+    temporary.replace(path)
     print(f"Wrote {len(scores)} rows to {path}")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_manifest(
+    path: Path,
+    agencies_with_data: list[str],
+    scores_path: Path,
+    score_count: int,
+) -> None:
+    included = []
+    for agency in agencies_with_data:
+        feed = GTFS_CACHE_DIR / f"{agency}.zip"
+        included.append(
+            {
+                "id": agency,
+                "name": AGENCY_NAMES[agency],
+                "feed_retrieved_at": (
+                    datetime.fromtimestamp(feed.stat().st_mtime, UTC).isoformat()
+                    if feed.exists()
+                    else None
+                ),
+                "feed_sha256": _sha256(feed) if feed.exists() else None,
+            }
+        )
+    missing = [
+        {"id": agency, "name": AGENCY_NAMES[agency]}
+        for agency in GTFS_FEEDS
+        if agency not in agencies_with_data
+    ]
+    payload = {
+        "schema_version": 1,
+        "packaged_at": datetime.now(UTC).isoformat(),
+        "coverage_status": "complete" if not missing else "partial",
+        "method_version": "routes-within-800m-v1",
+        "buffer_meters": BUFFER_METERS,
+        "included_agencies": included,
+        "missing_agencies": missing,
+        "artifacts": {
+            scores_path.name: {
+                "sha256": _sha256(scores_path),
+                "tract_count": score_count,
+            }
+        },
+        "notes": [
+            "Scores count unique scheduled routes with a stop within 800 metres of a census tract boundary.",
+            "The score does not measure service frequency or travel time.",
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(f"{path.suffix}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
 
 
 def update_db(scores: dict[str, tuple[int, float]], db_url: str) -> int:
@@ -272,14 +361,28 @@ def update_db(scores: dict[str, tuple[int, float]], db_url: str) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Load GTFS transit scores")
     parser.add_argument("--skip-download", action="store_true", help="Use cached GTFS zips")
+    parser.add_argument("--refresh", action="store_true", help="Refresh feeds even when cache files are recent")
     parser.add_argument("--generate-csv", action="store_true", help="Write CSV instead of updating DB")
     parser.add_argument("--db-url", default=None, help="Database URL (default: from env/settings)")
+    parser.add_argument("--output", type=Path, help="CSV output path (default: packaged transit_scores.csv)")
+    parser.add_argument("--manifest-output", type=Path, help="Manifest output path")
     parser.add_argument(
         "--allow-partial",
         action="store_true",
-        help="Allow writing results even when agency coverage is below the minimum threshold.",
+        help="Allow diagnostic CSV output with missing agencies; requires explicit noncanonical --output.",
     )
     args = parser.parse_args()
+
+    output_path = args.output or CANONICAL_SCORES_PATH
+    if args.allow_partial and (
+        not args.generate_csv
+        or args.output is None
+        or output_path.resolve() == CANONICAL_SCORES_PATH.resolve()
+    ):
+        parser.error(
+            "--allow-partial is diagnostic only and requires --generate-csv with an "
+            "explicit noncanonical --output path."
+        )
 
     db_url = args.db_url or os.environ.get(
         "DATABASE_URL",
@@ -292,7 +395,7 @@ def main() -> None:
         print("\n1. Downloading GTFS feeds...")
         failed_agencies: list[str] = []
         for agency, url in GTFS_FEEDS.items():
-            _, ok = download_feed(agency, url)
+            _, ok = download_feed(agency, url, force=args.refresh)
             if not ok:
                 failed_agencies.append(agency)
         if failed_agencies:
@@ -306,7 +409,7 @@ def main() -> None:
     agencies_with_data: list[str] = []
     for agency in GTFS_FEEDS:
         zip_path = GTFS_CACHE_DIR / f"{agency}.zip"
-        stops = parse_gtfs_stop_routes(zip_path)
+        stops = {} if agency in failed_agencies else parse_gtfs_stop_routes(zip_path)
         print(f"  {agency}: {len(stops)} stops")
         all_feeds[agency] = stops
         if stops:
@@ -348,8 +451,14 @@ def main() -> None:
     print(f"  Median routes: {sorted(values)[len(values)//2]}")
 
     if args.generate_csv:
-        out = PROJECT_ROOT / "app" / "data" / "transit_scores.csv"
-        write_csv(scores, out)
+        write_csv(scores, output_path)
+        manifest_path = args.manifest_output or (
+            CANONICAL_MANIFEST_PATH
+            if output_path.resolve() == CANONICAL_SCORES_PATH.resolve()
+            else output_path.with_suffix(".manifest.json")
+        )
+        write_manifest(manifest_path, agencies_with_data, output_path, len(scores))
+        print(f"Wrote transit provenance manifest to {manifest_path}")
     else:
         print("\n4. Updating metrics table...")
         updated = update_db(scores, db_url)

@@ -1,0 +1,5 @@
+-r requirements.in
+
+httpx2>=2.12,<3.0
+pip-audit>=2.9,<3.0
+pytest>=8.3,<9.0

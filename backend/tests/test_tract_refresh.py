@@ -114,24 +114,59 @@ def test_seed_boundary_refresh_rejects_unmatched_tracts(tmp_path):
 
 
 def test_database_boundary_refresh_preserves_metric_values(db_session):
-    geography = db_session.query(Geography).filter(Geography.type == "census_tract").first()
+    geographies = db_session.query(Geography).filter(Geography.type == "census_tract").all()
+    geography = geographies[0]
     assert geography is not None
     metric = db_session.query(Metric).filter(Metric.geoid == geography.geoid).one()
     original_income = metric.median_income
-    row = {
-        "geoid": geography.geoid,
-        "name": geography.name,
-        "type": "census_tract",
-        "county": geography.county,
-        "state": geography.state,
-        "geometry": _polygon(-79.9, 43.1, -79.6, 43.4),
-        "bbox": [-79.9, 43.1, -79.6, 43.4],
-        "geometry_source": "refreshed",
-        "metrics": [{"year": metric.year, "median_income": 1}],
-    }
+    rows = []
+    for item in geographies:
+        item_metric = db_session.query(Metric).filter(Metric.geoid == item.geoid).one()
+        rows.append(
+            {
+                "geoid": item.geoid,
+                "name": item.name,
+                "type": "census_tract",
+                "county": item.county,
+                "state": item.state,
+                "geometry": (
+                    _polygon(-79.9, 43.1, -79.6, 43.4)
+                    if item.geoid == geography.geoid
+                    else item.geometry
+                ),
+                "bbox": (
+                    [-79.9, 43.1, -79.6, 43.4]
+                    if item.geoid == geography.geoid
+                    else item.bbox
+                ),
+                "geometry_source": "refreshed",
+                "metrics": [{"year": item_metric.year, "median_income": 1}],
+            }
+        )
 
-    assert upsert_tract_geometries(db_session, [row]) == 1
+    assert upsert_tract_geometries(db_session, rows) == len(rows)
     db_session.flush()
 
     assert metric.median_income == original_income
     assert geography.geometry_source == "refreshed"
+
+
+def test_database_boundary_refresh_rejects_missing_existing_tract(db_session):
+    geographies = db_session.query(Geography).filter(Geography.type == "census_tract").all()
+    rows = [
+        {
+            "geoid": item.geoid,
+            "name": item.name,
+            "type": "census_tract",
+            "county": item.county,
+            "state": item.state,
+            "geometry": item.geometry,
+            "bbox": item.bbox,
+            "geometry_source": "refreshed",
+            "metrics": [],
+        }
+        for item in geographies[:-1]
+    ]
+
+    with pytest.raises(ValueError, match="identifiers do not match"):
+        upsert_tract_geometries(db_session, rows)

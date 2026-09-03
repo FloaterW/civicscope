@@ -31,7 +31,7 @@ type MapPayload = {
     };
     geography_type: "municipality" | "census_tract";
     data_quality: {
-      metric_status: "official" | "estimated" | "mixed" | "zone";
+      metric_status: "official" | "derived" | "estimated" | "mixed" | "zone";
       label: string;
     };
   };
@@ -292,6 +292,17 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(yearSelect).toBeDisabled();
   });
 
+  test("comparison keeps requested areas when a metric is unavailable", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByLabel("Map metric").selectOption("vacancy_rate");
+
+    const comparison = page.getByTestId("comparison-panel");
+    await expect(comparison).toContainText("default GTA municipalities");
+    await expect(comparison.locator("tbody tr")).toHaveCount(5);
+    await expect(comparison).toContainText("Not available");
+  });
+
   test("switching between Census and CMHC metrics does not produce API errors", async ({ page }) => {
     const apiErrors: string[] = [];
     page.on("response", (response) => {
@@ -490,7 +501,8 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(response.ok()).toBeTruthy();
     const payload = (await response.json()) as MapPayload;
 
-    expect(payload.metadata.data_quality.metric_status).toBe("zone");
+    expect(payload.metadata.data_quality.metric_status).toBe("mixed");
+    expect(payload.metadata.data_quality.label).toContain("municipal fallback");
 
     const toronto = payload.features.filter((f) => f.properties.name?.includes("Toronto census tract"));
     const values = new Set(toronto.map((f) => (f.properties as Record<string, unknown>).value));
@@ -575,6 +587,48 @@ test.describe("CivicScope dashboard regressions", () => {
     await search.click();
     await search.fill("zzzznomatch");
     await expect(page.getByTestId("search-empty")).toContainText("No", { timeout: 5000 });
+  });
+
+  test("API failure is visible and retry restores the map", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    let failMap = true;
+    await page.route(`${API_BASE}/api/map-data**`, async (route) => {
+      if (failMap) {
+        await route.abort("failed");
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto("/");
+    await expect(page.getByText("Map data is unavailable")).toBeVisible();
+
+    failMap = false;
+    await page.getByRole("button", { name: "Retry map", exact: true }).click();
+    await expect(page.getByText("Map data is unavailable")).toBeHidden({ timeout: 30000 });
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-feature-count", "25");
+  });
+
+  test("search network failures are not reported as no matches", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/geographies**`, (route) => route.abort("failed"));
+    await page.goto("/");
+    await page.getByTestId("geography-search").fill("Toronto");
+
+    await expect(page.getByTestId("search-error")).toContainText("temporarily unavailable");
+    await expect(page.getByTestId("search-empty")).toHaveCount(0);
+  });
+
+  test("mobile details control exposes its expanded state", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const toggle = page.getByRole("button", { name: "Summary & Details" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toHaveAttribute("aria-controls", "summary-details-panel");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
   });
 
   test("the no-results message does not block other controls", async ({ page }) => {

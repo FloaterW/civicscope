@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import csv
-import json
-from importlib.resources import files
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -14,6 +12,11 @@ from sqlalchemy.orm import Session, load_only
 from app.db.session import get_db
 from app.models import CmhcMetric, CmhcTractMetric, Geography, Metric
 from app.schemas.responses import GeographiesListResponse, GeographyResponse
+from app.services.cmhc_allocations import (
+    CMHC_COUNT_METRICS,
+    CMHC_REAL_TRACT_METRICS,
+    build_tract_count_allocations,
+)
 from app.services.geojson import compact_geometry
 from app.services.metric_calculations import (
     CMHC_METRICS,
@@ -28,51 +31,23 @@ from app.services.metric_calculations import (
 )
 from app.services.postgis import load_postgis_map_geometries
 from app.services.summary import build_summary
+from app.services.transit_provenance import (
+    load_transit_manifest,
+    load_transit_routes,
+    transit_data_quality,
+    transit_data_source,
+)
 
 router = APIRouter(prefix="/api", tags=["civic data"])
 
 DEFAULT_GEOGRAPHY_TYPE = "municipality"
 SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
 
-_transit_routes_cache: dict[str, Any] | None = None
-
-
-def _load_transit_routes() -> dict[str, Any]:
-    global _transit_routes_cache
-    if _transit_routes_cache is not None:
-        return _transit_routes_cache
-    path = files("app.data").joinpath("transit_routes.geojson")
-    if path.is_file():
-        _transit_routes_cache = json.loads(path.read_text(encoding="utf-8"))
-    else:
-        _transit_routes_cache = {"type": "FeatureCollection", "features": []}
-    return _transit_routes_cache
-
-
 @router.get("/transit-routes")
 def get_transit_routes() -> JSONResponse:
-    return JSONResponse(_load_transit_routes())
-
-# Count-based CMHC metrics are municipality-level totals. In census tract views
-# they are proportionally allocated by renter-household share and labeled as
-# estimated; rate/average metrics such as vacancy and rents are inherited.
-CMHC_COUNT_METRICS = frozenset({
-    "rental_universe",
-    "housing_starts_total",
-    "housing_starts_single",
-    "housing_starts_semi",
-    "housing_starts_row",
-    "housing_starts_apartment",
-    "housing_completions",
-    "units_under_construction",
-    "unabsorbed_units",
-})
-
-# Count metrics for which CMHC publishes REAL census-tract values (loaded into
-# cmhc_tract_metrics during ETL, validated against published CMA totals). For a
-# tract+year that has a real value we serve it (provenance "official"); for
-# everything else we keep the renter-share allocation (provenance "estimated").
-CMHC_REAL_TRACT_METRICS = frozenset({"housing_starts_total", "housing_completions"})
+    payload = dict(load_transit_routes())
+    payload["metadata"] = load_transit_manifest()
+    return JSONResponse(payload)
 
 # CMHC reports some GTA municipalities together as one combined survey zone, so
 # those municipalities share identical rental values. This map lets the UI
@@ -164,7 +139,7 @@ MAX_IDS = 500
 def parse_ids(ids: str | None) -> list[str]:
     if not ids:
         return []
-    items = [item.strip() for item in ids.split(",") if item.strip()]
+    items = list(dict.fromkeys(item.strip() for item in ids.split(",") if item.strip()))
     if len(items) > MAX_IDS:
         raise HTTPException(status_code=400, detail=f"Too many IDs (max {MAX_IDS}).")
     return items
@@ -258,16 +233,15 @@ def serialize_cmhc_metric(
     cmhc: CmhcMetric,
     *,
     tract_inherited: bool = False,
-    tract_share: float | None = None,
+    allocated_counts: Mapping[str, int | None] | None = None,
     real_tract: "CmhcTractMetric | None" = None,
     zone_name: str | None = None,
 ) -> dict[str, Any]:
     """Serialize a CmhcMetric row to a dict.
 
     When ``tract_inherited`` is True the row is a municipality-level record
-    being attached to a census tract.  If ``tract_share`` (0-1) is provided,
-    count-based metrics are proportionally allocated to the tract based on its
-    share of the municipality's renter households.
+    being attached to a census tract. ``allocated_counts`` contains the
+    conservative largest-remainder allocation computed for all sibling tracts.
 
     When ``zone_name`` is provided, rate metrics (vacancy, average rent) are
     overridden with the tract's CMHC survey-zone value instead of inheriting
@@ -278,14 +252,14 @@ def serialize_cmhc_metric(
     ``official`` via the ``*_source`` keys; other count fields stay estimated.
     """
 
-    def _alloc(val: int | None) -> int | None:
+    def _alloc(metric_key: str, val: int | None) -> int | None:
         if not tract_inherited or val is None:
             return val
-        if tract_share is None:
+        if allocated_counts is None:
             return None
-        return round(val * tract_share)
+        return allocated_counts.get(metric_key)
 
-    allocated = tract_inherited and tract_share is not None
+    allocated = tract_inherited and allocated_counts is not None
 
     def _count_with_source(metric_key: str, allocated_val: int | None) -> tuple[int | None, str]:
         if real_tract is not None:
@@ -298,15 +272,21 @@ def serialize_cmhc_metric(
         return allocated_val, "estimated"
 
     starts, starts_source = _count_with_source(
-        "housing_starts_total", _alloc(cmhc.housing_starts_total)
+        "housing_starts_total", _alloc("housing_starts_total", cmhc.housing_starts_total)
     )
     completions, completions_source = _count_with_source(
-        "housing_completions", _alloc(cmhc.housing_completions)
+        "housing_completions", _alloc("housing_completions", cmhc.housing_completions)
     )
 
     zone_data = ZONE_RMS.get(zone_name) if zone_name else None
     vacancy = zone_data["vacancy_rate"] if zone_data and zone_data["vacancy_rate"] is not None else cmhc.vacancy_rate
     avg_rent = zone_data["average_rent_total"] if zone_data and zone_data["average_rent_total"] is not None else cmhc.average_rent_total
+    shared_municipal_zone = CMHC_RMS_SHARED_ZONES.get(cmhc.geoid)
+
+    def _rms_source(zone_value_available: bool) -> str:
+        if tract_inherited:
+            return "survey_zone" if zone_value_available else "inherited_municipality"
+        return "survey_zone" if shared_municipal_zone else "municipality"
 
     result: dict[str, Any] = {
         "year": cmhc.year,
@@ -318,44 +298,33 @@ def serialize_cmhc_metric(
         "average_rent_3br_plus": cmhc.average_rent_3br_plus,
         "turnover_rate": cmhc.turnover_rate,
         "availability_rate": cmhc.availability_rate,
-        "rental_universe": _alloc(cmhc.rental_universe),
+        "rental_universe": _alloc("rental_universe", cmhc.rental_universe),
         "housing_starts_total": starts,
-        "housing_starts_single": _alloc(cmhc.housing_starts_single),
-        "housing_starts_semi": _alloc(cmhc.housing_starts_semi),
-        "housing_starts_row": _alloc(cmhc.housing_starts_row),
-        "housing_starts_apartment": _alloc(cmhc.housing_starts_apartment),
+        "housing_starts_single": _alloc("housing_starts_single", cmhc.housing_starts_single),
+        "housing_starts_semi": _alloc("housing_starts_semi", cmhc.housing_starts_semi),
+        "housing_starts_row": _alloc("housing_starts_row", cmhc.housing_starts_row),
+        "housing_starts_apartment": _alloc(
+            "housing_starts_apartment", cmhc.housing_starts_apartment
+        ),
         "housing_completions": completions,
-        "units_under_construction": _alloc(cmhc.units_under_construction),
-        "unabsorbed_units": _alloc(cmhc.unabsorbed_units),
+        "units_under_construction": _alloc(
+            "units_under_construction", cmhc.units_under_construction
+        ),
+        "unabsorbed_units": _alloc("unabsorbed_units", cmhc.unabsorbed_units),
         "rms_surveyed": cmhc.rms_surveyed,
         "allocated": allocated,
         "starts_source": starts_source,
         "completions_source": completions_source,
         "survey_zone": zone_name or CMHC_RMS_SHARED_ZONES.get(cmhc.geoid),
+        "vacancy_rate_source": _rms_source(
+            bool(zone_data and zone_data["vacancy_rate"] is not None)
+        ),
+        "average_rent_total_source": _rms_source(
+            bool(zone_data and zone_data["average_rent_total"] is not None)
+        ),
+        "other_rms_source": _rms_source(False),
     }
     return result
-
-
-def _compute_tract_shares(records: list) -> dict[str, float]:
-    """Compute each census tract's share of its municipality's renter households.
-
-    Returns a dict mapping tract geoid to fraction (0-1) used to
-    proportionally allocate municipal CMHC count metrics to tracts.
-    """
-    muni_renters: dict[str, int] = {}
-    tract_renters: dict[str, int] = {}
-    for geography, metric in records:
-        if geography.county:
-            r = metric.renter_households or 0
-            muni_renters[geography.county] = muni_renters.get(geography.county, 0) + r
-            tract_renters[geography.geoid] = r
-    shares: dict[str, float] = {}
-    for geography, _ in records:
-        if geography.county:
-            total = muni_renters.get(geography.county, 0)
-            if total > 0:
-                shares[geography.geoid] = tract_renters.get(geography.geoid, 0) / total
-    return shares
 
 
 def joined_records(
@@ -580,7 +549,7 @@ def compare_geographies(
     }
     # Build name-to-geoid lookup for census tract CMHC inheritance.
     municipality_name_to_geoid: dict[str, str] = {}
-    tract_shares: dict[str, float] = {}
+    tract_count_allocations: dict[str, dict[str, int | None]] = {}
     real_tract_cmhc: dict[str, CmhcTractMetric] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
@@ -596,10 +565,15 @@ def compare_geographies(
         all_tract_records = joined_records(
             db, metric_year, geography_type="census_tract", include_geometry=False
         )
-        tract_shares = _compute_tract_shares(all_tract_records)
         # Real published CMHC tract values for this year (same as the map uses)
         # so compare and map agree per tract instead of diverging.
         real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
+        tract_count_allocations = build_tract_count_allocations(
+            all_tract_records,
+            municipality_name_to_geoid,
+            cmhc_by_geoid,
+            real_tract_cmhc,
+        )
 
     items = []
     for geography, metric in ordered_records:
@@ -618,13 +592,15 @@ def compare_geographies(
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
-        share = tract_shares.get(geography.geoid) if is_tract_inherited else None
+        allocated_counts = (
+            tract_count_allocations.get(geography.geoid) if is_tract_inherited else None
+        )
         zone = TRACT_ZONE_CROSSWALK.get(geography.geoid) if is_tract_inherited else None
         if cmhc_row:
             item["cmhc_metrics"] = serialize_cmhc_metric(
                 cmhc_row,
                 tract_inherited=is_tract_inherited,
-                tract_share=share,
+                allocated_counts=allocated_counts,
                 real_tract=real_tract_cmhc.get(geography.geoid),
                 zone_name=zone,
             )
@@ -689,7 +665,7 @@ def get_map_data(
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
     }
     municipality_name_to_geoid: dict[str, str] = {}
-    tract_shares: dict[str, float] = {}
+    tract_count_allocations: dict[str, dict[str, int | None]] = {}
     real_tract_cmhc: dict[str, CmhcTractMetric] = {}
     if normalized_type == "census_tract":
         municipality_name_to_geoid = {
@@ -698,32 +674,28 @@ def get_map_data(
             .filter(Geography.type == "municipality")
             .all()
         }
-        tract_shares = _compute_tract_shares(records)
         # Always load real tract values in CMHC tract mode (not just when the
         # mapped metric is starts/completions): the detail panel serializes the
         # full cmhc_metrics for every feature, so starts/completions must keep
         # their real "official" provenance regardless of which metric colours
         # the map.
-        if cmhc:
-            real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
+        real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
+        tract_count_allocations = build_tract_count_allocations(
+            records,
+            municipality_name_to_geoid,
+            cmhc_by_geoid,
+            real_tract_cmhc,
+        )
 
     if cmhc:
         if normalized_type == "census_tract" and metric_key in CMHC_COUNT_METRICS:
             values = []
             for geography, _ in records:
-                real = real_tract_count(real_tract_cmhc.get(geography.geoid), metric_key)
-                if real is not None:
-                    values.append(real)
-                    continue
-                if not geography.county:
-                    continue
-                parent_geoid = municipality_name_to_geoid.get(geography.county)
-                cr = cmhc_by_geoid.get(parent_geoid) if parent_geoid else None
-                share = tract_shares.get(geography.geoid)
-                if cr and share is not None:
-                    raw = metric_value(metric_key, cr)
-                    if raw is not None:
-                        values.append(round(raw * share))
+                allocated = tract_count_allocations.get(geography.geoid, {}).get(
+                    metric_key
+                )
+                if allocated is not None:
+                    values.append(allocated)
         elif normalized_type == "census_tract" and metric_key in CMHC_ZONE_RATE_METRICS:
             values = []
             for geography, _ in records:
@@ -792,6 +764,8 @@ def get_map_data(
             for candidate in sorted(VALID_METRICS)
         },
     }
+    if is_transit_metric(metric_key):
+        metadata["transit_snapshot"] = load_transit_manifest()
 
     features = []
     for geography, row in records:
@@ -814,16 +788,16 @@ def get_map_data(
         else:
             cmhc_row = cmhc_by_geoid.get(geography.geoid)
             is_tract_inherited = False
-        share = tract_shares.get(geography.geoid) if is_tract_inherited else None
+        allocated_counts = (
+            tract_count_allocations.get(geography.geoid) if is_tract_inherited else None
+        )
         zone = TRACT_ZONE_CROSSWALK.get(geography.geoid) if is_tract_inherited else None
         real_row = real_tract_cmhc.get(geography.geoid)
         if cmhc:
-            real = real_tract_count(real_row, metric_key)
-            if real is not None:
-                props["value"] = real
-            elif is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
-                raw = metric_value(metric_key, cmhc_row) if cmhc_row else None
-                props["value"] = round(raw * share) if raw is not None and share is not None else None
+            if is_tract_inherited and metric_key in CMHC_COUNT_METRICS:
+                props["value"] = (
+                    allocated_counts.get(metric_key) if allocated_counts is not None else None
+                )
             elif is_tract_inherited and metric_key in CMHC_ZONE_RATE_METRICS:
                 zd = ZONE_RMS.get(zone) if zone else None
                 if zd and zd.get(metric_key) is not None:
@@ -838,7 +812,7 @@ def get_map_data(
             props["cmhc_metrics"] = serialize_cmhc_metric(
                 cmhc_row,
                 tract_inherited=is_tract_inherited,
-                tract_share=share,
+                allocated_counts=allocated_counts,
                 real_tract=real_row,
                 zone_name=zone,
             )
@@ -875,11 +849,7 @@ def is_transit_metric(metric_key: str) -> bool:
 
 def map_data_source(geography_type: str | None, cmhc: bool = False, metric_key: str | None = None) -> str:
     if metric_key and is_transit_metric(metric_key):
-        return (
-            "GTFS schedule data from TTC, GO Transit, MiWay, Brampton Transit, "
-            "and Durham Region Transit. Unique routes counted within 800m of each "
-            "census tract boundary."
-        )
+        return transit_data_source()
     if cmhc:
         return (
             "CMHC Rental Market Survey and Starts & Completions Survey data "
@@ -924,12 +894,11 @@ def data_quality(
             }
         if metric_key is not None and metric_key in CMHC_ZONE_RATE_METRICS and TRACT_ZONE_CROSSWALK:
             return {
-                "metric_status": "zone",
-                "label": "CMHC survey-zone value",
+                "metric_status": "mixed",
+                "label": "CMHC survey-zone values + municipal fallback",
                 "description": (
-                    "Each tract shows its CMHC survey zone's value. Zones are sub-city areas "
-                    "surveyed by CMHC, finer than the municipality but coarser than census tracts. "
-                    "Tracts in the same zone share the same value."
+                    "Matched tracts show their CMHC survey zone's value. Tracts without a zone "
+                    "crosswalk use the parent municipality's value and are identified per feature."
                 ),
             }
         return {
@@ -951,13 +920,14 @@ def data_quality(
             ),
         }
     if metric_key is not None and metric_key in TRANSIT_METRICS:
+        return transit_data_quality()
+    if metric_key in {"affordability_index", "rent_to_income_ratio", "population_growth_pct"}:
         return {
-            "metric_status": "official",
-            "label": "GTFS transit accessibility",
+            "metric_status": "derived",
+            "label": "Derived from official Census values",
             "description": (
-                "Transit score derived from GTFS schedule data published by TTC, GO Transit, "
-                "MiWay, Brampton Transit, and Durham Region Transit. Unique routes within 800m "
-                "of each census tract boundary are counted and normalized to a 0-100 score."
+                "This indicator is calculated from published Statistics Canada 2021 "
+                "Census Profile inputs; it is not a separately published Census measure."
             ),
         }
     if geography_type == "census_tract":

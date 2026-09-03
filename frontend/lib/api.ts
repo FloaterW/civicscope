@@ -9,6 +9,15 @@ import type {
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+const DEFAULT_API_TIMEOUT_MS = 60_000;
+
+export function normalizeApiTimeout(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : DEFAULT_API_TIMEOUT_MS;
+}
+
+export const API_TIMEOUT_MS = normalizeApiTimeout(
+  Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? DEFAULT_API_TIMEOUT_MS)
+);
 
 export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: string; group: string }> = [
   { key: "rent_burden_pct", label: "Rent burden", shortLabel: "Burden", group: "Census Profile" },
@@ -58,17 +67,42 @@ export function getTransitRoutes(): Promise<unknown> {
   return transitRoutesPromise;
 }
 
-export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+export async function fetchJson<T>(
+  path: string,
+  signal?: AbortSignal,
+  timeoutMs: number = API_TIMEOUT_MS
+): Promise<T> {
+  const effectiveTimeoutMs = normalizeApiTimeout(timeoutMs);
+  const requestController = new AbortController();
+  let timedOut = false;
+  const abortFromCaller = () => requestController.abort(signal?.reason);
+  if (signal?.aborted) {
+    abortFromCaller();
+  } else {
+    signal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true;
+    requestController.abort();
+  }, effectiveTimeoutMs);
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      signal
+      signal: requestController.signal
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (requestController.signal.aborted) {
+      if (timedOut) {
+        throw new Error(
+          `The CivicScope API did not respond within ${Math.max(1, Math.ceil(effectiveTimeoutMs / 1000))} seconds. Try again.`
+        );
+      }
       throw error;
     }
     throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
+  } finally {
+    globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abortFromCaller);
   }
   if (!response.ok) {
     let message: string;

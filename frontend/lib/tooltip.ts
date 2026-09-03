@@ -48,6 +48,8 @@ export function buildTooltipHtml(
   const note =
     fieldStatus === "estimated"
       ? " (estimated)"
+      : fieldStatus === "derived"
+        ? " (derived)"
       : fieldStatus === "low_confidence"
         ? " (low confidence)"
         : "";

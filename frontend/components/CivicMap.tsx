@@ -1,12 +1,12 @@
 "use client";
 
 import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatMetric, getMetricLabel, getTransitRoutes } from "@/lib/api";
 import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
 import { buildTooltipHtml, escapeHtml, safeJsonParse } from "@/lib/tooltip";
-import type { GeographyLevel, MapData, MapFeature, MetricFieldStatus, MetricKey, MetricQuality, MetricValues } from "@/types";
+import type { GeographyLevel, MapData, MapFeature, MetricKey } from "@/types";
 
 type Props = {
   data: MapData | null;
@@ -15,6 +15,8 @@ type Props = {
   geographyLevel: GeographyLevel;
   selectedGeoid?: string;
   onSelect: (feature: MapFeature["properties"]) => void;
+  error?: string | null;
+  onRetry?: () => void;
 };
 
 const sourceId = "civic-geographies";
@@ -27,7 +29,6 @@ const selectedLineLayerId = "civic-geographies-selected";
 const placeCircleLayerId = "gta-reference-places-circle";
 const transitSourceId = "transit-routes";
 const transitLineLayerId = "transit-routes-line";
-const transitLabelLayerId = "transit-routes-label";
 
 const referencePlaces = {
   type: "FeatureCollection",
@@ -88,7 +89,16 @@ function buildTransitFilter(filters: TransitFilters): FilterSpecification | unde
   return ["in", "transit_category", ...active] as unknown as FilterSpecification;
 }
 
-export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid, onSelect }: Props) {
+export function CivicMap({
+  data,
+  loading,
+  metric,
+  geographyLevel,
+  selectedGeoid,
+  onSelect,
+  error,
+  onRetry
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const mapReadyRef = useRef(false);
@@ -240,7 +250,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
               source: sourceId,
               filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
               paint: {
-                "line-color": "#0f172a",
+                "line-color": dark ? "#f8fafc" : "#0f172a",
                 "line-width": 4,
                 "line-opacity": 0.95
               }
@@ -430,7 +440,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         {
           padding: { top: 80, right: 80, bottom: 120, left: 80 },
           maxZoom: data?.metadata.geography_type === "census_tract" ? 11.35 : 9.15,
-          duration: 650
+          duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
         }
       );
     }
@@ -449,6 +459,13 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       }
       if (map.getLayer("background")) {
         map.setPaintProperty("background", "background-color", dark ? DARK_BG : LIGHT_BG);
+      }
+      if (map.getLayer(selectedLineLayerId)) {
+        map.setPaintProperty(
+          selectedLineLayerId,
+          "line-color",
+          dark ? "#f8fafc" : "#0f172a"
+        );
       }
     });
     observer.observe(document.documentElement, {
@@ -477,11 +494,28 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       }. Use the search box to inspect a specific geography.`}
       className="relative h-full w-full"
     >
-      {!data && (
+      {!data && loading && (
         <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel text-sm text-civic-muted">
           <div className="flex flex-col items-center gap-3">
             <div className="skeleton h-3 w-40" />
             <div className="skeleton h-3 w-28" />
+          </div>
+        </div>
+      )}
+      {!data && !loading && error && (
+        <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel p-6 text-center">
+          <div>
+            <p className="text-sm font-semibold text-civic-ink">Map data is unavailable</p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-civic-muted">{error}</p>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-3 rounded-md border border-civic-line px-3 py-1.5 text-xs font-semibold text-civic-ink hover:bg-civic-subtle"
+              >
+                Retry map
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -713,7 +747,7 @@ function computeColorStops(data: MapData): {
 
   const stops = ascending.map((value, index) => ({
     value,
-    color: rampColorAt(index / (ascending.length - 1))
+    color: rampColorAt(index / (ascending.length - 1), data.metadata.metric)
   }));
   return { stops, min, max, flat: false };
 }

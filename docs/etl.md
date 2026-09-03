@@ -33,7 +33,7 @@ docker compose exec backend python etl/load_tracts.py --update-seed --geojson /a
 docker compose exec backend python etl/load_tracts.py
 ```
 
-Use `--from-seed` when an existing local database already has municipality rows and needs the packaged census tract rows added without recreating the Postgres volume. Use `--update-seed` when refreshing the packaged offline seed after downloading an official CT GeoJSON extract.
+Use `--from-seed` when an existing local database already has municipality rows and needs the packaged census tract rows added without recreating the Postgres volume. `--update-seed` refreshes geometry only and preserves every official metric for matching CTUIDs. It aborts on identifier drift. `--replace-metrics-with-estimates` is an explicit demo-only escape hatch and must not be used for publication data.
 
 Source:
 
@@ -77,7 +77,7 @@ csduid,year,median_household_income,median_monthly_rent,population_2021,populati
 3520005,2021,88000,1850,2794000,2731571,650000,43.0
 ```
 
-The loader calculates `affordability_index`. It estimates `rent_burden_pct` only when a custom CSV omits the official shelter-cost burden field.
+The loader calculates `affordability_index`. Official/suppressed rent burden is preserved in storage; a labeled fallback is calculated only at API serialization time when rent and income are available.
 
 Source:
 
@@ -95,4 +95,25 @@ Alembic migrations create the core tables and the native `geographies.geom geome
 
 The frontend uses `detail=display` by default so the map remains responsive while the database keeps higher-detail municipal and tract boundaries. In SQLite tests, the API falls back to Python GeoJSON compaction.
 
-The map payload includes all metric values for each feature. The frontend changes the active metric locally for immediate color and legend updates, while the API still validates metric names and exposes `metadata.metric` for direct API consumers.
+The map payload includes all relevant values plus a per-metric metadata catalog. The frontend caches one payload per geography/data-family/year and changes metrics in that family locally. A different CMHC year, geography level, or Census/CMHC family triggers a new request.
+
+## Publication Safety
+
+Canonical seed refreshes are fail-closed and atomic. Census tract geometry and metric
+loaders reject missing, unexpected, duplicate, or wrong-vintage identifiers before
+mutating the database or seed. CMHC tract slices must reconcile to their published CMA
+totals. A partial network result can only be written with `--allow-partial` to an explicit,
+noncanonical diagnostic output path; it cannot update the database or overwrite a
+packaged seed.
+
+## Transit Loader
+
+`backend/etl/load_transit.py` builds route and tract-score artifacts from the configured
+TTC, MiWay, GO Transit, Durham Region Transit, and Brampton Transit GTFS feeds. Canonical
+publication requires all configured feeds. Downloads are refreshed after 24 hours (or
+with `--refresh`), are staged atomically, and never replace a usable cached feed on a
+failed request. `--skip-download` is the explicit offline-cache mode.
+
+Every canonical generation also writes `app/data/transit_manifest.json` with agency
+coverage, timestamps, method parameters, and artifact hashes. As with the other loaders,
+`--allow-partial` requires an explicit noncanonical output and cannot update the database.

@@ -143,9 +143,9 @@ def resolve_rent_burden(
 def build_metric_quality(row: Any) -> dict[str, str]:
     """Per-field provenance for a census metric row.
 
-    Statuses: ``official`` (published or reliably derived), ``estimated``
-    (fallback formula), ``unavailable`` (suppressed/missing), and
-    ``low_confidence`` (derived off a tiny denominator).
+    Statuses: ``official`` (published), ``derived`` (calculated from published
+    inputs), ``estimated`` (fallback formula), ``unavailable``
+    (suppressed/missing), and ``low_confidence`` (derived off a tiny denominator).
     """
     _, rent_burden_status = resolve_rent_burden(
         row.median_rent, row.median_income, row.rent_burden_pct
@@ -156,7 +156,7 @@ def build_metric_quality(row: Any) -> dict[str, str]:
     elif is_low_denominator_growth(row.previous_population):
         growth_status = "low_confidence"
     else:
-        growth_status = "official"
+        growth_status = "derived"
 
     def present(value: Any) -> str:
         return "official" if value is not None else "unavailable"
@@ -169,9 +169,17 @@ def build_metric_quality(row: Any) -> dict[str, str]:
         "renter_households": present(row.renter_households),
         "rent_burden_pct": rent_burden_status,
         "population_growth_pct": growth_status,
-        "affordability_index": present(row.affordability_index),
-        "transit_score": present(getattr(row, "transit_score", None)),
-        "transit_route_count": present(getattr(row, "transit_route_count", None)),
+        "affordability_index": (
+            "derived" if row.affordability_index is not None else "unavailable"
+        ),
+        "transit_score": (
+            "derived" if getattr(row, "transit_score", None) is not None else "unavailable"
+        ),
+        "transit_route_count": (
+            "derived"
+            if getattr(row, "transit_route_count", None) is not None
+            else "unavailable"
+        ),
     }
 
 

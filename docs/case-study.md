@@ -11,7 +11,7 @@ CivicScope is designed for a policy analyst, housing researcher, municipal plann
 ## Product Workflow
 
 1. Start at the GTA overview to scan median income, median rent, rent-to-income ratio, population, rent burden, and affordability index.
-2. Change the active metric to repaint the map immediately without waiting for another map request.
+2. Change the active metric. Metrics in the cached Census/transit or CMHC-year family repaint locally; changing family, year, or geography fetches the required payload once.
 3. Search for a municipality or census tract and inspect its local metrics in the detail panel.
 4. Compare selected places in the chart/table area to understand nearby variation.
 5. Use data-quality badges to distinguish official Census Profile metrics from CMHC metrics that are estimated when allocated to tracts.
@@ -20,13 +20,13 @@ CivicScope is designed for a policy analyst, housing researcher, municipal plann
 
 - FastAPI owns API validation, metric formulas, data shaping, and GeoJSON delivery.
 - PostgreSQL/PostGIS stores native geometries for map simplification and future spatial analysis.
-- The frontend receives all metric values in the map payload, then changes map colors locally for responsive metric switching.
+- The frontend caches one payload per geography/data-family/year and uses the API's metric metadata catalog to repaint values, legends, sources, and quality labels locally.
 - Packaged seed data keeps the demo reliable without API keys or live downloads.
 - ETL scripts separate official boundary loading, Census Profile metric loading, and tract layer refreshes.
 
 ## Current Data Quality
 
-Municipality and census tract metrics use official Statistics Canada 2021 Census Profile values. Census tract geometries are official Statistics Canada 2021 cartographic tract boundaries filtered to the GTA. CMHC rental-market metrics are official at the municipality level; in census tract mode, rate metrics are inherited from the parent municipality and count metrics are proportionally allocated, so the UI labels those tract-level CMHC values as estimated.
+Municipality and census tract metrics use official Statistics Canada 2021 Census Profile values. Census tract geometries are official Statistics Canada 2021 cartographic boundaries filtered to the GTA. CMHC tract construction counts are published values where available, parent-tract estimates after boundary splits, or renter-share municipal allocations as a final fallback. Vacancy and average rent use CMHC survey zones for matched tracts and a disclosed municipal fallback elsewhere. UI badges and CSV exports preserve these distinctions per value.
 
 ## What This Demonstrates
 

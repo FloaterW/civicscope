@@ -12,9 +12,13 @@ from etl.load_tract_census import (
     validate_tract_coverage,
     write_csv,
 )
+from etl.load_cmhc import SEED_PATH as CMHC_SEED_PATH
+from etl.load_cmhc import write_seed as write_cmhc_seed
 from etl.load_cmhc import CmhcRow, validate_seed_coverage
 from etl.load_cmhc_tracts import validate_generation_coverage
 from etl.load_transit import (
+    DEFAULT_CACHE_MAX_AGE_HOURS,
+    GTFS_FEEDS,
     MIN_AGENCIES,
     download_feed,
     merge_stop_routes,
@@ -95,6 +99,14 @@ def test_tract_census_field_gate_allows_expected_suppression_rate():
     assert report["field_coverage_pct"]["median_rent"] == 98.0
 
 
+def test_tract_census_gate_rejects_unexpected_identifiers():
+    geoids = ["5350001.00", "5350002.00"]
+    metrics = [_make_metric("5350001.00"), _make_metric("9999999.99")]
+
+    with pytest.raises(ValueError, match="unexpected tract identifiers"):
+        validate_tract_coverage(metrics, geoids)
+
+
 # --- CMHC municipality and tract coverage gates ---
 
 
@@ -119,6 +131,22 @@ def test_cmhc_seed_gate_accepts_complete_unsurveyed_row():
 
     assert report["partial"] is False
     assert report["actual_rows"] == 1
+
+
+def test_cmhc_seed_writer_supports_noncanonical_diagnostic_output(tmp_path: Path):
+    output = tmp_path / "cmhc-diagnostic.json"
+    rows = [
+        CmhcRow(
+            geoid="test",
+            year=2024,
+            housing_starts_total=1,
+            housing_completions=2,
+        )
+    ]
+
+    assert output != CMHC_SEED_PATH
+    assert write_cmhc_seed(rows, [2024], {"partial": True}, output) == 1
+    assert output.exists()
 
 
 def test_cmhc_tract_gate_rejects_missing_slices():
@@ -158,9 +186,29 @@ def test_transit_download_feed_reports_success(tmp_path: Path):
 
 def test_transit_min_agencies_gate():
     """Verify the MIN_AGENCIES constant is enforced."""
-    assert MIN_AGENCIES >= 2
+    assert MIN_AGENCIES == len(GTFS_FEEDS)
     agencies_with_data = ["ttc", "miway"]
-    assert len(agencies_with_data) < MIN_AGENCIES or MIN_AGENCIES <= 2
+    assert len(agencies_with_data) < MIN_AGENCIES
+
+
+def test_transit_stale_cache_is_refreshed(tmp_path: Path):
+    import io
+    cached = tmp_path / "test_agency.zip"
+    cached.write_bytes(b"old")
+    import os
+    import time
+
+    stale = time.time() - ((DEFAULT_CACHE_MAX_AGE_HOURS + 1) * 3600)
+    os.utime(cached, (stale, stale))
+    with patch("etl.load_transit.GTFS_CACHE_DIR", tmp_path):
+        mock_response = io.BytesIO(b"new")
+        with patch("etl.load_transit.urlopen", return_value=mock_response):
+            mock_response.__enter__ = lambda value: value
+            mock_response.__exit__ = lambda value, *args: None
+            path, ok = download_feed("test_agency", "http://fake")
+
+    assert ok is True
+    assert path.read_bytes() == b"new"
 
 
 def test_transit_parse_empty_zip_returns_empty():

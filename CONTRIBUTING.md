@@ -7,7 +7,7 @@
 git clone <repo-url> && cd civicscope
 docker compose up -d          # PostgreSQL + backend + frontend
 # OR run locally:
-cd backend && pip install -r requirements.txt
+cd backend && python -m pip install --require-hashes -r requirements-dev.lock
 cd ../frontend && npm install
 ```
 
@@ -19,7 +19,7 @@ cd ../frontend && npm install
 cd backend
 DATABASE_URL=sqlite:///./dev.db SEED_ON_STARTUP=true uvicorn app.main:app --reload
 # API docs at http://localhost:8000/docs
-python -m pytest               # 113 tests
+python -m pytest               # 157 pass; 2 PostGIS checks skip without a test database
 ```
 
 ### Frontend (Next.js)
@@ -29,15 +29,15 @@ cd frontend
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 npm run typecheck              # TypeScript strict mode
 npm run lint                   # ESLint
-npm run test:unit              # Vitest (20 tests)
-npm run test:e2e               # Playwright (35 tests, needs backend running)
+npm run test:unit              # Vitest (31 tests)
+npm run test:e2e               # Playwright (43 tests, needs backend running)
 ```
 
 ## Adding a New Census Metric
 
 1. **Backend model** -- add the column to `backend/app/models/metric.py`
-2. **Migration** -- create a new Alembic migration in `backend/app/db/migrations/`
-3. **Seed data** -- update `backend/data/demo_seed.json` with values for all geographies
+2. **Migration** -- create a new Alembic migration in `backend/alembic/versions/`
+3. **Seed data** -- update `backend/app/data/demo_seed.json` with values for all geographies
 4. **Metric calculation** -- register in `backend/app/services/metric_calculations.py` (`VALID_METRICS`, `metric_value()`)
 5. **API serialization** -- add to `serialize_metric()` in `backend/app/api/routes.py`
 6. **Frontend selector** -- add to `metricOptions` in `frontend/lib/api.ts`
@@ -51,8 +51,8 @@ Same as above, plus:
 
 - Add to `CMHC_METRICS` in `metric_calculations.py`
 - Add to `CMHC_METRIC_KEYS` in `frontend/lib/api.ts`
-- If it's a count metric, add to `CMHC_COUNT_METRICS` in `routes.py`
-- If it has real tract-level data, add to `CMHC_REAL_TRACT_METRICS` in `routes.py`
+- If it's a count metric, add to `CMHC_COUNT_METRICS` in `app/services/cmhc_allocations.py`
+- If it has real tract-level data, add to `CMHC_REAL_TRACT_METRICS` in `app/services/cmhc_allocations.py`
 
 ## Architecture
 
@@ -79,8 +79,8 @@ frontend/
 - Never fabricate data or label estimated values as official
 - All CMHC tract-level values must be validated against published CMA totals
 - Suppressed Census values show as "Not available", never backfilled silently
-- Growth rates computed from populations under 50 are flagged `low_confidence`
-- Field-level provenance (`official` / `estimated` / `unavailable`) is required for every metric
+- Growth rates computed from populations under 100 are flagged `low_confidence`
+- Field-level provenance (`official` / `estimated` / `estimated_parent` / `inherited` / `unavailable`) is required for exported and tract-level values
 
 ## Code Style
 
@@ -88,3 +88,15 @@ frontend/
 - Tailwind CSS with project CSS variables (`--civic-*`) for theming
 - Dark mode via CSS class strategy (`darkMode: "class"` in Tailwind config)
 - No comments unless the "why" is non-obvious
+
+## Updating Dependencies
+
+Runtime and development inputs live in `backend/requirements.in` and
+`backend/requirements-dev.in`. Regenerate both hash-locked environments with
+`pip-tools`, review the resolved changes, and run `pip-audit` before committing:
+
+```bash
+pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements.lock requirements.in
+pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements-dev.lock requirements-dev.in
+pip-audit --require-hashes -r requirements.lock
+```

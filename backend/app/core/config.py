@@ -38,6 +38,7 @@ class Settings:
     database_url: str = _resolve_database_url()
     seed_on_startup: bool = _env_bool("SEED_ON_STARTUP", True)
     force_reseed: bool = _env_bool("FORCE_RESEED", False)
+    rate_limit: str = os.getenv("RATE_LIMIT", "60/minute")
     cors_origins: tuple[str, ...] = _env_tuple(
         "CORS_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002,http://localhost:3101,http://127.0.0.1:3101,http://localhost:3102,http://127.0.0.1:3102",

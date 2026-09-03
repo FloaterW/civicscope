@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { getMetricDefinition } from "../components/MetricTooltip";
 import { buildTooltipHtml, escapeHtml } from "../lib/tooltip";
 
 // Pure unit tests for the map hover-tooltip markup. The pointer-driven popup is
@@ -77,4 +78,10 @@ test.describe("buildTooltipHtml", () => {
     expect(html).not.toContain("<img");
     expect(html).toContain("&lt;img");
   });
+});
+
+test("rent burden definition does not equate the 30% threshold with core housing need", () => {
+  const definition = getMetricDefinition("rent_burden_pct");
+  expect(definition?.definition).toContain("core housing need also considers");
+  expect(definition?.definition).not.toContain("is considered in core housing need");
 });

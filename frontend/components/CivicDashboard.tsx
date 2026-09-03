@@ -59,24 +59,27 @@ const geographyLabels: Record<GeographyLevel, { singular: string; plural: string
 
 const TRANSIT_METRICS = new Set<MetricKey>(["transit_score", "transit_route_count"]);
 
+type RequestState<T> = {
+  key: string;
+  data: T | null;
+  error: string | null;
+};
+
 export function CivicDashboard() {
   const [metric, setMetric] = useState<MetricKey>("rent_burden_pct");
   const [geographyLevel, setGeographyLevel] = useState<GeographyLevel>("municipality");
   const [mapDataByKey, setMapDataByKey] = useState<Record<string, MapData>>({});
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [comparison, setComparison] = useState<CompareResponse | null>(null);
+  const [summaryState, setSummaryState] = useState<RequestState<Summary> | null>(null);
+  const [comparisonState, setComparisonState] = useState<RequestState<CompareResponse> | null>(null);
   const [selected, setSelected] = useState<Geography | null>(null);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Geography[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [selectedCmhcMetrics, setSelectedCmhcMetrics] = useState<CmhcMetricValues | null>(null);
-  const [selectedCmhcYear, setSelectedCmhcYear] = useState<number | undefined>(undefined);
   const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
   const [availableYears, setAvailableYears] = useState<number[]>([2021]);
-  const [error, setError] = useState<string | null>(null);
-  const [mapLoading, setMapLoading] = useState(true);
-  const [summaryLoading, setSummaryLoading] = useState(true);
-  const [comparisonLoading, setComparisonLoading] = useState(true);
+  const [mapFailure, setMapFailure] = useState<{ key: string; error: string } | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +102,25 @@ export function CivicDashboard() {
     return [selectedGeoid, ...defaultCompareIds.filter((geoid) => geoid !== selectedGeoid)];
   }, [geographyLevel, selectedGeoid]);
 
+  const mapRequestKey = `${activeMapKey}:${retryKey}`;
+  const summaryRequestKey = `${geographyLevel}:${selectedGeoid ?? "all"}:${isCmhc ? selectedYear ?? "latest" : "census"}:${retryKey}`;
+  const comparisonRequestKey = `${geographyLevel}:${comparisonIds.join(",")}:${isCmhc ? selectedYear ?? "latest" : "census"}:${retryKey}`;
+  const mapError = mapFailure?.key === mapRequestKey ? mapFailure.error : null;
+  const mapLoading = !hasCachedMapData && !mapError;
+  const summary = summaryState?.key === summaryRequestKey ? summaryState.data : null;
+  const summaryError = summaryState?.key === summaryRequestKey ? summaryState.error : null;
+  const summaryLoading = summaryState?.key !== summaryRequestKey;
+  const comparison = comparisonState?.key === comparisonRequestKey ? comparisonState.data : null;
+  const comparisonError = comparisonState?.key === comparisonRequestKey ? comparisonState.error : null;
+  const comparisonLoading = comparisonState?.key !== comparisonRequestKey;
+  const error = summaryError ?? comparisonError;
+  const selectedFeature = selected
+    ? mapData?.features.find((feature) => feature.properties.geoid === selected.geoid)
+    : undefined;
+  const selectedCmhcMetrics: CmhcMetricValues | null =
+    selectedFeature?.properties.cmhc_metrics ?? null;
+  const selectedCmhcYear = selectedFeature?.properties.cmhc_year;
+
   function handleGeographyLevelChange(level: GeographyLevel) {
     if (level === geographyLevel) {
       return;
@@ -107,8 +129,8 @@ export function CivicDashboard() {
     setSelected(null);
     setSearch("");
     setSearchResults([]);
-    setSelectedCmhcMetrics(null);
-    setSelectedCmhcYear(undefined);
+    setSearchLoading(false);
+    setSearchError(null);
   }
 
   function handleMetricChange(nextMetric: MetricKey) {
@@ -118,24 +140,14 @@ export function CivicDashboard() {
     }
   }
 
-  useEffect(() => {
-    if (!selected || !mapData) {
-      return;
-    }
-    const feature = mapData.features.find(
-      (f) => f.properties.geoid === selected.geoid
-    );
-    setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
-    setSelectedCmhcYear(feature?.properties.cmhc_year);
-  }, [selected, mapData]);
+  function retryRequests() {
+    setRetryKey((current) => current + 1);
+  }
 
   useEffect(() => {
     if (hasCachedMapData) {
-      setMapLoading(false);
       return;
     }
-    setMapLoading(true);
-    setError(null);
     const controller = new AbortController();
 
     getMapData(metric, geographyLevel, controller.signal, requestedMapYear)
@@ -143,9 +155,6 @@ export function CivicDashboard() {
         if (controller.signal.aborted) return;
         if (mapPayload.metadata.available_years?.length) {
           setAvailableYears(mapPayload.metadata.available_years);
-        }
-        if (mapPayload.metadata.cmhc_year !== undefined) {
-          setSelectedCmhcYear(mapPayload.metadata.cmhc_year);
         }
         setMapDataByKey((current) =>
           current[activeMapKey]
@@ -158,77 +167,64 @@ export function CivicDashboard() {
       })
       .catch((requestError: Error) => {
         if (controller.signal.aborted) return;
-        setError(requestError.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setMapLoading(false);
-        }
+        setMapFailure({ key: mapRequestKey, error: requestError.message });
       });
 
     return () => controller.abort();
-  }, [activeMapKey, geographyLevel, hasCachedMapData, metric, requestedMapYear]);
+  }, [activeMapKey, geographyLevel, hasCachedMapData, mapRequestKey, metric, requestedMapYear]);
 
   useEffect(() => {
     const controller = new AbortController();
-    setSummaryLoading(true);
-    setError(null);
 
     getSummary(selectedGeoid, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
-      .then((summaryPayload) => setSummary(summaryPayload))
+      .then((summaryPayload) => {
+        if (!controller.signal.aborted) {
+          setSummaryState({ key: summaryRequestKey, data: summaryPayload, error: null });
+        }
+      })
       .catch((requestError: Error) => {
         if (controller.signal.aborted) {
           return;
         }
-        setError(requestError.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setSummaryLoading(false);
-        }
+        setSummaryState({ key: summaryRequestKey, data: null, error: requestError.message });
       });
 
     return () => controller.abort();
-  }, [geographyLevel, selectedGeoid, selectedYear, isCmhc]);
+  }, [geographyLevel, isCmhc, selectedGeoid, selectedYear, summaryRequestKey]);
 
   useEffect(() => {
     const controller = new AbortController();
-    setComparisonLoading(true);
-    setError(null);
 
     getComparison(comparisonIds, geographyLevel, controller.signal, isCmhc ? selectedYear : undefined)
-      .then((comparisonPayload) => setComparison(comparisonPayload))
+      .then((comparisonPayload) => {
+        if (!controller.signal.aborted) {
+          setComparisonState({ key: comparisonRequestKey, data: comparisonPayload, error: null });
+        }
+      })
       .catch((requestError: Error) => {
         if (controller.signal.aborted) {
           return;
         }
-        setError(requestError.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setComparisonLoading(false);
-        }
+        setComparisonState({ key: comparisonRequestKey, data: null, error: requestError.message });
       });
 
     return () => controller.abort();
-  }, [comparisonIds, geographyLevel, selectedYear, isCmhc]);
+  }, [comparisonIds, comparisonRequestKey, geographyLevel, isCmhc, selectedYear]);
 
   const visibleMapData = useMemo(() => applyMetricToMapData(mapData, metric), [mapData, metric]);
 
   useEffect(() => {
     if (!search.trim()) {
-      setSearchResults([]);
-      setSearchLoading(false);
       return;
     }
     const controller = new AbortController();
-    setSearchLoading(true);
     const timer = window.setTimeout(() => {
       searchGeographies(search, geographyLevel, controller.signal)
         .then((payload) => {
           setSearchResults(payload.items);
           setSearchHighlight(-1);
           setSearchLoading(false);
+          setSearchError(null);
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === "AbortError") {
@@ -236,6 +232,7 @@ export function CivicDashboard() {
           }
           setSearchResults([]);
           setSearchLoading(false);
+          setSearchError("Search is temporarily unavailable. Check the API connection and try again.");
         });
     }, 180);
 
@@ -258,8 +255,6 @@ export function CivicDashboard() {
       geometry_source: feature.geometry_source,
       metrics: feature.metrics
     });
-    setSelectedCmhcMetrics(feature.cmhc_metrics ?? null);
-    setSelectedCmhcYear(feature.cmhc_year);
     setMobilePanelOpen(true);
   }
 
@@ -268,14 +263,9 @@ export function CivicDashboard() {
       setSelected(geography);
       setSearch(geography.name);
       setSearchHighlight(-1);
-      const feature = mapData?.features.find(
-        (f) => f.properties.geoid === geography.geoid
-      );
-      setSelectedCmhcMetrics(feature?.properties.cmhc_metrics ?? null);
-      setSelectedCmhcYear(feature?.properties.cmhc_year);
       setMobilePanelOpen(true);
     },
-    [mapData]
+    []
   );
 
   const visibleResults = searchResults.slice(0, 8);
@@ -342,8 +332,13 @@ export function CivicDashboard() {
                   const next = event.target.value;
                   setSearch(next);
                   setSearchHighlight(-1);
+                  setSearchError(null);
                   if (next.trim()) {
+                    setSearchResults([]);
                     setSearchLoading(true);
+                  } else {
+                    setSearchResults([]);
+                    setSearchLoading(false);
                   }
                 }}
                 onKeyDown={handleSearchKeyDown}
@@ -384,7 +379,7 @@ export function CivicDashboard() {
                   ))}
                 </div>
               )}
-              {searchResults.length === 0 && search.trim() && search !== selected?.name && (
+              {!searchError && searchResults.length === 0 && search.trim() && search !== selected?.name && (
                 <div
                   data-testid="search-empty"
                   role="status"
@@ -393,6 +388,15 @@ export function CivicDashboard() {
                   {searchLoading
                     ? "Searching…"
                     : `No ${geographyLabel.plural} match "${search.trim()}".`}
+                </div>
+              )}
+              {searchError && search.trim() && (
+                <div
+                  data-testid="search-error"
+                  role="alert"
+                  className="absolute right-0 z-20 mt-2 w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900 shadow-panel dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+                >
+                  {searchError}
                 </div>
               )}
               <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -414,6 +418,29 @@ export function CivicDashboard() {
         </div>
       </header>
 
+      {error && (
+        <div
+          data-testid="api-error"
+          role="alert"
+          className="mx-auto mt-4 flex max-w-[1552px] items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+        >
+          <div>
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              Data could not be loaded
+            </div>
+            <p className="mt-1 text-xs">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={retryRequests}
+            className="shrink-0 rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 dark:border-red-700 dark:hover:bg-red-900"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.45fr)_430px] lg:px-6">
         <section
           data-testid="map-panel"
@@ -426,10 +453,10 @@ export function CivicDashboard() {
                 {getMetricLabel(metric)} by {geographyLabel.singular}
               </p>
               {geographyLevel === "census_tract" &&
-                visibleMapData?.metadata.data_quality?.metric_status === "zone" && (
+                visibleMapData?.metadata.data_quality?.label?.includes("survey-zone") && (
                   <p className="mt-1 max-w-prose text-xs leading-5 text-teal-700 dark:text-teal-400">
-                    Each tract shows its CMHC survey zone&apos;s value. Zones are sub-city areas
-                    surveyed by CMHC, so tracts in the same zone share the same value.
+                    Matched tracts show their CMHC survey zone&apos;s value. Tracts without a zone
+                    match use the parent municipality and disclose that fallback in exported data.
                   </p>
                 )}
               {geographyLevel === "census_tract" &&
@@ -460,6 +487,8 @@ export function CivicDashboard() {
               geographyLevel={geographyLevel}
               selectedGeoid={selectedGeoid}
               onSelect={handleFeatureSelect}
+              error={mapError}
+              onRetry={retryRequests}
             />
           </div>
         </section>
@@ -469,22 +498,17 @@ export function CivicDashboard() {
           type="button"
           onClick={() => setMobilePanelOpen(!mobilePanelOpen)}
           className="flex items-center justify-center gap-2 rounded-lg border border-civic-line bg-civic-panel py-3 text-sm font-medium text-civic-ink shadow-panel transition xl:hidden"
+          aria-expanded={mobilePanelOpen}
+          aria-controls="summary-details-panel"
         >
-          <ChevronUp className={`h-4 w-4 transition-transform ${mobilePanelOpen ? "rotate-180" : ""}`} />
+          <ChevronUp
+            className={`h-4 w-4 transition-transform ${mobilePanelOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
           {selected ? selected.name : "Summary & Details"}
         </button>
 
-        <aside className={`flex flex-col gap-4 transition-all duration-300 xl:opacity-100 xl:max-h-none ${mobilePanelOpen ? "max-h-[5000px] opacity-100" : "max-h-0 overflow-hidden opacity-0 xl:max-h-none xl:overflow-visible"}`}>
-          {error && (
-            <div className="animate-fade-in rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-              <div className="flex items-center gap-2 font-semibold">
-                <AlertCircle className="h-4 w-4" aria-hidden="true" />
-                API error
-              </div>
-              <p className="mt-1 text-xs">{error}</p>
-            </div>
-          )}
-
+        <aside id="summary-details-panel" className={`flex flex-col gap-4 transition-all duration-300 xl:opacity-100 xl:max-h-none ${mobilePanelOpen ? "max-h-[5000px] opacity-100" : "max-h-0 overflow-hidden opacity-0 xl:max-h-none xl:overflow-visible"}`}>
           <SummaryCards
             summary={summary}
             geographyLevel={geographyLevel}
@@ -500,8 +524,6 @@ export function CivicDashboard() {
             metricStatus={visibleMapData?.metadata.data_quality?.metric_status}
             onClear={() => {
               setSelected(null);
-              setSelectedCmhcMetrics(null);
-              setSelectedCmhcYear(undefined);
             }}
           />
         </aside>
@@ -513,6 +535,7 @@ export function CivicDashboard() {
             geographyLevel={geographyLevel}
             loading={comparisonLoading && !comparison}
             displayYear={isCmhc ? displayYear : undefined}
+            isUserSelection={Boolean(selectedGeoid)}
           />
         </section>
       </div>
@@ -528,8 +551,8 @@ export function CivicDashboard() {
             Market Survey, Starts &amp; Completions Survey).
           </p>
           <p>
-            Census-tract CMHC values are inherited/allocated from the parent municipality and
-            labeled as estimated.
+            Tract CMHC values use survey zones and published tract construction counts where
+            available; inherited or allocated fallbacks are labeled per value.
           </p>
         </div>
       </footer>

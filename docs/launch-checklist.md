@@ -33,6 +33,11 @@ Recommended path:
 4. Set `CORS_ORIGINS` after the frontend URL exists.
 5. Confirm `/health` returns `{"status":"ok"}`.
 
+Before deploying, protect `main` in GitHub: require pull requests, at least one approval
+when collaborators are present, conversation resolution, and the CI and CodeQL status
+checks. Enable Dependabot security updates and confirm the scheduled keep-alive workflow
+is active.
+
 The backend Dockerfile runs:
 
 ```bash
@@ -69,6 +74,9 @@ Redeploy/restart the backend after changing CORS.
 - Confirm the detail panel shows `Toronto census tract 0001.00`.
 - Open the backend `/health` URL.
 - Open browser devtools and confirm there are no API/CORS errors.
+- Confirm responses include the production Content Security Policy and HSTS headers.
+- Open `/api/transit-routes` and confirm its manifest reports the intended agency coverage.
+- Confirm the uptime monitor or keep-alive workflow records a persistent health failure as a failed check.
 
 ## 6. Update Portfolio Links
 

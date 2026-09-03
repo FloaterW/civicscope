@@ -1,6 +1,6 @@
 # Spike: Real CMHC census-tract data
 
-Status: **spike / assessment** (not implemented in the app). Date: 2026-05-30.
+Status: **implemented count-first; RMS tract ingestion remains follow-up**. Date: 2026-05-30; implementation status updated 2026-07-11.
 
 ## Goal
 
@@ -77,7 +77,7 @@ identical CMA-total series. Real CT rows require:
 5. **validating** the result against known-good CMHC figures before labeling anything
    "real."
 
-**Decision: Phase A remains a scoped follow-up milestone, not shipped now.**
+**Decision update: the SCSS portion of Phase A is shipped.**
 Feasibility is now *confirmed* (real data is reachable here), which removes the biggest
 unknown — but doing it correctly is a real data-pipeline effort, and shipping
 reverse-engineered values without the validation step (item 5) would violate the
@@ -101,14 +101,14 @@ get_cmhc(survey="Scss", series="Completions", dimension="Dwelling Type",
          geo_uid=get_cmhc_geography("CT", region="Toronto"), year=2024)
 ```
 
-## Proposed integration (if we proceed — not done here)
+## Implemented integration and remaining work
 
 Recommended **layered, count-first** rollout:
 
-1. **Phase A — SCSS counts + `rental_universe` (highest value, lowest risk).**
-   These have good CT coverage and are real counts, so they **replace the renter-share
-   allocation** entirely. New ETL loader writes per-tract `cmhc_metrics` rows keyed by
-   CTUID; the API stops allocating for tracts that have real rows.
+1. **Phase A — SCSS starts/completions: implemented.** The production loader writes
+   tract values and per-field source labels, validates all slices, and retains the
+   municipal allocation only where no published tract value exists. Real tract
+   `rental_universe` remains a follow-up.
 2. **Phase B — RMS rates/rents with a real fallback chain.** Use the real CT value
    where published; otherwise fall back CT → Neighbourhood → Zone → municipality (all
    real CMHC geographies, better than blind CSD passthrough).
@@ -128,7 +128,6 @@ Recommended **layered, count-first** rollout:
 
 ## Recommendation
 
-Worth doing as a **follow-up milestone**, count-first (Phase A). The current
-inheritance/allocation is an honest, clearly-labeled fallback and is fine to keep
-shipping until then. Do **not** rip out estimation — keep it as the labeled fallback
-for suppressed cells.
+Continue with tract RMS and `rental_universe` as a follow-up. Preserve the current
+validated SCSS ingestion and survey-zone/municipality fallback chain; do not remove
+fallbacks for suppressed or unavailable cells.

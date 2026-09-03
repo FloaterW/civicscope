@@ -3,7 +3,7 @@
 This guide assumes the portfolio deployment uses:
 
 - Backend: Render, Fly.io, or Railway
-- Database: managed PostgreSQL with PostGIS enabled
+- Database: the Render PostgreSQL 16 resource defined in `render.yaml`, or another managed PostgreSQL provider with PostGIS enabled
 - Frontend: Vercel
 
 The repository includes:
@@ -23,11 +23,13 @@ Required environment variables:
 | `DATABASE_URL` | PostgreSQL connection string using the SQLAlchemy/psycopg format, for example `postgresql+psycopg://user:password@host:5432/dbname`. |
 | `SEED_ON_STARTUP` | Use `true` for a portfolio demo with packaged GTA seed data; use `false` when production data is loaded separately. |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins, for example `https://civicscope.vercel.app,http://localhost:3001`. |
+| `FORWARDED_ALLOW_IPS` | Proxy addresses trusted for client IP/rate-limit headers. Render uses `*` because traffic is terminated by its managed proxy; self-hosted deployments should list only their proxy addresses. |
+| `RATE_LIMIT` | SlowAPI limit string. Defaults to `60/minute`; automated test environments can raise it without weakening production. |
 
 Install command:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements.lock
 ```
 
 Release or migration command:
@@ -73,6 +75,7 @@ Required Vercel environment variable:
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | Public URL of the deployed FastAPI service. |
+| `NEXT_PUBLIC_API_TIMEOUT_MS` | API timeout in milliseconds. The default is 60000 to tolerate a cold-starting demo backend. |
 
 Build command:
 
@@ -96,12 +99,12 @@ After deploying the frontend, update backend `CORS_ORIGINS` with the Vercel prod
 
 ## Data Refresh
 
-For a hosted demo, packaged seed data is enough to make the app usable immediately. To refresh from official sources:
+For a hosted demo, packaged seed data is enough to make the app usable immediately. To refresh the database from official sources:
 
 ```bash
 python etl/load_geo.py
 python etl/load_census.py --official-gta
-python etl/load_tracts.py
+python etl/load_tracts.py  # geometry-only; requires existing official tract metrics
 ```
 
 To refresh the packaged seed files before building a demo image:
@@ -110,7 +113,15 @@ To refresh the packaged seed files before building a demo image:
 python etl/load_geo.py --update-seed
 python etl/load_census.py --update-seed
 python etl/load_tracts.py --update-seed --geojson /path/to/statcan_ct.geojson
+python etl/load_tract_census.py --generate-csv --update-seed
+python etl/load_cmhc.py --update-seed
+python etl/load_cmhc_tracts.py --generate-csv
 ```
+
+Every tract/CMHC refresh validates row, field, geography/year, and slice coverage
+before replacing a file, and writes through a temporary file. `load_tracts.py`
+preserves official metrics during boundary refreshes. `--allow-partial` outputs are
+diagnostic and must not be deployed.
 
 ## Pre-Deploy Checklist
 
@@ -119,5 +130,10 @@ python etl/load_tracts.py --update-seed --geojson /path/to/statcan_ct.geojson
 - `npm run build` passes in `frontend`.
 - `npm run test:e2e` passes with backend reachable.
 - `alembic upgrade head` has run against the target database.
+- `/health` returns HTTP 200; HTTP 503 means the database is unavailable.
 - `CORS_ORIGINS` includes the deployed frontend origin.
 - No real secrets are committed; use `.env.example` only as a template.
+- `pip-audit --require-hashes -r requirements.lock` and `npm audit --audit-level=high` report no actionable vulnerabilities.
+- The transit snapshot manifest reports the agencies and coverage status expected for the release.
+- GitHub branch protection requires the CI and CodeQL checks before merging to `main`.
+- Configure external uptime/error monitoring for `/health`; the keep-alive workflow now fails visibly on a persistent non-200 response.

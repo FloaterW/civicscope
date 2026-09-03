@@ -14,7 +14,8 @@ field-level provenance already shipped for census metrics).
 
 Scope is **SCSS counts** (starts, completions, under-construction). RMS
 rates/rents (vacancy, average rent) are out of scope here — they are heavily
-suppressed at CT level and remain inherited from the parent municipality.
+suppressed at CT level; vacancy and average rent now use the official survey-zone
+crosswalk with a municipal fallback, while other RMS fields remain inherited.
 
 ## Verified acquisition recipe
 
@@ -50,10 +51,10 @@ CMA's 3-char prefix: `535` + `0001.00` = `5350001.00` (our CTUID). For Toronto,
 all **582/582** of our tracts matched. No external translation table needed.
 
 ### Coverage (real numbers, from the actual generated CSV)
-- **1,213 of 1,334 tracts (90.9%)** have CMHC SCSS CT data across the 3 CMAs.
+- **1,244 of 1,334 tracts (93.3%)** have CMHC SCSS CT data across the 3 CMAs.
   The other ~9% fall outside CMHC's CMA survey boundaries — they keep the
   allocation estimate.
-- Generated `cmhc_ct_metrics.csv`: **7,921 rows**, years 2018–2024 (starts) and
+- Generated `cmhc_ct_metrics.csv`: **8,198 rows**, years 2018–2024 (starts) and
   2018–2022 (completions; 2023–2024 not yet published by CMHC — honestly absent,
   not zero). Zero is a real value (no construction) distinct from "not covered".
 - The CSV is filtered to our seed's tracts, so a CMA's CSV subtotal is slightly

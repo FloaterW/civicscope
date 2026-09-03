@@ -373,11 +373,17 @@ def upsert_tract_geometries(db, tract_rows: list[dict[str, Any]]) -> int:
         row.geoid: row
         for row in db.query(Geography).filter(Geography.type == "census_tract").all()
     }
-    missing = [item["geoid"] for item in tract_rows if item["geoid"] not in existing]
-    if missing:
+    incoming_geoids = [item["geoid"] for item in tract_rows]
+    incoming = set(incoming_geoids)
+    new_geoids = incoming - set(existing)
+    missing_boundaries = set(existing) - incoming
+    duplicate_count = len(incoming_geoids) - len(incoming)
+    if new_geoids or missing_boundaries or duplicate_count:
         raise ValueError(
-            f"Boundary refresh contains {len(missing)} tracts without existing metrics. "
-            "Load official tract metrics first or explicitly replace metrics with estimates."
+            "Boundary refresh identifiers do not match existing tract metrics "
+            f"(new={len(new_geoids)}, missing={len(missing_boundaries)}, "
+            f"duplicates={duplicate_count}). Load official tract metrics first or "
+            "explicitly replace metrics with estimates."
         )
 
     fields = ("name", "type", "county", "state", "geometry", "bbox", "geometry_source")

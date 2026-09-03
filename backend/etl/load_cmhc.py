@@ -875,7 +875,10 @@ def validate_seed_coverage(
 
 
 def write_seed(
-    metrics: list[CmhcRow], years: list[int], coverage: dict[str, Any] | None = None
+    metrics: list[CmhcRow],
+    years: list[int],
+    coverage: dict[str, Any] | None = None,
+    output_path: Path = SEED_PATH,
 ) -> int:
     seed = {
         "metadata": {
@@ -897,9 +900,10 @@ def write_seed(
         },
         "metrics": [asdict(m) for m in metrics],
     }
-    temporary_path = SEED_PATH.with_suffix(f"{SEED_PATH.suffix}.tmp")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
     temporary_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
-    temporary_path.replace(SEED_PATH)
+    temporary_path.replace(output_path)
     return len(metrics)
 
 
@@ -943,7 +947,12 @@ def load_from_seed() -> int:
 # ---------------------------------------------------------------------------
 
 
-def update_seed(years: list[int] | None = None, *, allow_partial: bool = False) -> int:
+def update_seed(
+    years: list[int] | None = None,
+    *,
+    allow_partial: bool = False,
+    output_path: Path = SEED_PATH,
+) -> int:
     """Fetch RMS + Scss data from HMIP for the given years and write the seed file."""
     if years is None:
         years = list(range(DEFAULT_START_YEAR, DEFAULT_END_YEAR + 1))
@@ -1026,8 +1035,8 @@ def update_seed(years: list[int] | None = None, *, allow_partial: bool = False) 
     )
     if coverage["partial"]:
         print(f"WARNING: writing partial CMHC data: {coverage}", file=sys.stderr)
-    count = write_seed(all_metrics, years, coverage)
-    print(f"\nWrote {count} metric rows to {SEED_PATH}")
+    count = write_seed(all_metrics, years, coverage, output_path)
+    print(f"\nWrote {count} metric rows to {output_path}")
 
     # Quick verification: check that starts vary across municipalities
     sample_year = years[-1]
@@ -1100,7 +1109,12 @@ def main() -> None:
     parser.add_argument(
         "--allow-partial",
         action="store_true",
-        help="Allow diagnostic seed output that fails coverage validation.",
+        help="Allow diagnostic output that fails coverage validation; requires noncanonical --output.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Output seed path (default: canonical app/data/cmhc_seed.json).",
     )
     args = parser.parse_args()
 
@@ -1114,9 +1128,21 @@ def main() -> None:
         return
 
     if args.update_seed:
+        output_path = args.output or SEED_PATH
+        if args.allow_partial and (
+            args.output is None or output_path.resolve() == SEED_PATH.resolve()
+        ):
+            parser.error(
+                "--allow-partial requires an explicit noncanonical --output path; "
+                "partial diagnostics cannot replace the packaged seed."
+            )
         print("Fetching CMHC Rental Market Survey data from HMIP portal...")
         years = [args.year] if args.year else None
-        count = update_seed(years, allow_partial=args.allow_partial)
+        count = update_seed(
+            years,
+            allow_partial=args.allow_partial,
+            output_path=output_path,
+        )
         if count:
             print(f"Done. {count} rows written to seed file.")
         return
