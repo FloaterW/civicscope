@@ -83,6 +83,17 @@ Build command:
 npm run build
 ```
 
+For the production Docker image, public variables are compiled into the browser
+bundle and therefore must be supplied as build arguments (runtime-only values are
+too late for a static Next.js build):
+
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
+  --build-arg NEXT_PUBLIC_API_TIMEOUT_MS=60000 \
+  -t civicscope-frontend ./frontend
+```
+
 When importing the repository into Vercel, set the project root directory to:
 
 ```text
