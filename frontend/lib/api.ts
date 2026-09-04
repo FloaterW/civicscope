@@ -6,6 +6,10 @@ import type {
   MetricKey,
   Summary
 } from "@/types";
+import {
+  isTransitFeatureCollection,
+  type TransitFeatureCollection
+} from "@/lib/transit-map";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
@@ -55,14 +59,21 @@ export function mapDataCacheKey(
   return `${geographyLevel}:${family}`;
 }
 
-let transitRoutesPromise: Promise<unknown> | null = null;
+let transitRoutesPromise: Promise<TransitFeatureCollection> | null = null;
 
-export function getTransitRoutes(): Promise<unknown> {
+export function getTransitRoutes(): Promise<TransitFeatureCollection> {
   if (!transitRoutesPromise) {
-    transitRoutesPromise = fetchJson<unknown>("/api/transit-routes").catch((error) => {
-      transitRoutesPromise = null;
-      throw error;
-    });
+    transitRoutesPromise = fetchJson<unknown>("/api/transit-routes")
+      .then((payload) => {
+        if (!isTransitFeatureCollection(payload)) {
+          throw new Error("Transit route data is empty or malformed.");
+        }
+        return payload;
+      })
+      .catch((error) => {
+        transitRoutesPromise = null;
+        throw error;
+      });
   }
   return transitRoutesPromise;
 }
@@ -85,11 +96,22 @@ export async function fetchJson<T>(
     timedOut = true;
     requestController.abort();
   }, effectiveTimeoutMs);
-  let response: Response;
+  let response: Response | undefined;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       signal: requestController.signal
     });
+    if (!response.ok) {
+      let message: string;
+      try {
+        const body = await response.json();
+        message = body?.detail ?? body?.message ?? JSON.stringify(body);
+      } catch {
+        message = await response.text();
+      }
+      throw new Error(message || `Request failed: ${response.status}`);
+    }
+    return (await response.json()) as T;
   } catch (error) {
     if (requestController.signal.aborted) {
       if (timedOut) {
@@ -99,22 +121,14 @@ export async function fetchJson<T>(
       }
       throw error;
     }
-    throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
+    if (!response) {
+      throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
+    }
+    throw error;
   } finally {
     globalThis.clearTimeout(timeout);
     signal?.removeEventListener("abort", abortFromCaller);
   }
-  if (!response.ok) {
-    let message: string;
-    try {
-      const body = await response.json();
-      message = body?.detail ?? body?.message ?? JSON.stringify(body);
-    } catch {
-      message = await response.text();
-    }
-    throw new Error(message || `Request failed: ${response.status}`);
-  }
-  return response.json() as Promise<T>;
 }
 
 export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {

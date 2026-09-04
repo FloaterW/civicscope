@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const frontendRoot = resolve(__dirname, "..");
 const projectRoot = resolve(frontendRoot, "..");
 const screenshotDir = resolve(projectRoot, "docs", "screenshots");
-const baseURL = process.env.CIVICSCOPE_SCREENSHOT_URL ?? "http://localhost:3001";
+const baseURL = process.env.CIVICSCOPE_SCREENSHOT_URL ?? "http://localhost:3000";
 
 await mkdir(screenshotDir, { recursive: true });
 
@@ -28,6 +28,12 @@ async function waitForDashboard() {
 }
 
 async function save(name) {
+  await page.locator(".maplibregl-canvas").waitFor({ state: "visible", timeout: 15_000 });
+  await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: "instant" }));
+  // MapLibre updates its WebGL canvas after React has committed the new data.
+  // Give that paint cycle time to settle so documentation never captures a
+  // populated legend over a still-blank canvas.
+  await page.waitForTimeout(1_000);
   await page.screenshot({
     path: resolve(screenshotDir, name),
     fullPage: false
@@ -60,6 +66,10 @@ await page.waitForFunction(() => {
   return map?.getAttribute("data-feature-count") === "1334";
 });
 await save("census-tracts.png");
+
+await page.setViewportSize({ width: 390, height: 844 });
+await waitForDashboard();
+await save("mobile-overview.png");
 
 await browser.close();
 

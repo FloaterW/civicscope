@@ -1,7 +1,6 @@
 "use client";
 
 import { Gauge, Home, Percent, TrendingUp, Users, WalletCards } from "lucide-react";
-import { useMemo } from "react";
 
 import { formatMetric } from "@/lib/api";
 import type { GeographyLevel, Summary } from "@/types";
@@ -24,7 +23,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const regionCount = new Intl.NumberFormat("en-CA").format(summary?.region_count ?? 0);
-  const heroCards = useMemo(() => [
+  const primaryCards = [
     {
       label: "Rent burden",
       metricKey: "rent_burden_pct",
@@ -37,8 +36,8 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
       value: formatMetric("affordability_index", summary?.affordability_index),
       icon: Gauge
     }
-  ], [summary]);
-  const subCards = useMemo(() => [
+  ];
+  const supportingCards = [
     {
       label: "Median income",
       metricKey: "median_income",
@@ -63,17 +62,17 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
       value: formatMetric("population", summary?.population),
       icon: Users
     }
-  ], [summary]);
+  ];
 
   return (
     <section
       data-testid="summary-panel"
       className="animate-fade-in rounded-lg border border-civic-line bg-civic-panel p-4 shadow-panel"
     >
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-civic-ink">Summary</h2>
-          <p className="text-xs text-civic-muted">
+          <h2 className="text-base font-semibold tracking-tight text-civic-ink">Housing snapshot</h2>
+          <p className="mt-0.5 text-sm text-civic-muted">
             {loading && !summary
               ? "Loading GTA data…"
               : !summary
@@ -83,24 +82,44 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
               : `${regionCount} ${summaryNouns[geographyLevel]}`}
           </p>
         </div>
-        <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-          {summary ? summary.year : "—"}
+        <span
+          className="shrink-0 rounded-md border border-civic-line px-2 py-1 text-xs font-medium text-civic-muted"
+          aria-label={summary ? `Census data year ${summary.year}` : "Census data year unavailable"}
+        >
+          {summary ? `Census ${summary.year}` : "Census —"}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {[...heroCards, ...subCards].map((card) => {
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+        {primaryCards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.label}
-              className="rounded-md border border-civic-line border-l-[3px] border-l-civic-teal bg-civic-subtle p-3"
+              className="rounded-lg border border-civic-line border-t-[3px] border-t-civic-teal bg-[var(--civic-accent-subtle)] p-3"
             >
-              <div className="flex items-center gap-1.5 text-xs font-medium text-civic-muted">
+              <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-civic-ink">
+                <Icon className="h-4 w-4 shrink-0 text-civic-teal" aria-hidden="true" />
+                {card.label}
+                <MetricTooltip metricKey={card.metricKey} />
+              </div>
+              <div className="mt-1.5 min-h-7 text-xl font-semibold tabular-nums tracking-tight text-civic-ink sm:text-2xl">
+                {loading ? <Skeleton className="h-7 w-20" /> : card.value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+        {supportingCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="rounded-md border border-civic-line bg-civic-panel p-3">
+              <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-civic-muted">
                 <Icon className="h-3.5 w-3.5 shrink-0 text-civic-teal" aria-hidden="true" />
                 {card.label}
                 <MetricTooltip metricKey={card.metricKey} />
               </div>
-              <div className="mt-1 min-h-6 text-lg font-semibold text-civic-ink">
+              <div className="mt-1 min-h-6 text-lg font-semibold tabular-nums tracking-tight text-civic-ink">
                 {loading ? <Skeleton className="h-6 w-16" /> : card.value}
               </div>
             </div>

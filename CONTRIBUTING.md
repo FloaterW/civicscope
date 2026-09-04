@@ -19,7 +19,7 @@ cd ../frontend && npm install
 cd backend
 DATABASE_URL=sqlite:///./dev.db SEED_ON_STARTUP=true uvicorn app.main:app --reload
 # API docs at http://localhost:8000/docs
-python -m pytest               # 157 pass; 2 PostGIS checks skip without a test database
+python -m pytest               # 158 pass; 3 PostGIS checks skip without a test database
 ```
 
 ### Frontend (Next.js)
@@ -29,8 +29,8 @@ cd frontend
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 npm run typecheck              # TypeScript strict mode
 npm run lint                   # ESLint
-npm run test:unit              # Vitest (31 tests)
-npm run test:e2e               # Playwright (43 tests, needs backend running)
+npm run test:unit              # Vitest (50 tests)
+npm run test:e2e               # Playwright (68 executions across 3 browsers; needs backend running)
 ```
 
 ## Adding a New Census Metric

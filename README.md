@@ -59,12 +59,19 @@ Census tract map layer:
 
 ![Census tract map layer](docs/screenshots/census-tracts.png)
 
+Responsive mobile overview:
+
+![CivicScope mobile overview](docs/screenshots/mobile-overview.png)
+
 Regenerate screenshots from the running app:
 
 ```bash
 cd frontend
 npm run screenshots
 ```
+
+The capture scripts use `http://localhost:3000` by default. Set
+`CIVICSCOPE_SCREENSHOT_URL` to capture another running deployment or port.
 
 Regenerate the demo video from the running app:
 
@@ -368,8 +375,8 @@ Or individually:
 
 ```bash
 cd backend && pytest                   # 158 passing tests; 3 PostGIS tests skip without a test database
-cd frontend && npm run test:unit       # 31 Vitest unit tests
-cd frontend && npm run test:e2e        # 48 Playwright e2e tests (incl. axe-core a11y audit)
+cd frontend && npm run test:unit       # 50 Vitest unit tests
+cd frontend && npm run test:e2e        # 68 Playwright executions across Chromium, Firefox, and WebKit
 cd frontend && npm run typecheck       # TypeScript strict mode
 cd frontend && npm run lint            # ESLint
 ```
@@ -377,14 +384,14 @@ cd frontend && npm run lint            # ESLint
 **Test coverage highlights:**
 
 - **158 backend tests** plus 3 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
-- **48 Playwright e2e tests** covering map rendering, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, and accessibility
-- **31 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
+- **68 Playwright executions** covering 62 user journeys and checks, including map rendering, shareable URL/history state, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, accessibility, and critical journeys repeated in Chromium, Firefox, and WebKit
+- **50 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, dashboard URL state, transit-map helpers, reduced-motion behavior, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
 - **axe-core WCAG 2.0 AA audit** runs in CI — zero critical or serious violations
 - **Rate limiting** at 60 req/min per IP via slowapi
 
 The Playwright suite expects the backend API running at `NEXT_PUBLIC_API_URL` or `http://127.0.0.1:8000`. It starts its own Next.js server on port `3101`. To run against Docker, pass `PLAYWRIGHT_PORT=3102`.
 
-CI (`.github/workflows/ci.yml`) runs dependency audits, backend pytest, frontend typecheck/lint/build, Vitest, Playwright against a freshly seeded API, reversible migrations against real PostGIS, and production Docker image builds. CodeQL and Dependabot add scheduled static analysis and update checks.
+CI (`.github/workflows/ci.yml`) runs dependency audits, backend pytest, frontend typecheck/lint/build, Vitest, Playwright across Chromium plus critical Firefox and WebKit journeys against a freshly seeded API, reversible migrations against real PostGIS, and production Docker image builds. CodeQL and Dependabot add scheduled static analysis and update checks.
 
 Screenshot generation:
 

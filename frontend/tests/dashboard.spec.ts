@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -102,7 +104,7 @@ test.describe("CivicScope dashboard regressions", () => {
 
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: "Greater Toronto Housing Affordability Monitor" })
+      page.getByRole("heading", { name: "Greater Toronto Housing Affordability Explorer" })
     ).toBeVisible();
 
     const summary = page.getByTestId("summary-panel");
@@ -117,6 +119,7 @@ test.describe("CivicScope dashboard regressions", () => {
     const legend = page.getByTestId("map-legend");
     await expect(legend).toContainText("Rent burden");
     await expect(legend.locator("[data-legend-class]").first()).toBeVisible();
+    await expect(legend.locator("[data-legend-no-data]")).toContainText("No data");
 
     const canvas = map.locator("canvas");
     await expect(canvas).toHaveCount(1);
@@ -130,7 +133,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(comparison).toContainText("Toronto");
     await expect(comparison).toContainText("Mississauga");
     await expect(comparison.locator(".recharts-bar-rectangle")).toHaveCount(5);
-    await expect(page.getByTestId("dashboard-root")).not.toContainText("No data");
+    await expect(page.getByTestId("detail-panel")).not.toContainText("No data");
 
     expect(consoleErrors.filter((message) => !message.includes("Failed to load resource"))).toEqual([]);
   });
@@ -144,12 +147,15 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.goto("/");
 
     const summary = page.getByTestId("summary-panel");
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("aria-busy", "true");
     await expect(summary).toContainText("Loading GTA data");
     await expect(summary).not.toContainText("0 GTA municipalities");
     await expect(page.getByTestId("data-service-status")).toContainText(
       "Still connecting to the CivicScope data service"
     );
     await expect(summary).toContainText("25 GTA municipalities", { timeout: 15_000 });
+    await expect(map).toHaveAttribute("aria-busy", "false");
     await expect(page.getByTestId("data-service-status")).toHaveCount(0);
   });
 
@@ -171,6 +177,39 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   });
 
+  test("metric information stays inside a phone viewport and dismisses cleanly", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    const trigger = page
+      .getByRole("button", { name: "What is Affordability index?" })
+      .first();
+    await trigger.click();
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+
+    const bounds = await tooltip.boundingBox();
+    const viewport = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(bounds).not.toBeNull();
+    expect(bounds?.x).toBeGreaterThanOrEqual(0);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(
+      viewport.clientWidth
+    );
+    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+
+    await page.keyboard.press("Escape");
+    await expect(tooltip).toBeHidden();
+    await trigger.click();
+    await expect(tooltip).toBeVisible();
+    await page.getByRole("heading", { name: "GTA housing data map" }).click();
+    await expect(tooltip).toBeHidden();
+  });
+
   test("municipality search selects Toronto without losing local metrics", async ({ page }) => {
     await blockExternalMapAssets(page);
 
@@ -186,6 +225,81 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
     await expect(page.getByTestId("detail-panel")).not.toContainText("No data");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+  });
+
+  test("search results dismiss outside and Escape preserves the user's query", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
+    const search = page.getByTestId("geography-search");
+
+    await search.fill("Toronto");
+    await expect(page.getByRole("option").filter({ hasText: "3520005" })).toBeVisible();
+    await page.getByRole("heading", { name: "GTA housing data map" }).click();
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(search).toHaveValue("Toronto");
+
+    await search.focus();
+    await expect(page.getByRole("option").filter({ hasText: "3520005" })).toBeVisible();
+    await search.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(search).toHaveValue("Toronto");
+  });
+
+  test("a slower stale search response cannot replace newer results", async ({ page }) => {
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const requestUrl =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString();
+        if (!requestUrl.includes("/api/geographies?")) {
+          return nativeFetch(input, init);
+        }
+
+        const query = new URL(requestUrl).searchParams.get("search") ?? "";
+        const isOldQuery = query === "old";
+        return {
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise((resolve) => {
+              window.setTimeout(
+                () =>
+                  resolve({
+                    items: [
+                      {
+                        id: isOldQuery ? 1 : 2,
+                        geoid: isOldQuery ? "old-id" : "new-id",
+                        name: isOldQuery ? "Old result" : "New result",
+                        type: "municipality",
+                        county: null,
+                        state: "ON",
+                        bbox: [-79.5, 43.5, -79.4, 43.6],
+                        geometry_source: "Test fixture"
+                      }
+                    ]
+                  }),
+                isOldQuery ? 650 : 40
+              );
+            })
+        } as Response;
+      };
+    });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const search = page.getByTestId("geography-search");
+    await search.fill("old");
+    await page.waitForTimeout(230);
+    await search.fill("new");
+    await expect(page.getByRole("option").filter({ hasText: "New result" })).toBeVisible();
+    await page.waitForTimeout(700);
+    await expect(page.getByRole("option").filter({ hasText: "New result" })).toBeVisible();
+    await expect(page.getByRole("option").filter({ hasText: "Old result" })).toHaveCount(0);
   });
 
   test("switching between municipalities and census tracts does not produce API errors", async ({ page }) => {
@@ -301,11 +415,91 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByText("Transit access score by census tract")).toBeVisible();
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "transit_score");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-geography-type", "census_tract");
+    await expect(page.getByRole("button", { name: "Municipalities" })).toBeDisabled();
+    await expect(page.getByText("Transit metrics use census tracts.")).toBeVisible();
     const coverage = page.getByTestId("transit-coverage-notice");
     await expect(coverage).toContainText("Partial transit snapshot");
     await expect(coverage).toContainText("TTC");
     await expect(coverage).toContainText("Not included: Brampton Transit");
     await expect(page.getByText(/all GTA transit agencies/i)).toHaveCount(0);
+    const comparisonPanel = page.getByTestId("comparison-panel");
+    await expect(comparisonPanel.getByText(/^Transit snapshot \d{4}-\d{2}-\d{2}$/)).toBeVisible();
+    await expect(comparisonPanel.locator("caption")).toContainText(
+      /from the transit snapshot packaged \d{4}-\d{2}-\d{2}/
+    );
+    await expect(comparisonPanel.getByRole("columnheader")).toHaveCount(2);
+    await expect(comparisonPanel.getByRole("columnheader", { name: "Ratio" })).toHaveCount(0);
+  });
+
+  test("transit overlay is lazy, reports failure, and retries successfully", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    let transitRequests = 0;
+    let failTransit = true;
+    await page.route(`${API_BASE}/api/transit-routes`, async (route) => {
+      transitRequests += 1;
+      if (failTransit) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ type: "FeatureCollection", features: [] })
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: {
+                type: "LineString",
+                coordinates: [[-79.4, 43.7], [-79.3, 43.8]]
+              },
+              properties: {
+                agency: "TTC",
+                route_name: "1",
+                route_long_name: "Yonge–University",
+                route_type: "Subway",
+                color: "#C23030",
+                transit_category: "ttc_subway"
+              }
+            }
+          ]
+        })
+      });
+    });
+
+    await page.goto("/");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-feature-count", "25");
+    expect(transitRequests).toBe(0);
+
+    const transitButton = page.getByRole("button", { name: "Transit", exact: true });
+    await transitButton.click();
+    await expect(transitButton).toHaveAttribute("aria-expanded", "true");
+    await expect(transitButton).not.toHaveAttribute("aria-pressed", /.*/);
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Transit lines could not be loaded" }),
+    ).toBeVisible();
+    expect(transitRequests).toBe(1);
+
+    failTransit = false;
+    await page.getByRole("button", { name: "Retry transit lines" }).click();
+    await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "GO Transit" })).toBeChecked();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-status", "loaded");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-feature-count", "1");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "true");
+    await page.getByRole("button", { name: "Browse route details (1)" }).click();
+    await expect(page.locator("#transit-route-details")).toContainText(
+      "TTC — Route 1 — Yonge–University"
+    );
+    expect(transitRequests).toBe(2);
+
+    await page.getByRole("button", { name: "Dark theme" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
   });
 
   test("basemap attribution remains visible", async ({ page }) => {
@@ -329,10 +523,39 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
     await expect(mapHost).toHaveAttribute("data-map-theme", "light");
 
-    await page.getByRole("button", { name: "Toggle color theme" }).click();
+    const themeToggle = page.getByRole("button", { name: "Dark theme" });
+    await themeToggle.click();
     await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(themeToggle).toHaveAttribute("aria-pressed", "true");
     await expect(mapHost).toHaveAttribute("data-map-theme", "dark");
     await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
+
+    await page.reload();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(themeToggle).toBeVisible();
+    await expect(mapHost).toHaveAttribute("data-map-theme", "dark");
+    await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
+  });
+
+  test("theme switching still completes when browser storage is unavailable", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(Storage.prototype, "setItem", {
+        configurable: true,
+        value: () => {
+          throw new DOMException("Storage blocked", "SecurityError");
+        }
+      });
+    });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const themeToggle = page.getByRole("button", { name: "Dark theme" });
+    await themeToggle.click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(themeToggle).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => page.locator("html").getAttribute("class")).not.toContain(
+      "theme-changing"
+    );
   });
 
   test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
@@ -340,14 +563,219 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.goto("/");
     await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
 
-    const yearSelect = page.getByLabel("Data year");
-    await expect(yearSelect).toBeDisabled();
+    const censusYearSelect = page.getByLabel("Census data year", { exact: true });
+    await expect(censusYearSelect).toBeDisabled();
 
     await page.getByLabel("Map metric").selectOption("vacancy_rate");
+    const yearSelect = page.getByLabel("CMHC data year", { exact: true });
     await expect(yearSelect).toBeEnabled();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "vacancy_rate");
+    await expect
+      .poll(() => yearSelect.locator("option").count())
+      .toBeGreaterThan(1);
+
+    const yearOptions = await yearSelect.locator("option").evaluateAll((options) =>
+      options.map((option) => (option as HTMLOptionElement).value)
+    );
+    expect(yearOptions.length).toBeGreaterThan(1);
+    const earliestYear = yearOptions[0];
+    const latestYear = yearOptions.at(-1)!;
+
+    await yearSelect.selectOption(earliestYear);
+    await expect.poll(() => new URL(page.url()).searchParams.get("year")).toBe(earliestYear);
+    await yearSelect.selectOption(latestYear);
+    await expect.poll(() => new URL(page.url()).searchParams.get("year")).toBe(latestYear);
+
+    await page.goBack();
+    await expect(yearSelect).toHaveValue(earliestYear);
+    await expect(page.getByTestId("map-panel")).toContainText(`CMHC ${earliestYear}`);
+    await page.goForward();
+    await expect(yearSelect).toHaveValue(latestYear);
+    await expect(page.getByTestId("map-panel")).toContainText(`CMHC ${latestYear}`);
 
     await page.getByLabel("Map metric").selectOption("rent_burden_pct");
-    await expect(yearSelect).toBeDisabled();
+    await expect(page.getByLabel("Census data year", { exact: true })).toBeDisabled();
+  });
+
+  test("a shared URL restores state, preserves unrelated parts, and supports Back", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto(
+      "/?campaign=civic&level=census_tract&metric=population&geoid=5350001.00#comparison"
+    );
+
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30_000 });
+    await expect(map).toHaveAttribute("data-metric", "population");
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0001.00");
+    await expect(page.getByTestId("geography-search")).toHaveValue(
+      "Toronto census tract 0001.00"
+    );
+
+    let current = new URL(page.url());
+    expect(current.searchParams.get("campaign")).toBe("civic");
+    expect(current.searchParams.get("level")).toBe("census_tract");
+    expect(current.searchParams.get("metric")).toBe("population");
+    expect(current.searchParams.get("geoid")).toBe("5350001.00");
+    expect(current.searchParams.has("year")).toBe(false);
+    expect(current.hash).toBe("#comparison");
+
+    await page.getByLabel("Map metric").selectOption("median_income");
+    await expect(map).toHaveAttribute("data-metric", "median_income");
+    expect(new URL(page.url()).searchParams.get("metric")).toBe("median_income");
+
+    await page.goBack();
+    await expect(map).toHaveAttribute("data-metric", "population");
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
+    current = new URL(page.url());
+    expect(current.searchParams.get("campaign")).toBe("civic");
+    expect(current.hash).toBe("#comparison");
+
+    await page.goForward();
+    await expect(map).toHaveAttribute("data-metric", "median_income");
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
+
+    await page.getByRole("button", { name: "Clear selected geography" }).click();
+    await expect(map).toHaveAttribute("data-selected-geoid", "");
+    await expect.poll(() => new URL(page.url()).searchParams.has("geoid")).toBe(false);
+
+    await page.goBack();
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350001.00");
+    await page.goForward();
+    await expect(map).toHaveAttribute("data-selected-geoid", "");
+  });
+
+  test("invalid shared parameters are sanitized without losing unrelated state", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/?keep=yes&level=ward&metric=unknown&year=9999&geoid=bad#map");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-geography-type",
+      "municipality"
+    );
+
+    await expect
+      .poll(() => {
+        const url = new URL(page.url());
+        return [
+          url.searchParams.get("keep"),
+          url.searchParams.get("level"),
+          url.searchParams.get("metric"),
+          url.searchParams.has("year"),
+          url.searchParams.has("geoid"),
+          url.hash
+        ].join("|");
+      })
+      .toBe("yes|municipality|rent_burden_pct|false|false|#map");
+    const current = new URL(page.url());
+    expect(current.searchParams.get("keep")).toBe("yes");
+    expect(current.searchParams.get("level")).toBe("municipality");
+    expect(current.searchParams.get("metric")).toBe("rent_burden_pct");
+    expect(current.searchParams.has("year")).toBe(false);
+    expect(current.searchParams.has("geoid")).toBe(false);
+    expect(current.hash).toBe("#map");
+  });
+
+  test("a CMHC deep link recovers when year catalog metadata is missing", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/map-data**`, async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("metric") !== "housing_starts_total") {
+        await route.continue();
+        return;
+      }
+
+      const response = await route.fetch();
+      const payload = (await response.json()) as {
+        metadata: { available_years?: number[]; cmhc_year?: number };
+      };
+      delete payload.metadata.available_years;
+      await route.fulfill({ response, json: payload });
+    });
+
+    await page.goto(
+      "/?level=census_tract&metric=housing_starts_total&year=1901&geoid=5350017.01"
+    );
+    const year = page.getByLabel("CMHC data year", { exact: true });
+    await expect(year).toBeEnabled({ timeout: 30_000 });
+    await expect(year).toHaveValue("2025");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute(
+      "data-selected-geoid",
+      "5350017.01"
+    );
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0017.01");
+    await expect(page.getByTestId("comparison-panel")).toContainText(
+      "Toronto census tract 0017.01"
+    );
+    expect(new URL(page.url()).searchParams.get("year")).toBe("2025");
+  });
+
+  test("CMHC catalog drift keeps the selector, map, and URL on one valid year", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    let catalogShrunk = false;
+    await page.route(`${API_BASE}/api/map-data**`, async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("metric") !== "vacancy_rate") {
+        await route.continue();
+        return;
+      }
+
+      const response = await route.fetch();
+      const payload = (await response.json()) as {
+        metadata: { available_years?: number[]; cmhc_year?: number };
+      };
+      payload.metadata.available_years = catalogShrunk ? [2023] : [2018, 2023];
+      payload.metadata.cmhc_year = 2023;
+      await route.fulfill({ response, json: payload });
+    });
+
+    await page.goto("/?level=municipality&metric=vacancy_rate&year=2023");
+    const year = page.getByLabel("CMHC data year", { exact: true });
+    await expect(year).toHaveValue("2023", { timeout: 30_000 });
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "vacancy_rate");
+    await expect(year).toBeEnabled();
+    await expect(year.locator("option")).toHaveCount(2);
+
+    catalogShrunk = true;
+    await year.selectOption("2018");
+
+    await expect(year).toHaveValue("2023");
+    await expect(page.getByTestId("map-panel")).toContainText("CMHC 2023");
+    await expect.poll(() => new URL(page.url()).searchParams.get("year")).toBe("2023");
+  });
+
+  test("navigation away from a pending CMHC deep link cannot be overwritten", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    let signalRequestStarted!: () => void;
+    const requestStarted = new Promise<void>((resolve) => {
+      signalRequestStarted = resolve;
+    });
+    await page.route(`${API_BASE}/api/map-data**`, async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("metric") !== "housing_starts_total") {
+        await route.continue();
+        return;
+      }
+      signalRequestStarted();
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await route.continue().catch(() => undefined);
+    });
+
+    await page.goto("/?level=census_tract&metric=housing_starts_total&year=1901");
+    await requestStarted;
+    await page.evaluate(() => {
+      window.history.pushState({}, "", "/?keep=navigation&level=municipality&metric=population");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "municipality");
+    await expect(map).toHaveAttribute("data-metric", "population");
+    await page.waitForTimeout(750);
+    await expect(map).toHaveAttribute("data-metric", "population");
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.searchParams.get("keep")}|${url.searchParams.get("metric")}|${url.searchParams.has("year")}`;
+    }).toBe("navigation|population|false");
   });
 
   test("comparison keeps requested areas when a metric is unavailable", async ({ page }) => {
@@ -450,6 +878,21 @@ test.describe("CivicScope dashboard regressions", () => {
     const panel = page.getByTestId("detail-panel");
     await expect(panel.getByTestId("low-confidence-flag").first()).toBeVisible();
     await expect(panel).toContainText("very small 2016 base");
+
+    await page.getByLabel("Map metric").selectOption("population_growth_pct");
+    const comparisonPanel = page.getByTestId("comparison-panel");
+    await expect(comparisonPanel).toContainText("Low confidence — very small 2016 base");
+    await expect(comparisonPanel).toContainText(
+      "Chart omitted because the available growth values are low confidence"
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await comparisonPanel.getByRole("button", { name: "Export comparison data as CSV" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const csv = await readFile(downloadPath!, "utf8");
+    expect(csv).toContain("low_confidence");
   });
 
   test("tract with a suppressed value renders Not available without crashing", async ({ page }) => {
@@ -486,8 +929,10 @@ test.describe("CivicScope dashboard regressions", () => {
     // A handful of near-empty 2016-base tracts reach ~29,580% growth; they must
     // not define the color scale (they are still shown, flagged, on click).
     const domainMax = Number(await map.getAttribute("data-domain-max"));
+    const scaleMax = Number(await map.getAttribute("data-scale-max"));
     expect(domainMax).toBeGreaterThan(0);
     expect(domainMax).toBeLessThan(5000);
+    expect(scaleMax).toBe(domainMax);
   });
 
   test("CMHC starts in census tract mode shows official+estimated provenance", async ({ page }) => {
@@ -511,7 +956,7 @@ test.describe("CivicScope dashboard regressions", () => {
 
     // 2023 has real published tract starts; select it so a covered tract shows
     // the real value (the latest year has no tract data yet).
-    await page.getByLabel("Data year").selectOption("2023");
+    await page.getByLabel("CMHC data year", { exact: true }).selectOption("2023");
 
     // A covered Toronto tract shows the real value flagged "CMHC tract data".
     await page.getByTestId("geography-search").fill("5350017.01");
@@ -540,7 +985,7 @@ test.describe("CivicScope dashboard regressions", () => {
       { timeout: 30000 }
     );
     await page.getByLabel("Map metric").selectOption("housing_starts_total");
-    await page.getByLabel("Data year").selectOption("2023");
+    await page.getByLabel("CMHC data year", { exact: true }).selectOption("2023");
 
     // 5320003.01 split from CMHC parent 0003.00 -> allocated value, distinct
     // "est. (CMHC parent tract)" provenance (not "CMHC tract data", not plain "est.").
@@ -641,6 +1086,7 @@ test.describe("CivicScope dashboard regressions", () => {
   test("search with no matches shows a no-results message", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
     const search = page.getByTestId("geography-search");
     await search.click();
     await search.fill("zzzznomatch");
@@ -664,8 +1110,19 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("summary-panel")).toContainText("GTA data unavailable");
     await expect(page.getByTestId("summary-panel")).not.toContainText("0 GTA municipalities");
 
+    const globalRetry = page.getByTestId("api-error").getByRole("button", { name: "Retry" });
+    await globalRetry.focus();
+    expect(await globalRetry.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe(
+      "none"
+    );
+    const mapRetry = page.getByRole("button", { name: "Retry map", exact: true });
+    await mapRetry.focus();
+    expect(await mapRetry.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe(
+      "none"
+    );
+
     failMap = false;
-    await page.getByRole("button", { name: "Retry map", exact: true }).click();
+    await mapRetry.click();
     await expect(page.getByText("Map data is unavailable")).toBeHidden({ timeout: 30000 });
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-feature-count", "25");
   });
@@ -674,6 +1131,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await blockExternalMapAssets(page);
     await page.route(`${API_BASE}/api/geographies**`, (route) => route.abort("failed"));
     await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
     await page.getByTestId("geography-search").fill("Toronto");
 
     await expect(page.getByTestId("search-error")).toContainText("temporarily unavailable");
@@ -685,14 +1143,76 @@ test.describe("CivicScope dashboard regressions", () => {
     await blockExternalMapAssets(page);
     await page.goto("/");
 
-    const toggle = page.getByRole("button", { name: "Summary & Details" });
-    const panel = page.locator("#summary-details-panel");
+    const summaryBox = await page.getByTestId("summary-panel").boundingBox();
+    const mapBox = await page.getByTestId("map-panel").boundingBox();
+    expect(summaryBox).not.toBeNull();
+    expect(mapBox).not.toBeNull();
+    expect(summaryBox?.y).toBeLessThan(mapBox?.y ?? 0);
+
+    const toggle = page.getByTestId("details-toggle");
+    const panel = page.locator("#selected-geography-details");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(toggle).toHaveAttribute("aria-controls", "summary-details-panel");
+    await expect(toggle).toHaveAttribute("aria-controls", "selected-geography-details");
     await expect(panel).toBeHidden();
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(panel).toBeVisible();
+  });
+
+  test("keyboard focus is visibly indicated on primary controls", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
+
+    const metric = page.getByLabel("Map metric");
+    await metric.focus();
+    await expect(metric).toBeFocused();
+    const metricShadow = await metric.evaluate((element) => getComputedStyle(element).boxShadow);
+    expect(metricShadow).not.toBe("none");
+
+    const theme = page.getByRole("button", { name: "Dark theme" });
+    await theme.focus();
+    await expect(theme).toBeFocused();
+    const themeShadow = await theme.evaluate((element) => getComputedStyle(element).boxShadow);
+    expect(themeShadow).not.toBe("none");
+
+    const search = page.getByTestId("geography-search");
+    await search.fill("Toronto");
+    const searchOption = page.locator("#geography-search-results").getByRole("option").first();
+    await expect(searchOption).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(searchOption).toBeFocused();
+    expect(await searchOption.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe(
+      "none"
+    );
+
+    await search.fill("5");
+    const resultList = page.locator("#geography-search-results");
+    await expect(resultList.getByRole("option")).toHaveCount(8);
+    for (let index = 0; index < 8; index += 1) {
+      await page.keyboard.press("ArrowDown");
+    }
+    const activeResultId = await search.getAttribute("aria-activedescendant");
+    expect(activeResultId).toBeTruthy();
+    const activeResult = page.locator(`#${activeResultId}`);
+    await expect(activeResult).toHaveAttribute("aria-selected", "true");
+    expect(
+      await activeResult.evaluate((element) => {
+        const optionBounds = element.getBoundingClientRect();
+        const listBounds = element.parentElement?.getBoundingClientRect();
+        return Boolean(
+          listBounds &&
+            optionBounds.top >= listBounds.top - 1 &&
+            optionBounds.bottom <= listBounds.bottom + 1
+        );
+      })
+    ).toBe(true);
+
+    const exportButton = page.getByRole("button", { name: "Export comparison data as CSV" });
+    await exportButton.focus();
+    expect(await exportButton.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe(
+      "none"
+    );
   });
 
   test("the no-results message does not block other controls", async ({ page }) => {
@@ -774,9 +1294,9 @@ test.describe("CivicScope dashboard regressions", () => {
     await page.getByTestId("geography-search").fill("5350001.00");
     await page.getByRole("option").filter({ hasText: "5350001.00" }).click();
 
-    const detailsToggle = page.locator('button[aria-controls="summary-details-panel"]');
+    const detailsToggle = page.getByTestId("details-toggle");
     await expect(detailsToggle).toHaveAttribute("aria-expanded", "true");
-    await expect(page.locator("#summary-details-panel")).toBeVisible();
+    await expect(page.locator("#selected-geography-details")).toBeVisible();
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0001.00");
     await page.getByRole("button", { name: "What is Transit access score?" }).first().click();
     await expect(page.getByRole("tooltip")).toBeVisible();
@@ -793,8 +1313,12 @@ test.describe("CivicScope dashboard regressions", () => {
       `Light-theme accessibility violations: ${JSON.stringify(lightSerious, null, 2)}`
     ).toHaveLength(0);
 
-    await page.getByRole("button", { name: "Toggle color theme" }).click();
+    await page.getByRole("button", { name: "Dark theme" }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
+    const transitButton = page.getByRole("button", { name: "Transit", exact: true });
+    await transitButton.click();
+    await expect(transitButton).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#transit-layer-panel")).toBeVisible();
     const darkResults = await new AxeBuilder({ page })
       .exclude("[data-testid='map-canvas-host']")
       .withTags(["wcag2a", "wcag2aa"])

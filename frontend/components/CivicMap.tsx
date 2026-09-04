@@ -1,10 +1,28 @@
 "use client";
 
 import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatMetric, getMetricLabel, getTransitRoutes } from "@/lib/api";
-import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
+import {
+  buildChoroplethScale,
+  choroplethColorExpression,
+  FLAT_COLOR,
+  NULL_COLOR,
+  type ChoroplethClass
+} from "@/lib/colors";
+import { mapAnimationDuration } from "@/lib/map-motion";
+import {
+  allTransitFiltersEnabled,
+  anyTransitFilterEnabled,
+  buildTransitFilter,
+  TRANSIT_FILTERS_OFF,
+  TRANSIT_FILTERS_ON,
+  TRANSIT_LAYERS,
+  transitRouteLabels,
+  type TransitFeatureCollection,
+  type TransitFilters
+} from "@/lib/transit-map";
 import { buildTooltipHtml, escapeHtml, safeJsonParse } from "@/lib/tooltip";
 import type { GeographyLevel, MapData, MapFeature, MetricKey } from "@/types";
 
@@ -61,42 +79,34 @@ const BASEMAP_STYLES = {
   dark: "https://tiles.openfreemap.org/styles/dark"
 } as const;
 
+const PRECISE_LEGEND_CURRENCY = new Intl.NumberFormat("en-CA", {
+  style: "currency",
+  currency: "CAD",
+  maximumFractionDigits: 2
+});
+const PRECISE_LEGEND_NUMBER = new Intl.NumberFormat("en-CA", {
+  maximumFractionDigits: 3
+});
+
 type ThemeName = keyof typeof BASEMAP_STYLES;
+
+type TransitLoadState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded" }
+  | { status: "error"; message: string };
 
 function currentTheme(): ThemeName {
   return isDarkMode() ? "dark" : "light";
 }
 
-type TransitFilters = {
-  ttc_subway: boolean;
-  ttc_other: boolean;
-  go_transit: boolean;
-  miway: boolean;
-  durham_rt: boolean;
-};
-
-const TRANSIT_LAYERS = [
-  { key: "ttc_subway" as const, label: "TTC Subway", color: "#C23030", indent: true },
-  { key: "ttc_other" as const, label: "TTC Bus / Streetcar", color: "#888888", indent: true },
-  { key: "go_transit" as const, label: "GO Transit", color: "#5C8A4D" },
-  { key: "miway" as const, label: "MiWay", color: "#8C7356" },
-  { key: "durham_rt" as const, label: "Durham RT", color: "#7A6B8C" },
-] as const;
-
-const ALL_OFF: TransitFilters = { ttc_subway: false, ttc_other: false, go_transit: false, miway: false, durham_rt: false };
-const ALL_ON: TransitFilters = { ttc_subway: true, ttc_other: true, go_transit: true, miway: true, durham_rt: true };
-
-function buildTransitFilter(filters: TransitFilters): FilterSpecification | undefined {
-  const active = Object.entries(filters).filter(([, v]) => v).map(([k]) => k);
-  if (active.length === 0) return ["==", "transit_category", "__none__"];
-  if (active.length === Object.keys(filters).length) return undefined;
-  if (active.length === 1) return ["==", "transit_category", active[0]];
-  return ["in", "transit_category", ...active] as unknown as FilterSpecification;
-}
-
-function applyTransitFilterState(map: MapLibreMap, filters: TransitFilters) {
+function applyTransitFilterState(
+  map: MapLibreMap,
+  filters: TransitFilters,
+  routesAreLoaded: boolean
+) {
   if (!map.getLayer(transitLineLayerId)) return;
-  const anyEnabled = Object.values(filters).some(Boolean);
+  const anyEnabled = routesAreLoaded && anyTransitFilterEnabled(filters);
   map.setLayoutProperty(transitLineLayerId, "visibility", anyEnabled ? "visible" : "none");
   map.setFilter(transitLineLayerId, buildTransitFilter(filters) ?? null);
 }
@@ -152,7 +162,7 @@ function addCivicLayers(
         type: "fill",
         source: sourceId,
         paint: {
-          "fill-color": colorExpression(data),
+          "fill-color": choroplethColorExpression(data),
           "fill-opacity": 0.68
         } as never
       },
@@ -258,14 +268,25 @@ export function CivicMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const mapReadyRef = useRef(false);
+  const initialViewportAppliedRef = useRef(false);
+  const pendingViewportFitRef = useRef(true);
   const [transitOpen, setTransitOpen] = useState(false);
-  const [transitFilters, setTransitFilters] = useState<TransitFilters>({ ...ALL_OFF });
+  const [transitFilters, setTransitFilters] = useState<TransitFilters>({
+    ...TRANSIT_FILTERS_OFF
+  });
+  const [transitLoadState, setTransitLoadState] = useState<TransitLoadState>({
+    status: "idle"
+  });
+  const [transitRouteList, setTransitRouteList] = useState<string[]>([]);
+  const [transitFeatureCount, setTransitFeatureCount] = useState(0);
+  const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const onSelectRef = useRef(onSelect);
   const popupRef = useRef<Popup | null>(null);
   const latestDataRef = useRef<MapData | null>(data);
   const selectedGeoidRef = useRef(selectedGeoid);
   const transitFiltersRef = useRef<TransitFilters>(transitFilters);
-  const transitRoutesRef = useRef<unknown>(null);
+  const transitRoutesRef = useRef<TransitFeatureCollection | null>(null);
+  const transitRequestRef = useRef(0);
   const themeRef = useRef<ThemeName>(currentTheme());
   // The hover handler is registered once at init; read the live metric from a
   // ref so the tooltip always reflects the currently selected metric.
@@ -273,8 +294,8 @@ export function CivicMap({
   const isReady = Boolean(data);
   const loadedMetric = data?.metadata.metric ?? null;
 
-  // Same quantile computation the map paints by, so the legend always agrees.
-  const legend = useMemo(() => (data ? computeColorStops(data) : null), [data]);
+  // The same stepped quantile scale drives both paint and legend semantics.
+  const legend = useMemo(() => (data ? buildChoroplethScale(data) : null), [data]);
   // Data loaded, but every geography is null for this metric (e.g. turnover /
   // availability, not collected in this dataset). Surface an explicit empty
   // state instead of a silently blank map.
@@ -282,14 +303,60 @@ export function CivicMap({
     data && data.metadata.domain.min === null && data.metadata.domain.max === null
   );
 
-  const anyTransitOn = Object.values(transitFilters).some(Boolean);
+  const anyTransitOn = anyTransitFilterEnabled(transitFilters);
+
+  const loadTransitRoutes = useCallback(async () => {
+    const requestId = transitRequestRef.current + 1;
+    transitRequestRef.current = requestId;
+    setTransitLoadState({ status: "loading" });
+
+    try {
+      const geojson = await getTransitRoutes();
+      if (requestId !== transitRequestRef.current) return;
+
+      transitRoutesRef.current = geojson;
+      setTransitRouteList(transitRouteLabels(geojson));
+      setTransitFeatureCount(geojson.features.length);
+      const map = mapRef.current;
+      const source = map?.getSource(transitSourceId);
+      if (source && "setData" in source) {
+        (source as { setData: (payload: never) => void }).setData(geojson as never);
+      }
+      if (map && mapReadyRef.current) {
+        applyTransitFilterState(map, transitFiltersRef.current, true);
+      }
+      setTransitLoadState({ status: "loaded" });
+    } catch (transitError) {
+      if (requestId !== transitRequestRef.current) return;
+      transitRoutesRef.current = null;
+      setTransitRouteList([]);
+      setTransitFeatureCount(0);
+      setRouteDetailsOpen(false);
+      const map = mapRef.current;
+      if (map && mapReadyRef.current) {
+        applyTransitFilterState(map, transitFiltersRef.current, false);
+      }
+      console.error("Transit route overlay failed to load.", transitError);
+      setTransitLoadState({
+        status: "error",
+        message: "Transit lines could not be loaded. Check your connection and try again."
+      });
+    }
+  }, []);
 
   useEffect(() => {
     transitFiltersRef.current = transitFilters;
     const map = mapRef.current;
     if (!map || !mapReadyRef.current || !map.getLayer(transitLineLayerId)) return;
-    applyTransitFilterState(map, transitFilters);
-  }, [transitFilters, anyTransitOn]);
+    applyTransitFilterState(map, transitFilters, transitRoutesRef.current !== null);
+  }, [transitFilters]);
+
+  useEffect(
+    () => () => {
+      transitRequestRef.current += 1;
+    },
+    []
+  );
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -333,13 +400,29 @@ export function CivicMap({
           themeRef.current,
           transitRoutesRef.current
         );
-        applyTransitFilterState(map, transitFiltersRef.current);
+        applyTransitFilterState(
+          map,
+          transitFiltersRef.current,
+          transitRoutesRef.current !== null
+        );
         containerRef.current?.setAttribute(
           "data-civic-layer-order",
           civicLayersAreAboveBasemap(map) ? "valid" : "invalid"
         );
         containerRef.current?.setAttribute("data-map-theme", themeRef.current);
         mapReadyRef.current = true;
+        if (pendingViewportFitRef.current) {
+          const didFitViewport = fitToCurrentGeography(
+            map,
+            latestData,
+            selectedGeoidRef.current,
+            false
+          );
+          if (didFitViewport) {
+            pendingViewportFitRef.current = false;
+            initialViewportAppliedRef.current = true;
+          }
+        }
       };
       map.on("style.load", handleStyleLoad);
 
@@ -370,16 +453,16 @@ export function CivicMap({
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
       map.on("load", () => {
         mapReadyRef.current = true;
-        fitToDataBounds(map, initialData, false);
-        getTransitRoutes()
-          .then((geojson) => {
-            transitRoutesRef.current = geojson;
-            const src = map.getSource(transitSourceId);
-            if (src && "setData" in src) {
-              (src as { setData: (d: never) => void }).setData(geojson as never);
-            }
-          })
-          .catch(() => {});
+        if (!initialViewportAppliedRef.current) {
+          const didFitViewport = fitToCurrentGeography(
+            map,
+            latestDataRef.current ?? initialData,
+            selectedGeoidRef.current,
+            false
+          );
+          initialViewportAppliedRef.current = didFitViewport;
+          pendingViewportFitRef.current = !didFitViewport;
+        }
       });
 
       map.on("click", fillLayerId, (event) => {
@@ -444,6 +527,8 @@ export function CivicMap({
     return () => {
       cancelled = true;
       mapReadyRef.current = false;
+      initialViewportAppliedRef.current = false;
+      pendingViewportFitRef.current = true;
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
@@ -470,14 +555,15 @@ export function CivicMap({
       (source as { setData: (payload: never) => void }).setData(data as never);
     }
     if (map.getLayer(fillLayerId)) {
-      map.setPaintProperty(fillLayerId, "fill-color", colorExpression(data));
+      map.setPaintProperty(fillLayerId, "fill-color", choroplethColorExpression(data));
     }
   }, [data, metric]);
 
   useEffect(() => {
     selectedGeoidRef.current = selectedGeoid;
     const map = mapRef.current;
-    if (!map || !map.getLayer(selectedLineLayerId)) {
+    if (!map || !mapReadyRef.current || !map.getLayer(selectedLineLayerId)) {
+      pendingViewportFitRef.current = true;
       return;
     }
     const selectedFilter: FilterSpecification = ["==", ["get", "geoid"], selectedGeoid ?? ""];
@@ -485,27 +571,9 @@ export function CivicMap({
       map.setFilter(selectedFillLayerId, selectedFilter);
     }
     map.setFilter(selectedLineLayerId, selectedFilter);
-    if (!selectedGeoid) {
-      fitToDataBounds(map, data, true);
-      return;
-    }
-    const selectedFeature = data?.features.find(
-      (feature) => feature.properties.geoid === selectedGeoid
-    );
-    if (selectedFeature?.properties.bbox) {
-      const [minLng, minLat, maxLng, maxLat] = selectedFeature.properties.bbox;
-      map.fitBounds(
-        [
-          [minLng, minLat],
-          [maxLng, maxLat]
-        ],
-        {
-          padding: { top: 80, right: 80, bottom: 120, left: 80 },
-          maxZoom: data?.metadata.geography_type === "census_tract" ? 11.35 : 9.15,
-          duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
-        }
-      );
-    }
+    const didFitViewport = fitToCurrentGeography(map, data, selectedGeoid, true);
+    pendingViewportFitRef.current = !didFitViewport;
+    if (didFitViewport) initialViewportAppliedRef.current = true;
   }, [data, selectedGeoid]);
 
   useEffect(() => {
@@ -539,8 +607,16 @@ export function CivicMap({
       data-geography-type={data?.metadata.geography_type ?? ""}
       data-domain-min={data?.metadata.domain.min ?? ""}
       data-domain-max={data?.metadata.domain.max ?? ""}
+      data-scale-min={legend?.min ?? ""}
+      data-scale-max={legend?.max ?? ""}
+      data-transit-status={transitLoadState.status}
+      data-transit-feature-count={transitFeatureCount}
+      data-transit-visible={
+        transitLoadState.status === "loaded" && anyTransitOn ? "true" : "false"
+      }
       data-empty={dataIsEmpty ? "true" : "false"}
       role="region"
+      aria-busy={loading}
       aria-label={`Map of ${getMetricLabel(metric)} by ${
         (data?.metadata.geography_type ?? geographyLevel) === "census_tract"
           ? "census tract"
@@ -565,7 +641,7 @@ export function CivicMap({
               <button
                 type="button"
                 onClick={onRetry}
-                className="mt-3 rounded-md border border-civic-line px-3 py-1.5 text-xs font-semibold text-civic-ink hover:bg-civic-subtle"
+                className="mt-3 rounded-md border border-civic-line px-3 py-1.5 text-xs font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
               >
                 Retry map
               </button>
@@ -574,7 +650,7 @@ export function CivicMap({
         </div>
       )}
       {data && loading && loadedMetric !== metric && (
-        <div className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs font-medium text-civic-ink shadow-panel backdrop-blur-sm">
+        <div role="status" className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs font-medium text-civic-ink shadow-panel backdrop-blur-sm">
           Updating map...
         </div>
       )}
@@ -596,103 +672,151 @@ export function CivicMap({
       {data && legend && (
         <div
           data-testid="map-legend"
+          aria-label={`${getMetricLabel(metric)} map legend`}
           className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
         >
           <div className="mb-1.5 font-semibold text-civic-ink">{getMetricLabel(metric)}</div>
-          {legend.flat || legend.stops.length < 2 ? (
+          {legend.classes.length === 0 ? (
+            <p className="text-civic-muted">No values available</p>
+          ) : legend.flat ? (
             <div data-legend-class className="flex items-center gap-2 text-civic-muted">
-              <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: FLAT_COLOR }} />
-              <span className="tabular-nums">{formatMetric(metric, legend.min)}</span>
+              <span className="h-3 w-3 shrink-0 rounded-sm border border-slate-500 dark:border-slate-400" style={{ backgroundColor: FLAT_COLOR }} />
+              <span className="tabular-nums">{formatMetric(metric, legend.classes[0].lower)}</span>
             </div>
           ) : (
-            <ul className="space-y-1">
-              {legend.stops.map((stop, index) => {
-                const isLast = index === legend.stops.length - 1;
-                const upper = isLast ? legend.max : legend.stops[index + 1].value;
-                return (
+            <div>
+              <p className="mb-1 text-[11px] text-civic-muted">Grouped by quantiles</p>
+              <ul className="space-y-1" aria-label="Quantile ranges">
+                {legend.classes.map((colorClass, index) => (
                   <li
-                    key={`${stop.value}-${index}`}
+                    key={`${colorClass.lower}-${index}`}
                     data-legend-class
                     className="flex items-center gap-2 text-civic-muted"
                   >
                     <span
-                      className="h-3 w-3 shrink-0 rounded-sm"
-                      style={{ backgroundColor: stop.color }}
+                      className="h-3 w-3 shrink-0 rounded-sm border border-slate-500 dark:border-slate-400"
+                      style={{ backgroundColor: colorClass.color }}
                     />
                     <span className="tabular-nums">
-                      {isLast
-                        ? `${formatMetric(metric, stop.value)}+`
-                        : `${formatMetric(metric, stop.value)} – ${formatMetric(metric, upper)}`}
+                      {formatLegendClass(metric, colorClass)}
                     </span>
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            </div>
           )}
+          <div
+            data-legend-no-data
+            className="mt-1.5 flex items-center gap-2 border-t border-civic-line pt-1.5 text-civic-muted"
+          >
+            <span className="h-3 w-3 shrink-0 rounded-sm border border-slate-500 dark:border-slate-400" style={{ backgroundColor: NULL_COLOR }} />
+            <span>
+              No data{legend.noDataCount > 0 ? ` (${legend.noDataCount.toLocaleString("en-CA")})` : ""}
+            </span>
+          </div>
         </div>
       )}
       {data && (
         <div className="absolute bottom-9 right-3 z-10 flex flex-col items-end gap-1.5">
           {transitOpen && (
-            <div className="animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm">
+            <div
+              id="transit-layer-panel"
+              className="animate-fade-in min-w-56 rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+            >
               <div className="mb-2 flex items-center justify-between gap-4">
                 <span className="font-semibold text-civic-ink">Transit Lines</span>
-                <button
-                  type="button"
-                  className="text-[10px] text-civic-muted hover:text-civic-ink"
-                  onClick={() => {
-                    const allOn = Object.values(transitFilters).every(Boolean);
-                    setTransitFilters({ ...(allOn ? ALL_OFF : ALL_ON) });
-                  }}
-                >
-                  {Object.values(transitFilters).every(Boolean) ? "Clear all" : "Select all"}
-                </button>
+                {transitLoadState.status === "loaded" && (
+                  <button
+                    type="button"
+                    className="min-h-8 rounded px-2 py-1 text-[11px] text-civic-muted hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                    onClick={() => {
+                      const allOn = allTransitFiltersEnabled(transitFilters);
+                      setTransitFilters({
+                        ...(allOn ? TRANSIT_FILTERS_OFF : TRANSIT_FILTERS_ON)
+                      });
+                    }}
+                  >
+                    {allTransitFiltersEnabled(transitFilters) ? "Clear all" : "Select all"}
+                  </button>
+                )}
               </div>
-              <fieldset className="space-y-1.5">
-                <legend className="sr-only">Transit line filters</legend>
-                <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-civic-muted">TTC</div>
-                {TRANSIT_LAYERS.filter((l) => l.key.startsWith("ttc")).map((layer) => (
-                  <label key={layer.key} className="flex cursor-pointer items-center gap-2 text-civic-muted hover:text-civic-ink">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={transitFilters[layer.key]}
-                      onChange={() => setTransitFilters((prev) => ({ ...prev, [layer.key]: !prev[layer.key] }))}
-                    />
-                    <span
-                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white"
-                      style={transitFilters[layer.key] ? { backgroundColor: layer.color } : undefined}
+              {transitLoadState.status === "loading" && (
+                <div role="status" className="flex items-center gap-2 py-2 text-civic-muted">
+                  <span
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-civic-line border-t-civic-teal motion-reduce:animate-none"
+                  />
+                  Loading transit lines…
+                </div>
+              )}
+              {transitLoadState.status === "error" && (
+                <div role="alert" className="max-w-64 py-1 text-civic-muted">
+                  <p className="leading-5">{transitLoadState.message}</p>
+                  <button
+                    type="button"
+                    onClick={loadTransitRoutes}
+                    className="mt-2 min-h-9 rounded-md border border-civic-line px-2.5 py-1.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                  >
+                    Retry transit lines
+                  </button>
+                </div>
+              )}
+              {transitLoadState.status === "loaded" && (
+                <div>
+                  <fieldset className="space-y-0.5">
+                    <legend className="sr-only">Transit line filters</legend>
+                    <div className="mb-0.5 text-[11px] font-medium uppercase tracking-wider text-civic-muted">TTC</div>
+                    {TRANSIT_LAYERS.filter((layer) => layer.key.startsWith("ttc")).map((layer) => (
+                      <TransitFilterOption
+                        key={layer.key}
+                        layer={layer}
+                        checked={transitFilters[layer.key]}
+                        label={layer.label.replace("TTC ", "")}
+                        onToggle={() =>
+                          setTransitFilters((previous) => ({
+                            ...previous,
+                            [layer.key]: !previous[layer.key]
+                          }))
+                        }
+                      />
+                    ))}
+                    <div className="mb-0.5 mt-2 text-[11px] font-medium uppercase tracking-wider text-civic-muted">Regional</div>
+                    {TRANSIT_LAYERS.filter((layer) => !layer.key.startsWith("ttc")).map((layer) => (
+                      <TransitFilterOption
+                        key={layer.key}
+                        layer={layer}
+                        checked={transitFilters[layer.key]}
+                        label={layer.label}
+                        onToggle={() =>
+                          setTransitFilters((previous) => ({
+                            ...previous,
+                            [layer.key]: !previous[layer.key]
+                          }))
+                        }
+                      />
+                    ))}
+                  </fieldset>
+                  <button
+                    type="button"
+                    onClick={() => setRouteDetailsOpen((open) => !open)}
+                    aria-expanded={routeDetailsOpen}
+                    aria-controls="transit-route-details"
+                    className="mt-2 w-full rounded-md border border-civic-line px-2 py-1.5 text-left text-[11px] font-medium text-civic-muted hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                  >
+                    Browse route details ({transitRouteList.length})
+                  </button>
+                  {routeDetailsOpen && (
+                    <ul
+                      id="transit-route-details"
+                      className="mt-1.5 max-h-36 space-y-1 overflow-y-auto rounded-md bg-civic-subtle p-2 text-civic-ink"
                     >
-                      {transitFilters[layer.key] && (
-                        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M2.5 6l2.5 2.5 4.5-5" /></svg>
-                      )}
-                    </span>
-                    <span className="h-0.5 w-3 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
-                    {layer.label.replace("TTC ", "")}
-                  </label>
-                ))}
-                <div className="mb-1 mt-2.5 text-[10px] font-medium uppercase tracking-wider text-civic-muted">Regional</div>
-                {TRANSIT_LAYERS.filter((l) => !l.key.startsWith("ttc")).map((layer) => (
-                  <label key={layer.key} className="flex cursor-pointer items-center gap-2 text-civic-muted hover:text-civic-ink">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={transitFilters[layer.key]}
-                      onChange={() => setTransitFilters((prev) => ({ ...prev, [layer.key]: !prev[layer.key] }))}
-                    />
-                    <span
-                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white"
-                      style={transitFilters[layer.key] ? { backgroundColor: layer.color } : undefined}
-                    >
-                      {transitFilters[layer.key] && (
-                        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M2.5 6l2.5 2.5 4.5-5" /></svg>
-                      )}
-                    </span>
-                    <span className="h-0.5 w-3 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
-                    {layer.label}
-                  </label>
-                ))}
-              </fieldset>
+                      {transitRouteList.map((routeLabel) => (
+                        <li key={routeLabel}>{routeLabel}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <button
@@ -700,18 +824,27 @@ export function CivicMap({
             onClick={() => {
               if (!transitOpen) {
                 setTransitOpen(true);
-                if (!anyTransitOn) setTransitFilters({ ...ALL_ON });
+                if (!anyTransitOn) setTransitFilters({ ...TRANSIT_FILTERS_ON });
+                if (
+                  transitLoadState.status === "idle" ||
+                  transitLoadState.status === "error"
+                ) {
+                  void loadTransitRoutes();
+                }
               } else {
                 setTransitOpen(false);
-                setTransitFilters({ ...ALL_OFF });
+                setTransitFilters({ ...TRANSIT_FILTERS_OFF });
+                setRouteDetailsOpen(false);
               }
             }}
-            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel transition-colors ${
-              anyTransitOn
-                ? "border-civic-teal bg-civic-teal text-white"
+            className={`flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel ${
+              transitOpen
+                ? "border-civic-teal bg-civic-teal text-white dark:text-slate-950"
                 : "border-civic-line bg-civic-panel text-civic-muted hover:text-civic-ink"
             }`}
-            aria-pressed={anyTransitOn}
+            aria-controls="transit-layer-panel"
+            aria-expanded={transitOpen}
+            aria-busy={transitLoadState.status === "loading"}
             title={transitOpen ? "Hide transit lines" : "Show transit lines"}
           >
             <svg
@@ -723,6 +856,7 @@ export function CivicMap({
               strokeLinecap="round"
               strokeLinejoin="round"
               className="h-3.5 w-3.5"
+              aria-hidden="true"
             >
               <rect x="4" y="3" width="16" height="18" rx="2" />
               <path d="M12 3v18" />
@@ -737,102 +871,73 @@ export function CivicMap({
   );
 }
 
-// Color ramp shared with the comparison chart (see lib/colors).
-
-/**
- * Compute quantile boundaries from a sorted ascending array of values.
- * Returns `count` interior break points at evenly-spaced percentiles
- * (e.g. count=4 -> 20/40/60/80 for 5 classes). Uses linear interpolation
- * between sorted samples.
- */
-function quantileBreaks(sorted: number[], count: number): number[] {
-  const breaks: number[] = [];
-  for (let i = 1; i <= count; i += 1) {
-    const q = i / (count + 1);
-    const pos = q * (sorted.length - 1);
-    const lower = Math.floor(pos);
-    const upper = Math.min(sorted.length - 1, lower + 1);
-    const frac = pos - lower;
-    breaks.push(sorted[lower] + (sorted[upper] - sorted[lower]) * frac);
-  }
-  return breaks;
+function TransitFilterOption({
+  layer,
+  checked,
+  label,
+  onToggle
+}: {
+  layer: (typeof TRANSIT_LAYERS)[number];
+  checked: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <label className="flex min-h-8 cursor-pointer items-center gap-2 rounded px-0.5 text-civic-muted hover:text-civic-ink">
+      <input
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        onChange={onToggle}
+      />
+      <span
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-civic-teal peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-civic-panel"
+        style={checked ? { backgroundColor: layer.color } : undefined}
+      >
+        {checked && (
+          <svg
+            viewBox="0 0 12 12"
+            className="h-2.5 w-2.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path d="M2.5 6l2.5 2.5 4.5-5" />
+          </svg>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        className="h-0.5 w-3 shrink-0 rounded-full"
+        style={{ backgroundColor: layer.color }}
+      />
+      {label}
+    </label>
+  );
 }
 
-/**
- * Quantile (data-driven) colour stops computed from the actual distribution of
- * the active metric's non-null feature values. This differentiates right-skewed
- * metrics far better than linear min/mid/max interpolation, which washes most
- * areas into the palest band. Returns the stop boundaries (ascending, deduped)
- * paired with the ramp colour for each, plus the domain min/max, shared by the
- * map paint expression and the legend so the two always agree.
- */
-function computeColorStops(data: MapData): {
-  stops: Array<{ value: number; color: string }>;
-  min: number;
-  max: number;
-  flat: boolean;
-} {
-  const values = data.features
-    .map((feature) => feature.properties.value)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-    .sort((a, b) => a - b);
-
-  const min = values.length ? values[0] : (data.metadata.domain.min ?? 0);
-  const max = values.length ? values[values.length - 1] : (data.metadata.domain.max ?? 1);
-
-  // All equal (or no data): flat fill, interpolate needs ascending stops.
-  if (!values.length || min === max) {
-    return { stops: [], min, max, flat: true };
+function formatLegendClass(metric: MetricKey, colorClass: ChoroplethClass): string {
+  let lower = formatMetric(metric, colorClass.lower);
+  if (colorClass.upper === null) return `${lower} and above`;
+  let upper = formatMetric(metric, colorClass.upper);
+  if (lower === upper) {
+    lower = formatPreciseLegendBoundary(metric, colorClass.lower);
+    upper = formatPreciseLegendBoundary(metric, colorClass.upper);
   }
-
-  // 5 classes -> 4 interior quantile breaks at the 20/40/60/80 percentiles.
-  // Anchor with the domain min so the first stop maps to the palest colour.
-  const interior = quantileBreaks(values, 4);
-  const candidate = [min, ...interior];
-
-  // Dedupe equal boundaries (heavily-tied distributions collapse quantiles)
-  // to keep stops strictly ascending, MapLibre throws otherwise.
-  const ascending: number[] = [];
-  for (const value of candidate) {
-    if (ascending.length === 0 || value > ascending[ascending.length - 1]) {
-      ascending.push(value);
-    }
-  }
-
-  // Need >=2 distinct stops to interpolate; otherwise fall back to flat.
-  if (ascending.length < 2) {
-    return { stops: [], min, max, flat: true };
-  }
-
-  const stops = ascending.map((value, index) => ({
-    value,
-    color: rampColorAt(index / (ascending.length - 1), data.metadata.metric)
-  }));
-  return { stops, min, max, flat: false };
+  return `${lower} to under ${upper}`;
 }
 
-function colorExpression(data: MapData): unknown[] {
-  const { stops, flat } = computeColorStops(data);
-
-  // When all features have the same value (e.g. CMA-level CMHC data),
-  // min === max makes interpolate stops non-monotonic which silently
-  // kills MapLibre rendering. Use a flat color instead.
-  if (flat) {
-    return ["case", ["==", ["get", "value"], null], NULL_COLOR, FLAT_COLOR];
+function formatPreciseLegendBoundary(metric: MetricKey, value: number): string {
+  const formatted = formatMetric(metric, value);
+  if (formatted.startsWith("$")) {
+    return PRECISE_LEGEND_CURRENCY.format(value);
   }
-
-  const interpolateStops = stops.flatMap((stop) => [stop.value, stop.color]);
-  return [
-    "case",
-    ["==", ["get", "value"], null],
-    NULL_COLOR,
-    [
-      "interpolate",
-      ["linear"],
-      ["to-number", ["get", "value"], stops[0].value],
-      ...interpolateStops
-    ]
-  ];
+  if (formatted.endsWith("%")) {
+    const percentage = metric === "rent_to_income_ratio" ? value * 100 : value;
+    return `${PRECISE_LEGEND_NUMBER.format(percentage)}%`;
+  }
+  return PRECISE_LEGEND_NUMBER.format(value);
 }
 
 function normalizeFeatureProperties(feature: {
@@ -898,15 +1003,54 @@ function getDataBounds(data?: MapData | null): LngLatBoundsLike | null {
   ];
 }
 
-function fitToDataBounds(map: MapLibreMap, data?: MapData | null, animated = true) {
+function fitToCurrentGeography(
+  map: MapLibreMap,
+  data: MapData | null | undefined,
+  selectedGeoid: string | undefined,
+  animated: boolean
+): boolean {
+  if (!selectedGeoid) return fitToDataBounds(map, data, animated);
+
+  const selectedFeature = data?.features.find(
+    (feature) => feature.properties.geoid === selectedGeoid
+  );
+  const bbox = selectedFeature?.properties.bbox;
+  if (!bbox || bbox.some((value) => !Number.isFinite(value))) return false;
+
+  const [minLng, minLat, maxLng, maxLat] = bbox;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  map.fitBounds(
+    [
+      [minLng, minLat],
+      [maxLng, maxLat]
+    ],
+    {
+      padding: { top: 80, right: 80, bottom: 120, left: 80 },
+      maxZoom: data?.metadata.geography_type === "census_tract" ? 11.35 : 9.15,
+      duration: mapAnimationDuration(animated, reduceMotion, 650)
+    }
+  );
+  return true;
+}
+
+function fitToDataBounds(
+  map: MapLibreMap,
+  data?: MapData | null,
+  animated = true
+): boolean {
   const bounds = getDataBounds(data);
   if (!bounds) {
-    return;
+    return false;
   }
 
   map.fitBounds(bounds, {
     padding: 40,
     maxZoom: 8.65,
-    duration: animated ? 450 : 0
+    duration: mapAnimationDuration(
+      animated,
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      450
+    )
   });
+  return true;
 }

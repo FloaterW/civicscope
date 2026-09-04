@@ -6,7 +6,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   LabelList,
   ResponsiveContainer,
   Tooltip,
@@ -15,8 +14,8 @@ import {
 } from "recharts";
 
 import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
+import { COMPARISON_BAR_COLOR } from "@/lib/colors";
 import { rowsToCsv } from "@/lib/csv-export";
-import { rampColorForValue } from "@/lib/colors";
 import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
 import type { CompareResponse, GeographyLevel, MetricKey, TransitSnapshot } from "@/types";
 
@@ -39,18 +38,28 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   const [chartTooltipActive, setChartTooltipActive] = useState(false);
   const isCmhc = isCmhcMetric(metric);
   const isTransit = isTransitMetric(metric);
+  const showsRentRatio = !isCmhc && !isTransit;
+  const snapshotDate = transitSnapshotDate(transitSnapshot);
+  const transitPeriodLabel =
+    snapshotDate === "Unknown"
+      ? "Transit snapshot date unavailable"
+      : `Transit snapshot ${snapshotDate}`;
   const comparisonRows =
     comparison?.items
       .map((item) => {
         const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, unknown>;
         const raw = allMetrics[metric];
         const rawValue = typeof raw === "number" ? raw : null;
+        const lowConfidence =
+          metric === "population_growth_pct" &&
+          item.metrics.data_quality?.population_growth_pct === "low_confidence";
         return {
           geoid: item.geoid,
           name: chartLabel(item.name, item.type, item.geoid),
           fullName: item.name,
-          value: rawValue,
+          value: lowConfidence ? null : rawValue,
           rawValue,
+          lowConfidence,
         };
       }) ?? [];
   const chartData = comparisonRows.filter(
@@ -58,10 +67,12 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   );
   const hasChartData = chartData.length > 0;
   const hasRows = comparisonRows.length > 0;
-  const missingCount = comparisonRows.length - chartData.length;
-  const values = chartData.map((d) => d.value as number);
-  const minValue = values.length ? Math.min(...values) : 0;
-  const maxValue = values.length ? Math.max(...values) : 0;
+  const missingCount = comparisonRows.filter((item) => item.rawValue === null).length;
+  const lowConfidenceCount = comparisonRows.filter((item) => item.lowConfidence).length;
+  const cohortDescription = isUserSelection
+    ? `selected ${geographyLevel === "municipality" ? "municipalities" : "census tracts"}`
+    : defaultComparisonNouns[geographyLevel];
+  const comparisonYear = displayYear ?? comparison?.year ?? 2021;
 
   const handleExportCsv = useCallback(() => {
     if (!comparison) return;
@@ -75,16 +86,19 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
       metricLabel,
       "Status",
       ...transitHeaders,
-      ...(isCmhc ? [] : ["Rent-to-income ratio"])
+      ...(showsRentRatio ? ["Rent-to-income ratio"] : [])
     ]];
     for (const item of comparison.items) {
       const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, unknown>;
       const val = allMetrics[metric];
+      const lowConfidence =
+        metric === "population_growth_pct" &&
+        item.metrics.data_quality?.population_growth_pct === "low_confidence";
       const row = [
         item.name,
         item.geoid,
         val != null ? String(val) : "",
-        val != null ? "available" : "unavailable",
+        val == null ? "unavailable" : lowConfidence ? "low_confidence" : "available",
         ...(isTransit
           ? [
               transitSnapshot?.coverage_status ?? "unknown",
@@ -93,7 +107,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               transitSnapshotDate(transitSnapshot)
             ]
           : []),
-        ...(isCmhc ? [] : [item.metrics.rent_to_income_ratio != null ? String(item.metrics.rent_to_income_ratio) : ""])
+        ...(showsRentRatio ? [item.metrics.rent_to_income_ratio != null ? String(item.metrics.rent_to_income_ratio) : ""] : [])
       ];
       rows.push(row);
     }
@@ -107,7 +121,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
     a.click();
     document.body.removeChild(a);
     window.setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [comparison, metric, geographyLevel, isCmhc, isTransit, transitSnapshot]);
+  }, [comparison, metric, geographyLevel, isTransit, showsRentRatio, transitSnapshot]);
 
   return (
     <div data-testid="comparison-panel" className="p-4">
@@ -115,11 +129,16 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
         <div>
           <h2 className="text-sm font-semibold text-civic-ink">Comparison</h2>
           <p className="text-xs text-civic-muted">
-            {getMetricLabel(metric)} across {isUserSelection ? `selected ${geographyLevel === "municipality" ? "municipalities" : "census tracts"}` : defaultComparisonNouns[geographyLevel]}
+            {getMetricLabel(metric)} across {cohortDescription}
           </p>
           {missingCount > 0 && (
             <p className="mt-1 text-xs text-civic-muted">
               {missingCount} {missingCount === 1 ? "area is" : "areas are"} listed as Not available.
+            </p>
+          )}
+          {lowConfidenceCount > 0 && (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+              {lowConfidenceCount} low-confidence growth {lowConfidenceCount === 1 ? "value is" : "values are"} shown in the table but excluded from the chart scale.
             </p>
           )}
         </div>
@@ -128,7 +147,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             <button
               type="button"
               onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
               aria-label="Export comparison data as CSV"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -136,13 +155,27 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             </button>
           )}
           <span className="rounded-md border border-civic-line px-2 py-1 text-xs text-civic-muted">
-            {displayYear ?? comparison?.year ?? "2021"}
+            {isTransit ? transitPeriodLabel : comparisonYear}
           </span>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="h-72 rounded-md border border-civic-line bg-civic-subtle p-3">
+        <div
+          className="relative h-72 overflow-hidden rounded-md border border-civic-line bg-civic-subtle p-3"
+          role={hasChartData ? "img" : undefined}
+          aria-label={
+            hasChartData
+              ? `${getMetricLabel(metric)} bar chart for ${cohortDescription}. ${
+                  isTransit
+                    ? snapshotDate === "Unknown"
+                      ? "Transit snapshot date unavailable."
+                      : `Transit snapshot packaged ${snapshotDate}.`
+                    : `Data year ${comparisonYear}.`
+                } Exact values are available in the adjacent table.`
+              : undefined
+          }
+        >
           {loading && !hasChartData ? (
             <div className="flex h-full flex-col items-center justify-center gap-2">
               <div className="skeleton h-4 w-48" />
@@ -154,7 +187,9 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             </div>
           ) : !hasChartData ? (
             <div className="grid h-full place-items-center text-sm text-civic-muted">
-              No comparison data available.
+              {lowConfidenceCount > 0
+                ? "Chart omitted because the available growth values are low confidence. Exact values remain in the table."
+                : "No comparison data available."}
             </div>
           ) : (
             <ResponsiveContainer
@@ -164,34 +199,40 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             >
               <BarChart
                 data={chartData}
-                margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                margin={{ top: 8, right: 8, bottom: 8, left: 12 }}
                 onMouseMove={() => setChartTooltipActive(true)}
                 onMouseLeave={() => setChartTooltipActive(false)}
               >
                 <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} width={54} />
+                <YAxis
+                  tick={{ fontSize: 12, fill: "var(--chart-label)" }}
+                  tickFormatter={(value: number) => formatAxisMetric(metric, value)}
+                  tickLine={false}
+                  width={62}
+                />
                 <Tooltip
                   active={chartTooltipActive}
-                  formatter={(value, _name, item) => [
-                    formatMetric(metric, item.payload.rawValue),
-                    getMetricLabel(metric)
-                  ]}
-                  contentStyle={{
-                    background: "var(--civic-panel)",
-                    border: "1px solid var(--civic-line)",
-                    borderRadius: "6px",
-                    color: "var(--civic-ink)"
-                  }}
-                  labelStyle={{ color: "var(--civic-ink)" }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64}>
-                  {chartData.map((item) => (
-                    <Cell
-                      key={item.geoid}
-                      fill={rampColorForValue(item.value as number, minValue, maxValue, metric)}
+                  content={(tooltipProps) => (
+                    <ComparisonChartTooltip
+                      active={tooltipProps.active}
+                      payload={tooltipProps.payload}
+                      metric={metric}
                     />
-                  ))}
+                  )}
+                  isAnimationActive={false}
+                  position={{ x: 8, y: 8 }}
+                  wrapperStyle={{
+                    maxWidth: "calc(100% - 16px)",
+                    pointerEvents: "none"
+                  }}
+                />
+                <Bar
+                  dataKey="value"
+                  fill={COMPARISON_BAR_COLOR}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={64}
+                >
                   <LabelList
                     dataKey="value"
                     position="top"
@@ -204,13 +245,28 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
           )}
         </div>
 
-        <div className="overflow-hidden rounded-md border border-civic-line">
+        <div className="overflow-x-auto rounded-md border border-civic-line">
           <table className="w-full border-collapse text-sm">
+            <caption className="sr-only">
+              {isTransit
+                ? `${getMetricLabel(metric)} values for ${cohortDescription} from the transit snapshot${
+                    snapshotDate === "Unknown"
+                      ? " (date unavailable)"
+                      : ` packaged ${snapshotDate}`
+                  }`
+                : `${getMetricLabel(metric)} values for ${cohortDescription} in ${comparisonYear}`}
+              {missingCount > 0
+                ? `. ${missingCount} ${missingCount === 1 ? "area has" : "areas have"} no available value.`
+                : "."}
+              {lowConfidenceCount > 0
+                ? ` ${lowConfidenceCount} low-confidence growth ${lowConfidenceCount === 1 ? "value is" : "values are"} excluded from the chart scale.`
+                : ""}
+            </caption>
             <thead className="bg-civic-subtle text-left text-xs uppercase tracking-wide text-civic-muted">
               <tr>
-                <th className="px-3 py-2 font-semibold">Area</th>
-                <th className="px-3 py-2 font-semibold">{getMetricLabel(metric)}</th>
-                {!isCmhc && <th className="px-3 py-2 font-semibold">Ratio</th>}
+                <th scope="col" className="px-3 py-2 font-semibold">Area</th>
+                <th scope="col" className="whitespace-nowrap px-3 py-2 text-right font-semibold">{getMetricLabel(metric)}</th>
+                {showsRentRatio && <th scope="col" className="px-3 py-2 text-right font-semibold">Ratio</th>}
               </tr>
             </thead>
             <tbody>
@@ -219,11 +275,16 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                 return (
                   <tr key={item.geoid} className="border-t border-civic-line">
                     <td className="px-3 py-2 font-medium text-civic-ink">{source?.name}</td>
-                    <td className="px-3 py-2 text-civic-ink">
+                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-civic-ink">
                       {formatMetric(metric, item.rawValue)}
+                      {item.lowConfidence && (
+                        <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                          Low confidence — very small 2016 base
+                        </span>
+                      )}
                     </td>
-                    {!isCmhc && (
-                      <td className="px-3 py-2 text-civic-muted">
+                    {showsRentRatio && (
+                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-civic-muted">
                         {formatMetric("rent_to_income_ratio", source?.metrics.rent_to_income_ratio)}
                       </td>
                     )}
@@ -234,6 +295,46 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+const COMPACT_NUMBER_FORMATTER = new Intl.NumberFormat("en-CA", {
+  notation: "compact",
+  maximumFractionDigits: 1
+});
+
+function formatAxisMetric(metric: MetricKey, value: number): string {
+  const formatted = formatMetric(metric, value);
+  if (formatted.endsWith("%")) return formatted;
+  if (Math.abs(value) < 1_000) return formatted;
+  const compact = COMPACT_NUMBER_FORMATTER.format(value);
+  return formatted.startsWith("$") ? `$${compact}` : compact;
+}
+
+function ComparisonChartTooltip({
+  active,
+  payload,
+  metric
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<{
+    payload?: { fullName?: string; rawValue?: number };
+  }>;
+  metric: MetricKey;
+}) {
+  const datum = payload?.[0]?.payload;
+  if (!active || !datum || typeof datum.rawValue !== "number") return null;
+
+  return (
+    <div
+      className="w-max whitespace-normal rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs text-civic-ink shadow-panel"
+      style={{ maxWidth: "min(16rem, calc(100vw - 4rem))" }}
+    >
+      <p className="break-words font-semibold leading-5">{datum.fullName}</p>
+      <p className="mt-0.5 leading-5 text-civic-muted">
+        {getMetricLabel(metric)}: <span className="tabular-nums text-civic-ink">{formatMetric(metric, datum.rawValue)}</span>
+      </p>
     </div>
   );
 }
