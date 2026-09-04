@@ -9,7 +9,7 @@ const projectRoot = resolve(frontendRoot, "..");
 const demoDir = resolve(projectRoot, "docs", "demo");
 const tempVideoDir = resolve(demoDir, ".tmp-video");
 const outputPath = resolve(demoDir, "civicscope-demo.webm");
-const baseURL = process.env.CIVICSCOPE_SCREENSHOT_URL ?? "http://localhost:3001";
+const baseURL = process.env.CIVICSCOPE_SCREENSHOT_URL ?? "http://localhost:3000";
 
 await rm(tempVideoDir, { recursive: true, force: true });
 await mkdir(tempVideoDir, { recursive: true });

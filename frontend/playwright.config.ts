@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 const host = "127.0.0.1";
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3101);
@@ -18,6 +18,22 @@ export default defineConfig({
   reporter: process.env.CI
     ? [["list"], ["html", { open: "never" }]]
     : "list",
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] }
+    },
+    {
+      name: "firefox-smoke",
+      testMatch: /cross-browser\.spec\.ts/,
+      use: { ...devices["Desktop Firefox"] }
+    },
+    {
+      name: "webkit-smoke",
+      testMatch: /cross-browser\.spec\.ts/,
+      use: { ...devices["Desktop Safari"] }
+    }
+  ],
   use: {
     baseURL,
     screenshot: "only-on-failure",

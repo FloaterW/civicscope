@@ -1,7 +1,15 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
+import { createPortal } from "react-dom";
 
 const metricDefinitions: Record<string, { term: string; definition: string; source: string }> = {
   rent_burden_pct: {
@@ -116,62 +124,171 @@ export function MetricTooltip({ metricKey }: { metricKey: string }) {
 function InfoTooltip({ term, definition, source }: { term: string; definition: string; source: string }) {
   const [open, setOpen] = useState(false);
   const [clickLocked, setClickLocked] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{
+    left: number;
+    top: number;
+    arrowLeft: number;
+    placement: "top" | "bottom";
+  } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const tooltipId = useId();
 
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
   const close = useCallback(() => {
+    clearCloseTimer();
     setOpen(false);
     setClickLocked(false);
+    setPosition(null);
+  }, [clearCloseTimer]);
+
+  const showPreview = useCallback(() => {
+    clearCloseTimer();
+    if (!clickLocked) {
+      setPosition(null);
+      setOpen(true);
+    }
+  }, [clearCloseTimer, clickLocked]);
+
+  const schedulePreviewClose = useCallback(() => {
+    if (clickLocked) return;
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpen(false);
+      setPosition(null);
+    }, 120);
+  }, [clearCloseTimer, clickLocked]);
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    const tooltip = tooltipRef.current?.getBoundingClientRect();
+    if (!trigger || !tooltip) return;
+
+    const viewportWidth = document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight;
+    const viewportMargin = 16;
+    const gap = 10;
+    const idealLeft = trigger.left + trigger.width / 2 - tooltip.width / 2;
+    const maxLeft = Math.max(viewportMargin, viewportWidth - viewportMargin - tooltip.width);
+    const left = Math.min(Math.max(idealLeft, viewportMargin), maxLeft);
+    const topSpace = trigger.top - viewportMargin;
+    const bottomSpace = viewportHeight - trigger.bottom - viewportMargin;
+    const placement = topSpace >= tooltip.height + gap || topSpace >= bottomSpace ? "top" : "bottom";
+    const idealTop = placement === "top" ? trigger.top - tooltip.height - gap : trigger.bottom + gap;
+    const maxTop = Math.max(viewportMargin, viewportHeight - viewportMargin - tooltip.height);
+    const top = Math.min(Math.max(idealTop, viewportMargin), maxTop);
+    const arrowLeft = Math.min(
+      Math.max(trigger.left + trigger.width / 2 - left, 14),
+      Math.max(14, tooltip.width - 14)
+    );
+
+    setPosition({ left, top, arrowLeft, placement });
   }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const resizeObserver = new ResizeObserver(updatePosition);
+    if (tooltipRef.current) resizeObserver.observe(tooltipRef.current);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      resizeObserver.disconnect();
+    };
+  }, [open, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+    function handleClickOutside(e: PointerEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || tooltipRef.current?.contains(target)) return;
+      close();
     }
     function handleEscape(e: KeyboardEvent) {
       if (e.key === "Escape") close();
     }
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("pointerdown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [open, close]);
 
+  useEffect(() => () => clearCloseTimer(), [clearCloseTimer]);
+
+  const tooltip = open ? (
+    <div
+      ref={tooltipRef}
+      id={tooltipId}
+      role="tooltip"
+      onMouseEnter={clearCloseTimer}
+      onMouseLeave={schedulePreviewClose}
+      className={`fixed z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-civic-line bg-civic-panel shadow-xl ${
+        position ? "visible" : "invisible"
+      }`}
+      style={{
+        left: position?.left ?? 16,
+        top: position?.top ?? 16,
+      }}
+    >
+      <div className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[inherit] p-4">
+        <p className="text-sm font-semibold text-civic-ink">{term}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-civic-muted">{definition}</p>
+        <p className="mt-2.5 text-xs italic leading-relaxed text-civic-muted">{source}</p>
+      </div>
+      {position && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute h-3 w-3 -translate-x-1/2 rotate-45 border-civic-line bg-civic-panel ${
+            position.placement === "top"
+              ? "-bottom-1.5 border-b border-r"
+              : "-top-1.5 border-l border-t"
+          }`}
+          style={{ left: position.arrowLeft }}
+        />
+      )}
+    </div>
+  ) : null;
+
   return (
-    <div ref={ref} className="relative inline-flex">
+    <div ref={triggerRef} className="relative inline-flex">
       <button
         type="button"
         onClick={() => {
           if (clickLocked) {
             close();
           } else {
+            clearCloseTimer();
+            setPosition(null);
             setOpen(true);
             setClickLocked(true);
           }
         }}
-        onMouseEnter={() => { if (!clickLocked) setOpen(true); }}
-        onMouseLeave={() => { if (!clickLocked) setOpen(false); }}
-        className="inline-flex items-center justify-center rounded-full text-civic-muted transition hover:text-civic-teal focus:outline-none focus:ring-2 focus:ring-civic-teal focus:ring-offset-1"
+        onMouseEnter={showPreview}
+        onMouseLeave={schedulePreviewClose}
+        onFocus={showPreview}
+        onBlur={schedulePreviewClose}
+        className="-my-2 -ml-1 -mr-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-civic-muted transition hover:bg-civic-hover hover:text-civic-teal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
         aria-label={`What is ${term}?`}
+        aria-expanded={open}
+        aria-controls={open ? tooltipId : undefined}
         aria-describedby={open ? tooltipId : undefined}
       >
         <Info className="h-3.5 w-3.5" />
       </button>
-      {open && (
-        <div
-          id={tooltipId}
-          role="tooltip"
-          className="absolute bottom-full left-1/2 z-30 mb-2 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border border-civic-line bg-civic-panel p-3 shadow-lg"
-        >
-          <p className="text-xs font-semibold text-civic-ink">{term}</p>
-          <p className="mt-1 text-xs leading-relaxed text-civic-muted">{definition}</p>
-          <p className="mt-2 text-[10px] italic text-civic-muted">{source}</p>
-          <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-civic-line" />
-        </div>
-      )}
+      {tooltip ? createPortal(tooltip, document.body) : null}
     </div>
   );
 }
