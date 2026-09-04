@@ -1,12 +1,12 @@
 "use client";
 
 import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { API_BASE, formatMetric, getMetricLabel } from "@/lib/api";
+import { formatMetric, getMetricLabel, getTransitRoutes } from "@/lib/api";
 import { FLAT_COLOR, NULL_COLOR, rampColorAt } from "@/lib/colors";
 import { buildTooltipHtml, escapeHtml, safeJsonParse } from "@/lib/tooltip";
-import type { GeographyLevel, MapData, MapFeature, MetricFieldStatus, MetricKey, MetricQuality, MetricValues } from "@/types";
+import type { GeographyLevel, MapData, MapFeature, MetricKey } from "@/types";
 
 type Props = {
   data: MapData | null;
@@ -15,10 +15,11 @@ type Props = {
   geographyLevel: GeographyLevel;
   selectedGeoid?: string;
   onSelect: (feature: MapFeature["properties"]) => void;
+  error?: string | null;
+  onRetry?: () => void;
 };
 
 const sourceId = "civic-geographies";
-const basemapSourceId = "carto-light";
 const placesSourceId = "gta-reference-places";
 const fillLayerId = "civic-geographies-fill";
 const selectedFillLayerId = "civic-geographies-selected-fill";
@@ -27,7 +28,14 @@ const selectedLineLayerId = "civic-geographies-selected";
 const placeCircleLayerId = "gta-reference-places-circle";
 const transitSourceId = "transit-routes";
 const transitLineLayerId = "transit-routes-line";
-const transitLabelLayerId = "transit-routes-label";
+const CIVIC_LAYER_IDS = new Set([
+  fillLayerId,
+  selectedFillLayerId,
+  lineLayerId,
+  selectedLineLayerId,
+  placeCircleLayerId,
+  transitLineLayerId
+]);
 
 const referencePlaces = {
   type: "FeatureCollection",
@@ -48,18 +56,16 @@ function isDarkMode(): boolean {
   return document.documentElement.classList.contains("dark");
 }
 
-const LIGHT_TILES = [
-  "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-  "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-  "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-];
-const DARK_TILES = [
-  "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-  "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-  "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-];
-const LIGHT_BG = "#eef2ed";
-const DARK_BG = "#0f172a";
+const BASEMAP_STYLES = {
+  light: "https://tiles.openfreemap.org/styles/positron",
+  dark: "https://tiles.openfreemap.org/styles/dark"
+} as const;
+
+type ThemeName = keyof typeof BASEMAP_STYLES;
+
+function currentTheme(): ThemeName {
+  return isDarkMode() ? "dark" : "light";
+}
 
 type TransitFilters = {
   ttc_subway: boolean;
@@ -88,7 +94,167 @@ function buildTransitFilter(filters: TransitFilters): FilterSpecification | unde
   return ["in", "transit_category", ...active] as unknown as FilterSpecification;
 }
 
-export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid, onSelect }: Props) {
+function applyTransitFilterState(map: MapLibreMap, filters: TransitFilters) {
+  if (!map.getLayer(transitLineLayerId)) return;
+  const anyEnabled = Object.values(filters).some(Boolean);
+  map.setLayoutProperty(transitLineLayerId, "visibility", anyEnabled ? "visible" : "none");
+  map.setFilter(transitLineLayerId, buildTransitFilter(filters) ?? null);
+}
+
+function firstLabelAboveBasemap(map: MapLibreMap): string | undefined {
+  const layers = map.getStyle().layers;
+  let lastNonSymbolIndex = -1;
+  layers.forEach((layer, index) => {
+    if (layer.type !== "symbol") lastNonSymbolIndex = index;
+  });
+  return layers.slice(lastNonSymbolIndex + 1).find((layer) => layer.type === "symbol")?.id;
+}
+
+function civicLayersAreAboveBasemap(map: MapLibreMap): boolean {
+  const layers = map.getStyle().layers;
+  const civicFillIndex = layers.findIndex((layer) => layer.id === fillLayerId);
+  const lastBasemapNonSymbolIndex = layers.reduce(
+    (last, layer, index) =>
+      layer.type !== "symbol" && !CIVIC_LAYER_IDS.has(layer.id) ? index : last,
+    -1
+  );
+  return civicFillIndex > lastBasemapNonSymbolIndex;
+}
+
+function addCivicLayers(
+  map: MapLibreMap,
+  data: MapData,
+  selectedGeoid: string | undefined,
+  theme: ThemeName,
+  transitRoutes: unknown
+) {
+  if (!map.getSource(sourceId)) {
+    map.addSource(sourceId, { type: "geojson", data: data as never });
+  }
+  if (!map.getSource(placesSourceId)) {
+    map.addSource(placesSourceId, { type: "geojson", data: referencePlaces as never });
+  }
+  if (!map.getSource(transitSourceId)) {
+    map.addSource(transitSourceId, {
+      type: "geojson",
+      data: (transitRoutes ?? { type: "FeatureCollection", features: [] }) as never
+    });
+  }
+
+  // Some basemap styles interleave early symbol layers with later road/land
+  // layers. Insert before the first label *after* every non-symbol basemap
+  // layer so civic polygons cannot be painted underneath the basemap.
+  const firstSymbolLayer = firstLabelAboveBasemap(map);
+  if (!map.getLayer(fillLayerId)) {
+    map.addLayer(
+      {
+        id: fillLayerId,
+        type: "fill",
+        source: sourceId,
+        paint: {
+          "fill-color": colorExpression(data),
+          "fill-opacity": 0.68
+        } as never
+      },
+      firstSymbolLayer
+    );
+  }
+  if (!map.getLayer(lineLayerId)) {
+    map.addLayer(
+      {
+        id: lineLayerId,
+        type: "line",
+        source: sourceId,
+        paint: {
+          "line-color": "#314154",
+          "line-width": ["case", ["==", ["get", "type"], "census_tract"], 0.45, 1],
+          "line-opacity": ["case", ["==", ["get", "type"], "census_tract"], 0.32, 0.45]
+        } as never
+      },
+      firstSymbolLayer
+    );
+  }
+  if (!map.getLayer(selectedFillLayerId)) {
+    map.addLayer(
+      {
+        id: selectedFillLayerId,
+        type: "fill",
+        source: sourceId,
+        filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
+        paint: { "fill-color": "#ffffff", "fill-opacity": 0.2 }
+      },
+      firstSymbolLayer
+    );
+  }
+  if (!map.getLayer(selectedLineLayerId)) {
+    map.addLayer(
+      {
+        id: selectedLineLayerId,
+        type: "line",
+        source: sourceId,
+        filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
+        paint: {
+          "line-color": theme === "dark" ? "#f8fafc" : "#0f172a",
+          "line-width": 4,
+          "line-opacity": 0.95
+        }
+      },
+      firstSymbolLayer
+    );
+  }
+  if (!map.getLayer(transitLineLayerId)) {
+    map.addLayer(
+      {
+        id: transitLineLayerId,
+        type: "line",
+        source: transitSourceId,
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+          visibility: "none"
+        },
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            7, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 2, 0.8],
+            10, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 4, 2],
+            12, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 5.5, 3]
+          ],
+          "line-opacity": ["case", ["==", ["get", "transit_category"], "ttc_subway"], 0.9, 0.65]
+        } as never
+      },
+      firstSymbolLayer
+    );
+  }
+  if (!map.getLayer(placeCircleLayerId)) {
+    map.addLayer(
+      {
+        id: placeCircleLayerId,
+        type: "circle",
+        source: placesSourceId,
+        paint: {
+          "circle-color": "#ffffff",
+          "circle-radius": 4,
+          "circle-stroke-color": "#117c78",
+          "circle-stroke-width": 2
+        }
+      },
+      firstSymbolLayer
+    );
+  }
+}
+
+export function CivicMap({
+  data,
+  loading,
+  metric,
+  geographyLevel,
+  selectedGeoid,
+  onSelect,
+  error,
+  onRetry
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const mapReadyRef = useRef(false);
@@ -96,6 +262,11 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   const [transitFilters, setTransitFilters] = useState<TransitFilters>({ ...ALL_OFF });
   const onSelectRef = useRef(onSelect);
   const popupRef = useRef<Popup | null>(null);
+  const latestDataRef = useRef<MapData | null>(data);
+  const selectedGeoidRef = useRef(selectedGeoid);
+  const transitFiltersRef = useRef<TransitFilters>(transitFilters);
+  const transitRoutesRef = useRef<unknown>(null);
+  const themeRef = useRef<ThemeName>(currentTheme());
   // The hover handler is registered once at init; read the live metric from a
   // ref so the tooltip always reflects the currently selected metric.
   const metricRef = useRef<MetricKey>(metric);
@@ -114,15 +285,10 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   const anyTransitOn = Object.values(transitFilters).some(Boolean);
 
   useEffect(() => {
+    transitFiltersRef.current = transitFilters;
     const map = mapRef.current;
     if (!map || !mapReadyRef.current || !map.getLayer(transitLineLayerId)) return;
-    map.setLayoutProperty(transitLineLayerId, "visibility", anyTransitOn ? "visible" : "none");
-    const f = buildTransitFilter(transitFilters);
-    if (f) {
-      map.setFilter(transitLineLayerId, f);
-    } else {
-      map.setFilter(transitLineLayerId, null);
-    }
+    applyTransitFilterState(map, transitFilters);
   }, [transitFilters, anyTransitOn]);
 
   useEffect(() => {
@@ -147,136 +313,39 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         return;
       }
 
-      const dark = isDarkMode();
+      const theme = currentTheme();
+      themeRef.current = theme;
       const map = new maplibregl.Map({
         container: containerRef.current,
         center: [-79.45, 43.78],
         zoom: 8.15,
         minZoom: 7,
         maxZoom: 12.5,
-        style: {
-          version: 8,
-          glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-          sources: {
-            [basemapSourceId]: {
-              type: "raster",
-              tiles: dark ? DARK_TILES : LIGHT_TILES,
-              tileSize: 256,
-              attribution: "OpenStreetMap contributors, CARTO"
-            },
-            [sourceId]: {
-              type: "geojson",
-              data: initialData as never
-            },
-            [placesSourceId]: {
-              type: "geojson",
-              data: referencePlaces as never
-            },
-            [transitSourceId]: {
-              type: "geojson",
-              data: { type: "FeatureCollection", features: [] } as never
-            }
-          },
-          layers: [
-            {
-              id: "background",
-              type: "background",
-              paint: {
-                "background-color": dark ? DARK_BG : LIGHT_BG
-              }
-            },
-            {
-              id: "carto-light-basemap",
-              type: "raster",
-              source: basemapSourceId,
-              paint: {
-                "raster-opacity": 0.82
-              }
-            },
-            {
-              id: fillLayerId,
-              type: "fill",
-              source: sourceId,
-              paint: {
-                "fill-color": colorExpression(initialData),
-                "fill-opacity": 0.68
-              } as never
-            },
-            {
-              id: lineLayerId,
-              type: "line",
-              source: sourceId,
-              paint: {
-                "line-color": "#314154",
-                "line-width": [
-                  "case",
-                  ["==", ["get", "type"], "census_tract"],
-                  0.45,
-                  1
-                ],
-                "line-opacity": [
-                  "case",
-                  ["==", ["get", "type"], "census_tract"],
-                  0.32,
-                  0.45
-                ]
-              } as never
-            },
-            {
-              id: selectedFillLayerId,
-              type: "fill",
-              source: sourceId,
-              filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
-              paint: {
-                // Subtle white lift keeps the choropleth value readable while
-                // marking the selection; the bold outline below does the work.
-                "fill-color": "#ffffff",
-                "fill-opacity": 0.2
-              }
-            },
-            {
-              id: selectedLineLayerId,
-              type: "line",
-              source: sourceId,
-              filter: ["==", ["get", "geoid"], selectedGeoid ?? ""],
-              paint: {
-                "line-color": "#0f172a",
-                "line-width": 4,
-                "line-opacity": 0.95
-              }
-            },
-            {
-              id: placeCircleLayerId,
-              type: "circle",
-              source: placesSourceId,
-              paint: {
-                "circle-color": "#ffffff",
-                "circle-radius": 4,
-                "circle-stroke-color": "#117c78",
-                "circle-stroke-width": 2
-              }
-            },
-            {
-              id: transitLineLayerId,
-              type: "line",
-              source: transitSourceId,
-              layout: {
-                "line-cap": "round",
-                "line-join": "round",
-                visibility: "none"
-              },
-              paint: {
-                "line-color": ["get", "color"],
-                "line-width": [
-                  "interpolate", ["linear"], ["zoom"],
-                  7, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 2, 0.8],
-                  10, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 4, 2],
-                  12, ["case", ["==", ["get", "transit_category"], "ttc_subway"], 5.5, 3]
-                ],
-                "line-opacity": ["case", ["==", ["get", "transit_category"], "ttc_subway"], 0.9, 0.65]
-              } as never
-            }
-          ]
+        style: BASEMAP_STYLES[theme]
+      });
+
+      const handleStyleLoad = () => {
+        const latestData = latestDataRef.current ?? initialData;
+        addCivicLayers(
+          map,
+          latestData,
+          selectedGeoidRef.current,
+          themeRef.current,
+          transitRoutesRef.current
+        );
+        applyTransitFilterState(map, transitFiltersRef.current);
+        containerRef.current?.setAttribute(
+          "data-civic-layer-order",
+          civicLayersAreAboveBasemap(map) ? "valid" : "invalid"
+        );
+        containerRef.current?.setAttribute("data-map-theme", themeRef.current);
+        mapReadyRef.current = true;
+      };
+      map.on("style.load", handleStyleLoad);
+
+      map.on("styleimagemissing", ({ id }) => {
+        if (!map.hasImage(id)) {
+          map.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
         }
       });
 
@@ -302,9 +371,9 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       map.on("load", () => {
         mapReadyRef.current = true;
         fitToDataBounds(map, initialData, false);
-        fetch(`${API_BASE}/api/transit-routes`)
-          .then((r) => r.json())
+        getTransitRoutes()
           .then((geojson) => {
+            transitRoutesRef.current = geojson;
             const src = map.getSource(transitSourceId);
             if (src && "setData" in src) {
               (src as { setData: (d: never) => void }).setData(geojson as never);
@@ -388,6 +457,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   }, [isReady]);
 
   useEffect(() => {
+    latestDataRef.current = data;
     const map = mapRef.current;
     if (!map || !data || !mapReadyRef.current) {
       return;
@@ -405,6 +475,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   }, [data, metric]);
 
   useEffect(() => {
+    selectedGeoidRef.current = selectedGeoid;
     const map = mapRef.current;
     if (!map || !map.getLayer(selectedLineLayerId)) {
       return;
@@ -429,9 +500,9 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
           [maxLng, maxLat]
         ],
         {
-          padding: 96,
+          padding: { top: 80, right: 80, bottom: 120, left: 80 },
           maxZoom: data?.metadata.geography_type === "census_tract" ? 11.35 : 9.15,
-          duration: 650
+          duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
         }
       );
     }
@@ -440,17 +511,16 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
   useEffect(() => {
     const observer = new MutationObserver(() => {
       const map = mapRef.current;
-      if (!map || !mapReadyRef.current) return;
-      const dark = isDarkMode();
-      const source = map.getSource(basemapSourceId);
-      if (source && "setTiles" in source) {
-        (source as { setTiles: (tiles: string[]) => void }).setTiles(
-          dark ? DARK_TILES : LIGHT_TILES
-        );
-      }
-      if (map.getLayer("background")) {
-        map.setPaintProperty("background", "background-color", dark ? DARK_BG : LIGHT_BG);
-      }
+      if (!map) return;
+      const theme = currentTheme();
+      if (themeRef.current === theme) return;
+      themeRef.current = theme;
+      mapReadyRef.current = false;
+      containerRef.current?.setAttribute("data-civic-layer-order", "loading");
+      popupRef.current?.remove();
+      // Force a full style lifecycle. URL-to-URL diffing can complete without a
+      // new map-level style.load event, leaving custom sources absent.
+      map.setStyle(BASEMAP_STYLES[theme], { diff: false });
     });
     observer.observe(document.documentElement, {
       attributes: true,
@@ -478,11 +548,28 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
       }. Use the search box to inspect a specific geography.`}
       className="relative h-full w-full"
     >
-      {!data && (
+      {!data && loading && (
         <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel text-sm text-civic-muted">
           <div className="flex flex-col items-center gap-3">
             <div className="skeleton h-3 w-40" />
             <div className="skeleton h-3 w-28" />
+          </div>
+        </div>
+      )}
+      {!data && !loading && error && (
+        <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel p-6 text-center">
+          <div>
+            <p className="text-sm font-semibold text-civic-ink">Map data is unavailable</p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-civic-muted">{error}</p>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-3 rounded-md border border-civic-line px-3 py-1.5 text-xs font-semibold text-civic-ink hover:bg-civic-subtle"
+              >
+                Retry map
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -500,7 +587,12 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
           No data available for {getMetricLabel(metric)} in this dataset.
         </div>
       )}
-      <div ref={containerRef} data-testid="map-canvas-host" className="h-full w-full" />
+      <div
+        ref={containerRef}
+        data-testid="map-canvas-host"
+        data-civic-layer-order="loading"
+        className="h-full w-full"
+      />
       {data && legend && (
         <div
           data-testid="map-legend"
@@ -540,7 +632,7 @@ export function CivicMap({ data, loading, metric, geographyLevel, selectedGeoid,
         </div>
       )}
       {data && (
-        <div className="absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1.5">
+        <div className="absolute bottom-9 right-3 z-10 flex flex-col items-end gap-1.5">
           {transitOpen && (
             <div className="animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm">
               <div className="mb-2 flex items-center justify-between gap-4">
@@ -714,7 +806,7 @@ function computeColorStops(data: MapData): {
 
   const stops = ascending.map((value, index) => ({
     value,
-    color: rampColorAt(index / (ascending.length - 1))
+    color: rampColorAt(index / (ascending.length - 1), data.metadata.metric)
   }));
   return { stops, min, max, flat: false };
 }
@@ -734,7 +826,12 @@ function colorExpression(data: MapData): unknown[] {
     "case",
     ["==", ["get", "value"], null],
     NULL_COLOR,
-    ["interpolate", ["linear"], ["to-number", ["get", "value"]], ...interpolateStops]
+    [
+      "interpolate",
+      ["linear"],
+      ["to-number", ["get", "value"], stops[0].value],
+      ...interpolateStops
+    ]
   ];
 }
 

@@ -34,7 +34,12 @@ export type GeoJsonGeometry = {
 };
 
 /** Per-field provenance for a census metric value. */
-export type MetricFieldStatus = "official" | "estimated" | "unavailable" | "low_confidence";
+export type MetricFieldStatus =
+  | "official"
+  | "derived"
+  | "estimated"
+  | "unavailable"
+  | "low_confidence";
 
 export type MetricQuality = {
   median_income?: MetricFieldStatus;
@@ -45,6 +50,8 @@ export type MetricQuality = {
   rent_burden_pct?: MetricFieldStatus;
   population_growth_pct?: MetricFieldStatus;
   affordability_index?: MetricFieldStatus;
+  transit_score?: MetricFieldStatus;
+  transit_route_count?: MetricFieldStatus;
 };
 
 export type MetricValues = {
@@ -68,7 +75,7 @@ export type MetricValues = {
   owner_households: number | null;
   transit_route_count: number | null;
   transit_score: number | null;
-  /** Field-level provenance flags (official / estimated / unavailable / low_confidence). */
+  /** Field-level provenance flags (official / derived / estimated / unavailable / low_confidence). */
   data_quality?: MetricQuality;
 };
 
@@ -103,9 +110,13 @@ export type CmhcMetricValues = {
    * Market Survey zone, so its rental values are shared across the named
    * municipalities (real survey granularity, not duplicated data). */
   survey_zone?: string | null;
+  vacancy_rate_source?: CmhcRmsSource;
+  average_rent_total_source?: CmhcRmsSource;
+  other_rms_source?: CmhcRmsSource;
 };
 
 export type CmhcCountSource = "official" | "estimated_parent" | "estimated";
+export type CmhcRmsSource = "municipality" | "survey_zone" | "inherited_municipality";
 
 export type Geography = {
   id: number;
@@ -145,13 +156,39 @@ export type MapData = {
     geography_type: GeographyLevel;
     available_years?: number[];
     data_quality: {
-      metric_status: "official" | "estimated" | "mixed" | "zone";
+      metric_status: "official" | "derived" | "estimated" | "mixed" | "zone";
       label: string;
       description: string;
     };
     source: string;
+    metric_catalog?: Partial<
+      Record<
+        MetricKey,
+        {
+          data_quality: MapData["metadata"]["data_quality"];
+          source: string;
+        }
+      >
+    >;
+    transit_snapshot?: TransitSnapshot;
   };
   features: MapFeature[];
+};
+
+export type TransitSnapshot = {
+  schema_version: number;
+  packaged_at?: string;
+  coverage_status: "complete" | "partial" | "unknown";
+  method_version?: string;
+  buffer_meters?: number;
+  included_agencies: Array<{
+    id: string;
+    name: string;
+    route_features?: number;
+    feed_retrieved_at?: string | null;
+  }>;
+  missing_agencies: Array<{ id: string; name: string }>;
+  notes?: string[];
 };
 
 export type Summary = {

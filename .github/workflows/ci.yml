@@ -25,7 +25,11 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: pip-audit --require-hashes -r requirements.lock
 
       - name: Run backend tests
         working-directory: backend
@@ -41,6 +45,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
 
       - name: Install Playwright browser
         working-directory: frontend
@@ -71,6 +79,7 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./ci-civicscope.db
           SEED_ON_STARTUP: "true"
+          RATE_LIMIT: 10000/minute
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
           echo $! > backend.pid
@@ -106,3 +115,66 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report
           if-no-files-found: ignore
+
+  postgis:
+    name: PostgreSQL/PostGIS migration and geometry checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: civicscope_test
+          POSTGRES_USER: civicscope
+          POSTGRES_PASSWORD: civicscope
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U civicscope -d civicscope_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://civicscope:civicscope@127.0.0.1:5432/civicscope_test
+      POSTGIS_TEST_DATABASE_URL: postgresql+psycopg://civicscope:civicscope@127.0.0.1:5432/civicscope_test
+      SEED_ON_STARTUP: "false"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Verify reversible migrations
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: Seed and verify native geometry
+        working-directory: backend
+        run: |
+          python etl/seed_demo_data.py
+          pytest -q tests/test_postgis_integration.py
+
+  containers:
+    name: Build production containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t civicscope-backend ./backend
+
+      - name: Build frontend image
+        run: docker build -t civicscope-frontend ./frontend

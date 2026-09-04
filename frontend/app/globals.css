@@ -6,11 +6,11 @@
 :root {
   color-scheme: light;
   --civic-ink: #18212f;
-  --civic-muted: #667085;
+  --civic-muted: #4f5b6b;
   --civic-line: #d8dee6;
   --civic-panel: #ffffff;
   --civic-surface: #f5f7f4;
-  --civic-teal: #117c78;
+  --civic-teal: #0b6864;
   --civic-blue: #285b9f;
   --civic-amber: #b76d1d;
   --shadow-panel: 0 1px 2px rgba(16, 24, 40, 0.08);
@@ -41,6 +41,13 @@
   box-sizing: border-box;
 }
 
+/* Theme changes must not animate through unreadable intermediate colours. */
+html.theme-changing *,
+html.theme-changing *::before,
+html.theme-changing *::after {
+  transition: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -57,9 +64,13 @@ select {
   font: inherit;
 }
 
-.maplibregl-ctrl-bottom-left,
-.maplibregl-ctrl-bottom-right {
-  display: none;
+.maplibregl-ctrl-attrib {
+  color: var(--civic-muted);
+  font-family: inherit;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--civic-blue);
 }
 
 /* Hover tooltip — match the restrained civic panel styling. */
@@ -71,6 +82,10 @@ select {
   font-family: inherit;
   pointer-events: none;
   background: var(--civic-panel);
+}
+
+.civic-map-popup.maplibregl-popup {
+  max-width: min(18rem, calc(100vw - 2rem)) !important;
 }
 
 .civic-map-popup .maplibregl-popup-tip {
@@ -107,4 +122,20 @@ select {
 @keyframes skeleton-slide {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .skeleton {
+    animation: none;
+    background: var(--civic-line);
+  }
 }

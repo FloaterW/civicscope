@@ -36,12 +36,13 @@ Every serialized `metrics` object includes a `data_quality` map giving the prove
 
 | Status | Meaning | UI treatment |
 | --- | --- | --- |
-| `official` | Published Statistics Canada 2021 Census Profile value (or reliably derived from official inputs). | Shown plainly. |
+| `official` | Published Statistics Canada 2021 Census Profile value. | Shown plainly. |
+| `derived` | Calculated from published inputs, such as affordability, rent-to-income, population growth, or transit access. | Shown with a derived indicator and formula/source explanation. |
 | `estimated` | Official value was suppressed; a labeled fallback was computed (currently only `rent_burden_pct`). | Value shown with an "est." flag and an explanatory note. |
 | `unavailable` | Suppressed/missing and not estimable; value is null. | Rendered as "Not available". |
 | `low_confidence` | Derived value off an unreliable base (currently `population_growth_pct` where the 2016 base population is below 100). | Value shown with a caution flag and note. |
 
-The map-data metadata `data_quality.metric_status` summarizes the selected metric for the badge: `official`, `estimated` (CMHC allocated to tracts), or `mixed` (tract rent burden, which contains official + estimated + unavailable values).
+The map-data metadata `data_quality.metric_status` summarizes the selected metric for the badge: `official`, `derived`, `estimated` (CMHC allocated to tracts), `mixed` (multiple provenance classes), or `zone` (CMHC survey-zone values).
 
 ## Formulas
 
@@ -67,4 +68,16 @@ Refresh the packaged seed's tract metrics from the canonical CSV (null-preservin
 
 ## cmhc_metrics
 
-CMHC metrics are stored at municipality level. In census tract views, rate and average metrics such as vacancy rate and average rent are inherited from the parent municipality, while count metrics such as starts and completions are proportionally allocated by each tract's renter-household share and labeled as estimated.
+Municipal CMHC metrics are stored by municipality/year. Census-tract starts and completions use published tract rows where available, parent-tract allocations after boundary splits, and renter-share municipal allocation only as a final fallback. Vacancy and average rent use official CMHC survey-zone values for matched tracts; unmatched tracts and other RMS fields use a disclosed parent-municipality fallback. API and CSV output carry per-field source labels.
+
+Municipality-level integer totals allocated to tracts use deterministic largest-remainder
+allocation. Published tract values are reserved first and only the residual is allocated,
+so the displayed tract integers conserve each available parent total exactly.
+
+## Transit snapshot
+
+`app/data/transit_manifest.json` records the packaged GTFS method, buffer distance,
+coverage status, included and missing agencies, build timestamp, feed timestamps when
+known, and SHA-256 checksums for the route and score artifacts. The current snapshot is
+partial: TTC, MiWay, GO Transit, and Durham Region Transit are included; Brampton Transit
+is explicitly missing. Transit fields are `derived`, not agency-published measures.

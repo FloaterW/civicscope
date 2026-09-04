@@ -7,15 +7,26 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
-from app.services.seed import seed_demo_data
+from app.services.seed import (
+    seed_cmhc_data,
+    seed_cmhc_tract_data,
+    seed_demo_data,
+    seed_transit_scores,
+)
 
 
 def main() -> None:
     init_db()
     db = SessionLocal()
     try:
-        row_count = seed_demo_data(db, force=True)
-        print(f"Seeded {row_count} demo rows.")
+        counts = {
+            "census": seed_demo_data(db, force=True),
+            "cmhc_municipal": seed_cmhc_data(db, force=True),
+            "cmhc_tract": seed_cmhc_tract_data(db, force=True),
+            "transit_tract": seed_transit_scores(db, force=True),
+        }
+        summary = ", ".join(f"{name}={count}" for name, count in counts.items())
+        print(f"Seeded packaged application data: {summary}.")
     except Exception:
         db.rollback()
         raise

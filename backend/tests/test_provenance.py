@@ -69,7 +69,7 @@ def test_metric_quality_all_official_for_complete_row():
     assert quality["median_rent"] == "official"
     assert quality["population"] == "official"
     assert quality["rent_burden_pct"] == "official"
-    assert quality["population_growth_pct"] == "official"
+    assert quality["population_growth_pct"] == "derived"
 
 
 def test_metric_quality_marks_missing_value_unavailable():

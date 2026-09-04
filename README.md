@@ -5,8 +5,8 @@ A geospatial analytics dashboard for exploring housing affordability, income, an
 [![CI](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml/badge.svg)](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![API Docs](https://img.shields.io/badge/API-OpenAPI%20Docs-009688)](https://civicscope.onrender.com/docs)
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.11x-009688)
+![Next.js](https://img.shields.io/badge/Next.js-16.3-black)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688)
 ![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-316192)
 
 [![CivicScope overview dashboard](docs/screenshots/overview-dashboard.png)](https://civicscope-gold.vercel.app)
@@ -32,10 +32,10 @@ Census tract geometries use Statistics Canada 2021 cartographic census tract bou
 
 The app tracks where every value comes from instead of silently filling gaps:
 
-- Every metric carries a field-level source flag (`official` / `estimated` / `unavailable` / `low_confidence`) that the UI shows, so an estimate is never displayed as if it were official.
+- Every metric carries a field-level source flag (`official` / `derived` / `estimated` / `unavailable` / `low_confidence`) that the UI shows, so a calculation or estimate is never displayed as if it were directly published.
 - Source-suppressed census values render as "Not available" rather than being filled. Where the official rent-burden value is suppressed, the app shows a labeled estimate derived from rent and income.
 - Tracts with a tiny 2016 base population have their growth rate flagged low-confidence, since a near-empty base turns ordinary growth into an absurd percentage.
-- CMHC publishes Starts & Completions at the census-tract level for the GTA's three CMAs (Toronto, Oshawa, Hamilton). The ETL ingests these and validates each slice against CMHC's published CMA total (a slice is rejected unless its tract values sum to the published total), then labels them `official`. Where CMHC still publishes on pre-2021 (coarser) tract boundaries, a 2021 tract inherits its real parent tract's value, labeled `estimated_parent` when that total has to be split among siblings. The remaining ~7% of tracts with no CMHC data fall back to a municipal-share allocation labeled `estimated`. CMHC rate metrics (vacancy, average rent) aren't published at tract level, so they're inherited from the parent municipality and labeled that way.
+- CMHC publishes Starts & Completions at the census-tract level for the GTA's three CMAs (Toronto, Oshawa, Hamilton). The ETL validates every slice against CMHC's published CMA total and labels published tract values `official`. Boundary-split values are `estimated_parent`; uncovered tracts use a municipal-share `estimated` fallback. Vacancy rate and average rent use CMHC survey-zone values where the tract-zone crosswalk is available, with a disclosed parent-municipality fallback elsewhere.
 
 ## Screenshots
 
@@ -168,7 +168,7 @@ docker compose up -d db
 
 # 2. Backend (DATABASE_URL must point at PostGIS; .env.example has this value).
 cd backend
-pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements-dev.lock
 export DATABASE_URL="postgresql+psycopg://civicscope:civicscope@localhost:5432/civicscope"
 alembic upgrade head
 uvicorn app.main:app --reload
@@ -197,6 +197,7 @@ npm run dev
 | `GET /api/compare?ids=3520005,3521005` | Compare selected geographies. |
 | `GET /api/map-data?metric=affordability_index` | GeoJSON FeatureCollection for map rendering. |
 | `GET /api/map-data?metric=rent_burden&detail=display` | Map-ready GeoJSON simplified with PostGIS when available. Add `type=census_tract` for tract-level map data. |
+| `GET /api/transit-routes` | Packaged transit-route GeoJSON plus snapshot coverage, agency, timestamp, and checksum metadata. |
 
 Supported metrics:
 
@@ -232,7 +233,7 @@ It also includes 1,334 packaged census tract features assigned to those municipa
 CMHC data is stored at municipality level, with two refinements for census tracts:
 
 - **Starts & Completions:** real CMHC census-tract values where published (1,244 of 1,334 tracts, ~93%), labeled `official` and validated against CMHC's published CMA totals during ETL. Toronto-CMA tracts match CMHC 1:1. For Oshawa/Hamilton, where CMHC still publishes on the pre-2021 (coarser) tract boundaries, a 2021 child tract inherits its real parent tract's value: `official` where the parent recorded zero, or `estimated_parent` (allocated among siblings by renter share, conserving the parent total exactly) where it was non-zero. Tracts with no CMHC data at all keep a municipal-share `estimated` allocation.
-- **Rate metrics** (vacancy, average rent): not published at tract level, so inherited unchanged from the parent municipality and labeled as inherited.
+- **Rate metrics:** vacancy rate and average rent use CMHC survey-zone values for 1,232 matched tracts; the remaining 102 tracts use a disclosed parent-municipality fallback. Bedroom rents, availability, and turnover remain parent-municipality values because those fields are not present in the zone crosswalk.
 
 > **Note:** Turnover rate and availability rate are defined in the CMHC schema but CMHC's RMS summary export does not include values for them. These metrics are not exposed in the UI and contain no data. They may be populated in a future release if CMHC makes this data available.
 
@@ -242,7 +243,7 @@ Current and planned sources:
 - Statistics Canada 2021 Cartographic Boundary Files for census subdivisions and census tracts.
 - Ontario GeoHub municipal boundaries for provincial municipal layers.
 - Optional CMHC rental market data for rent context.
-- Optional GTFS transit stop data from TTC, GO Transit, MiWay, Brampton Transit, York Region Transit, Durham Region Transit, and Burlington/Oakville/Milton providers for access scoring.
+- GTFS static feeds from TTC, GO Transit, MiWay, Brampton Transit, and Durham Region Transit for derived access scoring. The currently packaged snapshot is explicitly marked partial because Brampton Transit was unavailable when it was built; its manifest names the four included agencies and records artifact checksums.
 
 ## Metric Definitions
 
@@ -285,6 +286,11 @@ Refresh packaged census tract rows from a Statistics Canada CT GeoJSON file or U
 ```bash
 docker compose exec backend python etl/load_tracts.py --update-seed --geojson /app/data/statcan_ct.geojson
 ```
+
+This refresh is geometry-only and preserves official tract metrics. It aborts if
+boundary identifiers no longer match the metric seed. The explicit
+`--replace-metrics-with-estimates` flag exists for demo-only rebuilds and must not be
+used for publication data.
 
 Refresh the packaged offline seed geometries from the same official service:
 
@@ -334,7 +340,7 @@ guardrails are documented in `docs/cmhc-real-tract-data-plan.md`.
 
 ## Database Migrations
 
-Docker Compose runs `alembic upgrade head` before starting Uvicorn, and the FastAPI app verifies the database is on the expected migration revision during startup. The migration chain (currently through `0007`) creates the core tables, enables PostGIS, adds `geographies.geom geometry(GEOMETRY, 4326)` (backfilled from stored GeoJSON with a GiST spatial index), then layers on the CMHC metrics, dwelling/tenure columns, county/state indexes, and the real CMHC census-tract Starts & Completions table (`cmhc_tract_metrics`).
+Docker Compose runs `alembic upgrade head` before starting Uvicorn, and the FastAPI app verifies the database is on the expected migration revision during startup. The migration chain (currently through `0009`) creates the core tables, enables PostGIS, adds `geographies.geom geometry(GEOMETRY, 4326)` with a GiST index, then adds CMHC metrics, dwelling/tenure fields, indexes, real CMHC tract values with provenance, and transit accessibility columns.
 
 Run migrations manually:
 
@@ -361,24 +367,24 @@ make frontend-e2e  # Playwright browser tests (needs backend running)
 Or individually:
 
 ```bash
-cd backend && pytest                   # 113 backend tests
-cd frontend && npm run test:unit       # 20 Vitest unit tests
-cd frontend && npm run test:e2e        # 35 Playwright e2e tests (incl. axe-core a11y audit)
+cd backend && pytest                   # 158 passing tests; 3 PostGIS tests skip without a test database
+cd frontend && npm run test:unit       # 31 Vitest unit tests
+cd frontend && npm run test:e2e        # 48 Playwright e2e tests (incl. axe-core a11y audit)
 cd frontend && npm run typecheck       # TypeScript strict mode
 cd frontend && npm run lint            # ESLint
 ```
 
 **Test coverage highlights:**
 
-- **113 backend tests** covering API endpoints, provenance flags, CMHC allocation logic, metric calculations, and data validation
-- **35 Playwright e2e tests** covering map rendering, metric selection, search, comparison, data quality badges, and accessibility
-- **20 Vitest unit tests** for metric formatting, labeling, and CMHC metric classification
+- **158 backend tests** plus 3 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
+- **48 Playwright e2e tests** covering map rendering, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, and accessibility
+- **31 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
 - **axe-core WCAG 2.0 AA audit** runs in CI — zero critical or serious violations
 - **Rate limiting** at 60 req/min per IP via slowapi
 
 The Playwright suite expects the backend API running at `NEXT_PUBLIC_API_URL` or `http://127.0.0.1:8000`. It starts its own Next.js server on port `3101`. To run against Docker, pass `PLAYWRIGHT_PORT=3102`.
 
-CI (`.github/workflows/ci.yml`) runs backend pytest, frontend typecheck/lint/build, Vitest unit tests, and Playwright e2e against a freshly-seeded backend on every push and PR.
+CI (`.github/workflows/ci.yml`) runs dependency audits, backend pytest, frontend typecheck/lint/build, Vitest, Playwright against a freshly seeded API, reversible migrations against real PostGIS, and production Docker image builds. CodeQL and Dependabot add scheduled static analysis and update checks.
 
 Screenshot generation:
 
@@ -394,8 +400,8 @@ See `docs/launch-checklist.md` for the exact GitHub, Render, and Vercel launch s
 
 Current production stack:
 
-- **Database:** Neon PostgreSQL (free tier, AWS US East 1)
-- **Backend API:** Render free-tier web service (Docker), connected to Neon
+- **Database:** Render PostgreSQL 16 from `render.yaml` by default; an external PostGIS provider such as Neon can be used by supplying `DATABASE_URL`
+- **Backend API:** Render Docker web service
 - **Frontend:** Vercel (Next.js auto-deploy from `main` branch)
 - Render Blueprint: `render.yaml`
 - Vercel project config: `frontend/vercel.json`
@@ -417,10 +423,11 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 - **Tailwind CSS** (zero-runtime CSS-in-JS); no client-side style injection overhead
 - **GZip compression** on all API responses via Starlette middleware
 - **HTTP caching** — `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` on census data endpoints (2021 data is immutable)
-- **Geometry simplification** — map GeoJSON is simplified server-side (radial distance) and rounded to 5 decimal places, reducing payload ~60% vs. raw StatCan boundaries
+- **Geometry simplification** — production PostGIS uses `ST_SimplifyPreserveTopology`; SQLite/demo environments use compact rounded GeoJSON
 - **PostGIS spatial indexing** — GiST index on `geographies.geom` for efficient spatial queries
 - **Rate limiting** — 60 requests/minute per IP via slowapi
-- **Security headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, CORS locked to configured origins
+- **Security headers** — a restrictive Content Security Policy, HSTS, cross-origin opener isolation, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and CORS locked to configured origins
+- **Reproducible dependencies** — npm lockfile plus hash-locked Python runtime/development environments, audited in CI
 - **Bundle analysis** available via `npm run build:analyze` (`@next/bundle-analyzer`)
 
 ## Current Limitations
@@ -428,9 +435,9 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 - Packaged seed data remains available for offline demos even though the database can refresh boundaries and metrics from Statistics Canada and CMHC.
 - The native PostGIS `geom` column is currently backfilled from stored GeoJSON; a future migration can make it the canonical geometry store.
 - Census tract boundaries and metrics use official Statistics Canada 2021 Census Profile values (SDMX DF_CT). A small number of tracts have source-suppressed values, surfaced as "Not available".
-- Real CMHC tract data covers **Starts & Completions** only. CMHC *rate* metrics (vacancy, rent) are heavily suppressed at tract level, so they remain inherited from the parent municipality; `units_under_construction`/`unabsorbed_units` keep the renter-share allocation. Ingesting these as real tract values is a possible follow-up.
+- Real CMHC tract data covers **Starts & Completions** for 1,244 tracts. Vacancy and average rent use survey-zone values for 1,232 matched tracts and municipal fallback for 102; other RMS and construction inventory fields retain labeled municipal inheritance/allocation. Direct tract RMS ingestion remains a follow-up.
 - Dissemination areas and parcel-level workflows remain planned expansion paths.
-- Transit/access scoring is intentionally not implemented yet; GTFS ingestion is the next domain feature after deployment polish.
+- Transit access is derived from a packaged, partial four-agency GTFS snapshot (TTC, MiWay, GO Transit, and Durham Region Transit); Brampton Transit is recorded as missing in the manifest. Every tract receives an explicit route count, including zero-service tracts; the score measures route availability, not frequency or travel time.
 
 ## How this was built
 

@@ -9,6 +9,15 @@ import type {
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+const DEFAULT_API_TIMEOUT_MS = 60_000;
+
+export function normalizeApiTimeout(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : DEFAULT_API_TIMEOUT_MS;
+}
+
+export const API_TIMEOUT_MS = normalizeApiTimeout(
+  Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? DEFAULT_API_TIMEOUT_MS)
+);
 
 export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: string; group: string }> = [
   { key: "rent_burden_pct", label: "Rent burden", shortLabel: "Burden", group: "Census Profile" },
@@ -21,6 +30,8 @@ export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: s
   { key: "average_rent_total", label: "Average rent (CMHC)", shortLabel: "CMHC Rent", group: "CMHC Rental Market" },
   { key: "housing_starts_total", label: "Housing starts", shortLabel: "Starts", group: "CMHC Rental Market" },
   { key: "housing_completions", label: "Completions", shortLabel: "Compl.", group: "CMHC Rental Market" },
+  { key: "transit_score", label: "Transit access score", shortLabel: "Transit", group: "Transit Access" },
+  { key: "transit_route_count", label: "Transit routes nearby", shortLabel: "Routes", group: "Transit Access" },
 ];
 
 export const CMHC_METRIC_KEYS: Set<MetricKey> = new Set([
@@ -35,17 +46,63 @@ export function isCmhcMetric(metric: MetricKey): boolean {
   return CMHC_METRIC_KEYS.has(metric);
 }
 
-export async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+export function mapDataCacheKey(
+  geographyLevel: GeographyLevel,
+  metric: MetricKey,
+  year?: number
+): string {
+  const family = isCmhcMetric(metric) ? `cmhc:${year ?? "latest"}` : "census";
+  return `${geographyLevel}:${family}`;
+}
+
+let transitRoutesPromise: Promise<unknown> | null = null;
+
+export function getTransitRoutes(): Promise<unknown> {
+  if (!transitRoutesPromise) {
+    transitRoutesPromise = fetchJson<unknown>("/api/transit-routes").catch((error) => {
+      transitRoutesPromise = null;
+      throw error;
+    });
+  }
+  return transitRoutesPromise;
+}
+
+export async function fetchJson<T>(
+  path: string,
+  signal?: AbortSignal,
+  timeoutMs: number = API_TIMEOUT_MS
+): Promise<T> {
+  const effectiveTimeoutMs = normalizeApiTimeout(timeoutMs);
+  const requestController = new AbortController();
+  let timedOut = false;
+  const abortFromCaller = () => requestController.abort(signal?.reason);
+  if (signal?.aborted) {
+    abortFromCaller();
+  } else {
+    signal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true;
+    requestController.abort();
+  }, effectiveTimeoutMs);
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      signal
+      signal: requestController.signal
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (requestController.signal.aborted) {
+      if (timedOut) {
+        throw new Error(
+          `The CivicScope API did not respond within ${Math.max(1, Math.ceil(effectiveTimeoutMs / 1000))} seconds. Try again.`
+        );
+      }
       throw error;
     }
     throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
+  } finally {
+    globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abortFromCaller);
   }
   if (!response.ok) {
     let message: string;

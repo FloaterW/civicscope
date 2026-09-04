@@ -14,7 +14,7 @@ flowchart LR
 
 ## Phase 1-3 shape
 
-CivicScope is split into a typed Next.js frontend and a FastAPI backend. The backend owns metric formulas, seed loading, API validation, geography-level filtering, and GeoJSON delivery. The frontend fetches map features with all available metrics for the active geography level, then switches the active map metric locally so dropdown changes repaint immediately without waiting on another map request.
+CivicScope is split into a typed Next.js frontend and a FastAPI backend. The backend owns metric formulas, seed loading, API validation, provenance, geography-level filtering, and GeoJSON delivery. Conservation-safe CMHC allocations and transit snapshot/provenance handling live in focused services instead of endpoint code. The frontend caches one payload per geography level and data family (Census/transit or CMHC year), then repaints metrics in that family locally. Switching data families, years, or geography levels triggers a request; switching metrics within a cached family does not.
 
 The Docker Compose stack starts:
 
@@ -31,5 +31,9 @@ Map endpoints keep two geometry delivery modes: `detail=full` returns the stored
 ## Deployment boundary
 
 The backend should run migrations before app startup in production. Docker Compose does this with `alembic upgrade head && uvicorn ...`; hosted environments should use the same migration command as a release step. The frontend only needs the public API base URL through `NEXT_PUBLIC_API_URL`.
+
+Production installs use hash-locked Python dependencies and `npm ci`. CI also runs
+the migration chain forward, backward, and forward again against PostGIS before
+seeding and validating native geometry.
 
 See `deployment.md` for provider-oriented setup notes.

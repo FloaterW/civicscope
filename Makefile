@@ -1,4 +1,4 @@
-.PHONY: up down logs backend-dev frontend-dev test lint build backend-test frontend-test frontend-build frontend-e2e db-upgrade seed load-geo load-geo-seed load-census-url load-census-official load-census-seed load-census clean
+.PHONY: up down logs backend-dev frontend-dev test lint build backend-test frontend-test frontend-build frontend-e2e db-upgrade seed load-geo load-geo-seed load-census-url load-census-official load-census-seed load-census clean reset-db
 
 up:
 	docker compose up --build
@@ -65,4 +65,8 @@ load-census:
 	cd backend && python etl/load_census.py --csv $(CSV)
 
 clean:
+	cd frontend && npm run clean:next
+
+# Destructive: stops containers and permanently removes the PostgreSQL volume.
+reset-db:
 	docker compose down -v

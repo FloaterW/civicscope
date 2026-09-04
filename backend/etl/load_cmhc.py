@@ -792,15 +792,100 @@ def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
 def load_geoids_from_seed() -> list[str]:
     demo_seed_path = PROJECT_ROOT / "app" / "data" / "demo_seed.json"
     seed = json.loads(demo_seed_path.read_text(encoding="utf-8"))
-    return sorted(item["geoid"] for item in seed["geographies"])
+    return sorted(
+        item["geoid"]
+        for item in seed["geographies"]
+        if item.get("type") == "municipality"
+    )
 
 
-def write_seed(metrics: list[CmhcRow], years: list[int]) -> int:
+def validate_seed_coverage(
+    metrics: list[CmhcRow],
+    expected_geoids: set[str],
+    years: list[int],
+    *,
+    allow_partial: bool = False,
+) -> dict[str, Any]:
+    """Fail closed when an HMIP refresh is missing expected slices or fields."""
+    expected_pairs = {(geoid, year) for geoid in expected_geoids for year in years}
+    by_pair = {(row.geoid, row.year): row for row in metrics}
+    missing_pairs = expected_pairs - set(by_pair)
+    missing_scss = {
+        pair
+        for pair in expected_pairs & set(by_pair)
+        if by_pair[pair].housing_starts_total is None
+        and by_pair[pair].housing_completions is None
+    }
+    scss_field_coverage = {
+        field: (
+            100
+            * sum(getattr(by_pair[pair], field) is not None for pair in expected_pairs & set(by_pair))
+            / len(expected_pairs)
+            if expected_pairs
+            else 0.0
+        )
+        for field in ("housing_starts_total", "housing_completions")
+    }
+    rms_geoids = {
+        geoid
+        for zone_geoids in ZONE_TO_GEOIDS.values()
+        for geoid in zone_geoids
+        if geoid in expected_geoids
+    }
+    missing_rms = {
+        pair
+        for pair in {(geoid, year) for geoid in rms_geoids for year in years}
+        if pair not in by_pair
+        or all(
+            getattr(by_pair[pair], field) is None
+            for field in ("vacancy_rate", "average_rent_total", "rental_universe")
+        )
+    }
+    duplicate_count = len(metrics) - len(by_pair)
+    report = {
+        "expected_rows": len(expected_pairs),
+        "actual_rows": len(by_pair),
+        "missing_pairs": len(missing_pairs),
+        "missing_scss_pairs": len(missing_scss),
+        "scss_field_coverage_pct": {
+            field: round(value, 1) for field, value in scss_field_coverage.items()
+        },
+        "missing_rms_pairs": len(missing_rms),
+        "duplicate_rows": duplicate_count,
+    }
+    problems = []
+    if missing_pairs:
+        problems.append(f"{len(missing_pairs)} missing municipality/year rows")
+    if missing_scss:
+        problems.append(f"{len(missing_scss)} rows missing both starts and completions")
+    for field, coverage in scss_field_coverage.items():
+        if coverage < 90.0:
+            problems.append(f"{field} coverage {coverage:.1f}% is below 90.0%")
+    if missing_rms:
+        problems.append(f"{len(missing_rms)} surveyed rows missing RMS values")
+    if duplicate_count:
+        problems.append(f"{duplicate_count} duplicate rows")
+    if problems and not allow_partial:
+        raise ValueError(
+            "CMHC refresh failed coverage validation: " + "; ".join(problems)
+            + ". Re-run with --allow-partial only for diagnostic output."
+        )
+    report["partial"] = bool(problems)
+    return report
+
+
+def write_seed(
+    metrics: list[CmhcRow],
+    years: list[int],
+    coverage: dict[str, Any] | None = None,
+    output_path: Path = SEED_PATH,
+) -> int:
     seed = {
         "metadata": {
             "source": "cmhc_hmip",
             "years": sorted(years),
             "fetched_at": datetime.now(UTC).isoformat(),
+            "coverage": coverage or {},
             "notes": [
                 "Rental Market Survey (RMS) and Starts & Completions Survey (Scss) data",
                 "from CMHC Housing Market Information Portal (HMIP ExportTable endpoint).",
@@ -815,7 +900,10 @@ def write_seed(metrics: list[CmhcRow], years: list[int]) -> int:
         },
         "metrics": [asdict(m) for m in metrics],
     }
-    SEED_PATH.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
+    temporary_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    temporary_path.replace(output_path)
     return len(metrics)
 
 
@@ -859,7 +947,12 @@ def load_from_seed() -> int:
 # ---------------------------------------------------------------------------
 
 
-def update_seed(years: list[int] | None = None) -> int:
+def update_seed(
+    years: list[int] | None = None,
+    *,
+    allow_partial: bool = False,
+    output_path: Path = SEED_PATH,
+) -> int:
     """Fetch RMS + Scss data from HMIP for the given years and write the seed file."""
     if years is None:
         years = list(range(DEFAULT_START_YEAR, DEFAULT_END_YEAR + 1))
@@ -937,8 +1030,13 @@ def update_seed(years: list[int] | None = None) -> int:
         print("No data fetched. Seed file not updated.")
         return 0
 
-    count = write_seed(all_metrics, years)
-    print(f"\nWrote {count} metric rows to {SEED_PATH}")
+    coverage = validate_seed_coverage(
+        all_metrics, known_geoids, years, allow_partial=allow_partial
+    )
+    if coverage["partial"]:
+        print(f"WARNING: writing partial CMHC data: {coverage}", file=sys.stderr)
+    count = write_seed(all_metrics, years, coverage, output_path)
+    print(f"\nWrote {count} metric rows to {output_path}")
 
     # Quick verification: check that starts vary across municipalities
     sample_year = years[-1]
@@ -1008,6 +1106,16 @@ def main() -> None:
         type=int,
         help="Fetch a specific year only (default: 2018-2025).",
     )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow diagnostic output that fails coverage validation; requires noncanonical --output.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Output seed path (default: canonical app/data/cmhc_seed.json).",
+    )
     args = parser.parse_args()
 
     if args.print_url:
@@ -1020,9 +1128,21 @@ def main() -> None:
         return
 
     if args.update_seed:
+        output_path = args.output or SEED_PATH
+        if args.allow_partial and (
+            args.output is None or output_path.resolve() == SEED_PATH.resolve()
+        ):
+            parser.error(
+                "--allow-partial requires an explicit noncanonical --output path; "
+                "partial diagnostics cannot replace the packaged seed."
+            )
         print("Fetching CMHC Rental Market Survey data from HMIP portal...")
         years = [args.year] if args.year else None
-        count = update_seed(years)
+        count = update_seed(
+            years,
+            allow_partial=args.allow_partial,
+            output_path=output_path,
+        )
         if count:
             print(f"Done. {count} rows written to seed file.")
         return

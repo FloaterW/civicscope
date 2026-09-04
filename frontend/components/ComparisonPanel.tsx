@@ -1,7 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -15,8 +15,10 @@ import {
 } from "recharts";
 
 import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
+import { rowsToCsv } from "@/lib/csv-export";
 import { rampColorForValue } from "@/lib/colors";
-import type { CompareResponse, GeographyLevel, MetricKey } from "@/types";
+import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
+import type { CompareResponse, GeographyLevel, MetricKey, TransitSnapshot } from "@/types";
 
 type Props = {
   comparison: CompareResponse | null;
@@ -24,16 +26,20 @@ type Props = {
   geographyLevel: GeographyLevel;
   loading: boolean;
   displayYear?: number;
+  isUserSelection?: boolean;
+  transitSnapshot?: TransitSnapshot;
 };
 
-const comparisonNouns: Record<GeographyLevel, string> = {
-  municipality: "selected municipalities",
-  census_tract: "selected census tracts"
+const defaultComparisonNouns: Record<GeographyLevel, string> = {
+  municipality: "the default GTA municipalities",
+  census_tract: "the most populous census tracts"
 };
 
-export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear }: Props) {
+export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot }: Props) {
+  const [chartTooltipActive, setChartTooltipActive] = useState(false);
   const isCmhc = isCmhcMetric(metric);
-  const chartData =
+  const isTransit = isTransitMetric(metric);
+  const comparisonRows =
     comparison?.items
       .map((item) => {
         const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, unknown>;
@@ -46,9 +52,13 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
           value: rawValue,
           rawValue,
         };
-      })
-      .filter((item) => item.value !== null) ?? [];
+      }) ?? [];
+  const chartData = comparisonRows.filter(
+    (item): item is typeof item & { value: number; rawValue: number } => item.value !== null
+  );
   const hasChartData = chartData.length > 0;
+  const hasRows = comparisonRows.length > 0;
+  const missingCount = comparisonRows.length - chartData.length;
   const values = chartData.map((d) => d.value as number);
   const minValue = values.length ? Math.min(...values) : 0;
   const maxValue = values.length ? Math.max(...values) : 0;
@@ -56,7 +66,17 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   const handleExportCsv = useCallback(() => {
     if (!comparison) return;
     const metricLabel = getMetricLabel(metric);
-    const rows = [["Area", "Geoid", metricLabel, ...(isCmhc ? [] : ["Rent-to-income ratio"])]];
+    const transitHeaders = isTransit
+      ? ["Transit coverage", "Included agencies", "Missing agencies", "Snapshot date"]
+      : [];
+    const rows = [[
+      "Area",
+      "Geoid",
+      metricLabel,
+      "Status",
+      ...transitHeaders,
+      ...(isCmhc ? [] : ["Rent-to-income ratio"])
+    ]];
     for (const item of comparison.items) {
       const allMetrics = { ...item.metrics, ...item.cmhc_metrics } as Record<string, unknown>;
       const val = allMetrics[metric];
@@ -64,19 +84,30 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
         item.name,
         item.geoid,
         val != null ? String(val) : "",
+        val != null ? "available" : "unavailable",
+        ...(isTransit
+          ? [
+              transitSnapshot?.coverage_status ?? "unknown",
+              transitAgencyNames(transitSnapshot?.included_agencies),
+              transitAgencyNames(transitSnapshot?.missing_agencies),
+              transitSnapshotDate(transitSnapshot)
+            ]
+          : []),
         ...(isCmhc ? [] : [item.metrics.rent_to_income_ratio != null ? String(item.metrics.rent_to_income_ratio) : ""])
       ];
       rows.push(row);
     }
-    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = rowsToCsv(rows);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `civicscope-${metric}-${geographyLevel}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
-  }, [comparison, metric, geographyLevel, isCmhc]);
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(url), 100);
+  }, [comparison, metric, geographyLevel, isCmhc, isTransit, transitSnapshot]);
 
   return (
     <div data-testid="comparison-panel" className="p-4">
@@ -84,11 +115,16 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
         <div>
           <h2 className="text-sm font-semibold text-civic-ink">Comparison</h2>
           <p className="text-xs text-civic-muted">
-            {getMetricLabel(metric)} across {comparisonNouns[geographyLevel]}
+            {getMetricLabel(metric)} across {isUserSelection ? `selected ${geographyLevel === "municipality" ? "municipalities" : "census tracts"}` : defaultComparisonNouns[geographyLevel]}
           </p>
+          {missingCount > 0 && (
+            <p className="mt-1 text-xs text-civic-muted">
+              {missingCount} {missingCount === 1 ? "area is" : "areas are"} listed as Not available.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {hasChartData && (
+          {hasRows && (
             <button
               type="button"
               onClick={handleExportCsv}
@@ -121,12 +157,22 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               No comparison data available.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              onResize={() => setChartTooltipActive(false)}
+            >
+              <BarChart
+                data={chartData}
+                margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                onMouseMove={() => setChartTooltipActive(true)}
+                onMouseLeave={() => setChartTooltipActive(false)}
+              >
                 <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} width={54} />
                 <Tooltip
+                  active={chartTooltipActive}
                   formatter={(value, _name, item) => [
                     formatMetric(metric, item.payload.rawValue),
                     getMetricLabel(metric)
@@ -143,7 +189,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                   {chartData.map((item) => (
                     <Cell
                       key={item.geoid}
-                      fill={rampColorForValue(item.value as number, minValue, maxValue)}
+                      fill={rampColorForValue(item.value as number, minValue, maxValue, metric)}
                     />
                   ))}
                   <LabelList
@@ -168,7 +214,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               </tr>
             </thead>
             <tbody>
-              {chartData.map((item) => {
+              {comparisonRows.map((item) => {
                 const source = comparison?.items.find((i) => i.geoid === item.geoid);
                 return (
                   <tr key={item.geoid} className="border-t border-civic-line">

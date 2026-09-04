@@ -1,13 +1,13 @@
 "use client";
 
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Calculator, MapPinned, TriangleAlert } from "lucide-react";
 
 import type { GeographyLevel } from "@/types";
 
 type Props = {
   geographyLevel: GeographyLevel;
   dataQualityLabel?: string;
-  metricStatus?: "official" | "estimated" | "mixed" | "zone";
+  metricStatus?: "official" | "derived" | "estimated" | "mixed" | "zone";
 };
 
 const qualityCopy: Record<
@@ -28,13 +28,22 @@ const qualityCopy: Record<
 
 const estimatedTone = "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300";
 const zoneTone = "border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300";
+const derivedTone = "border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300";
 
 export function DataQualityBadge({ geographyLevel, dataQualityLabel, metricStatus }: Props) {
   const quality = qualityCopy[geographyLevel];
-  const Icon = quality.icon;
   const label = dataQualityLabel ?? quality.label;
+  const Icon =
+    metricStatus === "zone"
+      ? MapPinned
+      : metricStatus === "derived"
+        ? Calculator
+      : metricStatus === "estimated" || metricStatus === "mixed"
+        ? TriangleAlert
+        : quality.icon;
   const tone =
     metricStatus === "zone" ? zoneTone :
+    metricStatus === "derived" ? derivedTone :
     metricStatus === "estimated" || metricStatus === "mixed" ? estimatedTone : quality.tone;
 
   return (

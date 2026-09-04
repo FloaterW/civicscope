@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -18,7 +19,7 @@ from app.db.init_db import init_db
 from app.db.session import SessionLocal, get_db
 from app.services.seed import seed_cmhc_data, seed_cmhc_tract_data, seed_demo_data, seed_transit_scores
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_limit])
 
 
 def create_app(auto_initialize: bool = True) -> FastAPI:
@@ -64,16 +65,30 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    CACHEABLE_PREFIXES = ("/api/map-data", "/api/summary", "/api/compare", "/api/metrics")
+    CACHEABLE_PREFIXES = (
+        "/api/map-data",
+        "/api/summary",
+        "/api/compare",
+        "/api/metrics",
+        "/api/transit-routes",
+    )
 
     @app.middleware("http")
-    async def cache_control(request: Request, call_next):
+    async def security_and_cache_headers(request: Request, call_next):
         response: Response = await call_next(request)
-        if request.method == "GET" and request.url.path.startswith(CACHEABLE_PREFIXES):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        if (
+            request.method == "GET"
+            and response.status_code < 400
+            and request.url.path.startswith(CACHEABLE_PREFIXES)
+        ):
             response.headers.setdefault("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
         return response
 
-    @app.get("/health", tags=["system"])
+    @app.get("/health", tags=["system"], operation_id="health_check")
+    @app.head("/health", tags=["system"], include_in_schema=False)
     def health(db: Session = Depends(get_db)):
         try:
             db.execute(text("SELECT 1"))
@@ -81,7 +96,10 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
         except Exception:
             db_status = "unavailable"
         status = "ok" if db_status == "ok" else "degraded"
-        return {"status": status, "service": "civicscope-api", "database": db_status}
+        payload = {"status": status, "service": "civicscope-api", "database": db_status}
+        if db_status != "ok":
+            return JSONResponse(status_code=503, content=payload)
+        return payload
 
     app.include_router(api_router)
     return app

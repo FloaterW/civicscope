@@ -7,7 +7,7 @@ const metricDefinitions: Record<string, { term: string; definition: string; sour
   rent_burden_pct: {
     term: "Rent burden",
     definition:
-      "The share of renter households spending 30% or more of their before-tax income on shelter costs. A household above this threshold is considered in core housing need by CMHC's affordability standard.",
+      "The share of renter households spending 30% or more of before-tax income on shelter costs. Crossing this threshold means the affordability standard is not met; core housing need also considers housing adequacy or suitability and whether acceptable alternative housing is affordable.",
     source: "Statistics Canada, 2021 Census of Population, Catalogue no. 98-316-X2021001"
   },
   affordability_index: {
@@ -92,13 +92,13 @@ const metricDefinitions: Record<string, { term: string; definition: string; sour
     term: "Transit access score",
     definition:
       "A 0-100 index measuring transit service density near each census tract. Counts unique transit routes (bus, rail, streetcar) within 800m of the tract boundary, then normalizes across all GTA tracts using decile clamping. Higher scores indicate more transit options.",
-    source: "Derived from GTFS static feeds: TTC, GO Transit, MiWay, Brampton Transit, Durham Region Transit"
+    source: "Derived from agency-published GTFS static feeds; current agency coverage is disclosed in the API snapshot metadata"
   },
   transit_route_count: {
     term: "Transit routes nearby",
     definition:
-      "The number of unique transit routes with at least one stop within 800m of the census tract boundary. Includes bus, streetcar, subway, and commuter rail routes from all GTA transit agencies.",
-    source: "Derived from GTFS static feeds: TTC, GO Transit, MiWay, Brampton Transit, Durham Region Transit"
+      "The number of unique transit routes in the packaged agency snapshot with at least one stop within 800m of the census tract boundary.",
+    source: "Derived from agency-published GTFS static feeds; included and missing agencies are disclosed beside the map"
   }
 };
 
@@ -164,11 +164,11 @@ function InfoTooltip({ term, definition, source }: { term: string; definition: s
         <div
           id={tooltipId}
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 rounded-lg border border-civic-line bg-civic-panel p-3 shadow-lg"
+          className="absolute bottom-full left-1/2 z-30 mb-2 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border border-civic-line bg-civic-panel p-3 shadow-lg"
         >
           <p className="text-xs font-semibold text-civic-ink">{term}</p>
           <p className="mt-1 text-xs leading-relaxed text-civic-muted">{definition}</p>
-          <p className="mt-2 text-[10px] italic text-civic-muted/70">{source}</p>
+          <p className="mt-2 text-[10px] italic text-civic-muted">{source}</p>
           <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-civic-line" />
         </div>
       )}

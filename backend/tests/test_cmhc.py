@@ -31,6 +31,44 @@ def test_seed_cmhc_data_reseeds_when_a_value_changed(db_session):
     assert restored.vacancy_rate == official
 
 
+def test_seed_cmhc_data_reseeds_when_a_value_becomes_null(db_session):
+    seed = load_cmhc_seed()
+    target = next(m for m in seed["metrics"] if m.get("vacancy_rate") is None)
+    row = (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == target["geoid"], CmhcMetric.year == target["year"])
+        .one()
+    )
+    row.vacancy_rate = 12.3
+    db_session.commit()
+
+    reseeded = seed_cmhc_data(db_session)
+    assert reseeded > 0
+
+    restored = (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == target["geoid"], CmhcMetric.year == target["year"])
+        .one()
+    )
+    assert restored.vacancy_rate is None
+
+
+def test_seed_cmhc_data_removes_rows_no_longer_in_seed(db_session):
+    geoid = load_cmhc_seed()["metrics"][0]["geoid"]
+    db_session.add(CmhcMetric(geoid=geoid, year=2099, rms_surveyed=False))
+    db_session.commit()
+
+    reseeded = seed_cmhc_data(db_session)
+
+    assert reseeded > 0
+    assert (
+        db_session.query(CmhcMetric)
+        .filter(CmhcMetric.geoid == geoid, CmhcMetric.year == 2099)
+        .one_or_none()
+        is None
+    )
+
+
 def test_cmhc_metric_creation(db_session):
     metric = CmhcMetric(
         geoid="3520005",
@@ -326,6 +364,38 @@ def test_municipality_cmhc_not_allocated(client):
     assert cmhc["housing_starts_total"] is not None
 
 
+@pytest.mark.parametrize(
+    "metric_key",
+    ["rental_universe", "housing_starts_single", "units_under_construction", "unabsorbed_units"],
+)
+def test_allocated_tract_counts_conserve_municipal_totals(client, metric_key):
+    municipal = client.get(
+        f"/api/map-data?metric={metric_key}&type=municipality&year=2024"
+    ).json()
+    tracts = client.get(
+        f"/api/map-data?metric={metric_key}&type=census_tract&year=2024"
+    ).json()
+
+    parent_totals = {
+        feature["properties"]["name"]: feature["properties"]["value"]
+        for feature in municipal["features"]
+        if feature["properties"]["value"] is not None
+    }
+    tract_totals: dict[str, int] = {}
+    for feature in tracts["features"]:
+        county = feature["properties"]["county"]
+        value = feature["properties"]["value"]
+        if county in parent_totals and value is not None:
+            tract_totals[county] = tract_totals.get(county, 0) + value
+
+    assert tract_totals
+    assert {
+        county: total
+        for county, total in tract_totals.items()
+        if total != parent_totals[county]
+    } == {}
+
+
 def test_combined_zone_municipality_discloses_shared_survey_zone(client):
     # Richmond Hill (3519038) is reported by CMHC as part of a combined RMS zone
     # with Vaughan and King, so the API discloses survey_zone.
@@ -336,12 +406,31 @@ def test_combined_zone_municipality_discloses_shared_survey_zone(client):
     assert van["survey_zone"] == "Richmond Hill / Vaughan / King"
     assert van["average_rent_total"] == rh["average_rent_total"]
     assert van["vacancy_rate"] == rh["vacancy_rate"]
+    assert rh["vacancy_rate_source"] == "survey_zone"
 
 
 def test_standalone_municipality_has_no_survey_zone(client):
     # Toronto is its own set of zones (aggregated), not a shared combined zone.
     tor = client.get("/api/compare?ids=3520005").json()["items"][0]["cmhc_metrics"]
     assert tor["survey_zone"] is None
+    assert tor["vacancy_rate_source"] == "municipality"
+
+
+def test_tract_rms_values_expose_per_field_granularity(client):
+    payload = client.get(
+        "/api/map-data?metric=average_rent_total&type=census_tract&detail=display"
+    ).json()
+    cmhc_rows = [
+        feature["properties"].get("cmhc_metrics")
+        for feature in payload["features"]
+        if feature["properties"].get("cmhc_metrics")
+    ]
+
+    assert any(row["average_rent_total_source"] == "survey_zone" for row in cmhc_rows)
+    assert any(
+        row["average_rent_total_source"] == "inherited_municipality"
+        for row in cmhc_rows
+    )
 
 
 def test_summary_no_cmhc_blend_for_unresolvable_tract_parent(client, db_session):

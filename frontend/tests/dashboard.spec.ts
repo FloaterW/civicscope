@@ -31,7 +31,7 @@ type MapPayload = {
     };
     geography_type: "municipality" | "census_tract";
     data_quality: {
-      metric_status: "official" | "estimated" | "mixed" | "zone";
+      metric_status: "official" | "derived" | "estimated" | "mixed" | "zone";
       label: string;
     };
   };
@@ -133,6 +133,42 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("dashboard-root")).not.toContainText("No data");
 
     expect(consoleErrors.filter((message) => !message.includes("Failed to load resource"))).toEqual([]);
+  });
+
+  test("slow API startup shows an honest loading state instead of zero regions", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/**`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_800));
+      await route.continue();
+    });
+    await page.goto("/");
+
+    const summary = page.getByTestId("summary-panel");
+    await expect(summary).toContainText("Loading GTA data");
+    await expect(summary).not.toContainText("0 GTA municipalities");
+    await expect(page.getByTestId("data-service-status")).toContainText(
+      "Still connecting to the CivicScope data service"
+    );
+    await expect(summary).toContainText("25 GTA municipalities", { timeout: 15_000 });
+    await expect(page.getByTestId("data-service-status")).toHaveCount(0);
+  });
+
+  test("comparison tooltip is dismissed when the viewport changes", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    const chart = page.getByTestId("comparison-panel");
+    const bar = chart.locator(".recharts-bar-rectangle").first();
+    await expect(bar).toBeVisible();
+    await bar.hover();
+    await expect(chart.locator(".recharts-tooltip-wrapper")).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(chart.locator(".recharts-tooltip-wrapper")).toBeHidden();
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   });
 
   test("municipality search selects Toronto without losing local metrics", async ({ page }) => {
@@ -252,13 +288,51 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const select = page.getByLabel("Map metric");
     const optgroups = select.locator("optgroup");
-    await expect(optgroups).toHaveCount(2);
+    await expect(optgroups).toHaveCount(3);
     await expect(optgroups.nth(0)).toHaveAttribute("label", "Census Profile");
     await expect(optgroups.nth(1)).toHaveAttribute("label", "CMHC Rental Market");
+    await expect(optgroups.nth(2)).toHaveAttribute("label", "Transit Access");
 
     await select.selectOption("vacancy_rate");
     await expect(page.getByText("Vacancy rate by municipality")).toBeVisible();
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "vacancy_rate");
+
+    await select.selectOption("transit_score");
+    await expect(page.getByText("Transit access score by census tract")).toBeVisible();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "transit_score");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-geography-type", "census_tract");
+    const coverage = page.getByTestId("transit-coverage-notice");
+    await expect(coverage).toContainText("Partial transit snapshot");
+    await expect(coverage).toContainText("TTC");
+    await expect(coverage).toContainText("Not included: Brampton Transit");
+    await expect(page.getByText(/all GTA transit agencies/i)).toHaveCount(0);
+  });
+
+  test("basemap attribution remains visible", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const attribution = page.locator(".maplibregl-ctrl-attrib");
+    await expect(attribution).toBeVisible({ timeout: 30000 });
+    await expect(attribution).toContainText("OpenStreetMap");
+    await expect(attribution).toContainText("OpenFreeMap");
+    expect(
+      await page.locator("canvas.maplibregl-canvas").getAttribute("aria-label")
+    ).toBeTruthy();
+  });
+
+  test("theme switching keeps civic layers above every basemap fill and line", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const mapHost = page.getByTestId("map-canvas-host");
+    await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
+    await expect(mapHost).toHaveAttribute("data-map-theme", "light");
+
+    await page.getByRole("button", { name: "Toggle color theme" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(mapHost).toHaveAttribute("data-map-theme", "dark");
+    await expect(mapHost).toHaveAttribute("data-civic-layer-order", "valid");
   });
 
   test("year selector is disabled for Census metrics and enabled for CMHC metrics", async ({ page }) => {
@@ -274,6 +348,17 @@ test.describe("CivicScope dashboard regressions", () => {
 
     await page.getByLabel("Map metric").selectOption("rent_burden_pct");
     await expect(yearSelect).toBeDisabled();
+  });
+
+  test("comparison keeps requested areas when a metric is unavailable", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByLabel("Map metric").selectOption("vacancy_rate");
+
+    const comparison = page.getByTestId("comparison-panel");
+    await expect(comparison).toContainText("default GTA municipalities");
+    await expect(comparison.locator("tbody tr")).toHaveCount(5);
+    await expect(comparison).toContainText("Not available");
   });
 
   test("switching between Census and CMHC metrics does not produce API errors", async ({ page }) => {
@@ -474,7 +559,8 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(response.ok()).toBeTruthy();
     const payload = (await response.json()) as MapPayload;
 
-    expect(payload.metadata.data_quality.metric_status).toBe("zone");
+    expect(payload.metadata.data_quality.metric_status).toBe("mixed");
+    expect(payload.metadata.data_quality.label).toContain("municipal fallback");
 
     const toronto = payload.features.filter((f) => f.properties.name?.includes("Toronto census tract"));
     const values = new Set(toronto.map((f) => (f.properties as Record<string, unknown>).value));
@@ -561,6 +647,54 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("search-empty")).toContainText("No", { timeout: 5000 });
   });
 
+  test("API failure is visible and retry restores the map", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/summary**`, (route) => route.abort("failed"));
+    let failMap = true;
+    await page.route(`${API_BASE}/api/map-data**`, async (route) => {
+      if (failMap) {
+        await route.abort("failed");
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto("/");
+    await expect(page.getByText("Map data is unavailable")).toBeVisible();
+    await expect(page.getByTestId("summary-panel")).toContainText("GTA data unavailable");
+    await expect(page.getByTestId("summary-panel")).not.toContainText("0 GTA municipalities");
+
+    failMap = false;
+    await page.getByRole("button", { name: "Retry map", exact: true }).click();
+    await expect(page.getByText("Map data is unavailable")).toBeHidden({ timeout: 30000 });
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-feature-count", "25");
+  });
+
+  test("search network failures are not reported as no matches", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.route(`${API_BASE}/api/geographies**`, (route) => route.abort("failed"));
+    await page.goto("/");
+    await page.getByTestId("geography-search").fill("Toronto");
+
+    await expect(page.getByTestId("search-error")).toContainText("temporarily unavailable");
+    await expect(page.getByTestId("search-empty")).toHaveCount(0);
+  });
+
+  test("mobile details control exposes its expanded state", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+
+    const toggle = page.getByRole("button", { name: "Summary & Details" });
+    const panel = page.locator("#summary-details-panel");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toHaveAttribute("aria-controls", "summary-details-panel");
+    await expect(panel).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(panel).toBeVisible();
+  });
+
   test("the no-results message does not block other controls", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
@@ -575,6 +709,36 @@ test.describe("CivicScope dashboard regressions", () => {
       "census_tract",
       { timeout: 30000 }
     );
+  });
+
+  test("selecting Toronto via search sets map selected state", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+
+    await page.getByTestId("geography-search").fill("Toronto");
+    await page.getByRole("option").filter({ hasText: "3520005" }).click();
+
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    // After selection animation settles, the map should still show data
+    await expect(map).toHaveAttribute("data-feature-count", "25");
+  });
+
+  test("selecting a census tract sets map selected state", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Census tracts" }).click();
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
+
+    await page.getByTestId("geography-search").fill("5350092.00");
+    const result = page.getByRole("option").filter({ hasText: "5350092.00" });
+    await expect(result).toHaveCount(1);
+    await result.click();
+
+    await expect(map).toHaveAttribute("data-selected-geoid", "5350092.00");
+    await expect(page.getByTestId("detail-panel")).toContainText("census tract");
   });
 
   test("map exposes an accessible region label", async ({ page }) => {
@@ -598,6 +762,51 @@ test.describe("CivicScope dashboard regressions", () => {
     );
     expect(serious, `Accessibility violations: ${JSON.stringify(serious, null, 2)}`).toHaveLength(0);
   });
+
+  test("no critical or serious accessibility violations in a populated mobile transit state", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await blockExternalMapAssets(page);
+    await page.goto("/");
+    await page.getByLabel("Map metric").selectOption("transit_score");
+    await expect(page.getByTestId("transit-coverage-notice")).toContainText(
+      "Partial transit snapshot"
+    );
+    await page.getByTestId("geography-search").fill("5350001.00");
+    await page.getByRole("option").filter({ hasText: "5350001.00" }).click();
+
+    const detailsToggle = page.locator('button[aria-controls="summary-details-panel"]');
+    await expect(detailsToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#summary-details-panel")).toBeVisible();
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto census tract 0001.00");
+    await page.getByRole("button", { name: "What is Transit access score?" }).first().click();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+
+    const lightResults = await new AxeBuilder({ page })
+      .exclude("[data-testid='map-canvas-host']")
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    const lightSerious = lightResults.violations.filter(
+      (violation) => violation.impact === "critical" || violation.impact === "serious"
+    );
+    expect(
+      lightSerious,
+      `Light-theme accessibility violations: ${JSON.stringify(lightSerious, null, 2)}`
+    ).toHaveLength(0);
+
+    await page.getByRole("button", { name: "Toggle color theme" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    const darkResults = await new AxeBuilder({ page })
+      .exclude("[data-testid='map-canvas-host']")
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    const darkSerious = darkResults.violations.filter(
+      (violation) => violation.impact === "critical" || violation.impact === "serious"
+    );
+    expect(
+      darkSerious,
+      `Dark-theme accessibility violations: ${JSON.stringify(darkSerious, null, 2)}`
+    ).toHaveLength(0);
+  });
 });
 
 function countCoordinatePairs(value: unknown): number {
@@ -613,6 +822,49 @@ function countCoordinatePairs(value: unknown): number {
 }
 
 async function blockExternalMapAssets(page: Page) {
-  await page.route("https://*.basemaps.cartocdn.com/**", (route) => route.abort());
-  await page.route("https://demotiles.maplibre.org/**", (route) => route.abort());
+  await page.route("https://tiles.openfreemap.org/**", async (route) => {
+    if (new URL(route.request().url()).pathname.startsWith("/styles/")) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 8,
+          glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+          sources: {
+            "openfreemap-attribution": {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] },
+              attribution: "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"
+            }
+          },
+          layers: [
+            {
+              id: "background",
+              type: "background",
+              paint: { "background-color": "#eef2ed" }
+            },
+            {
+              id: "early-symbol",
+              type: "symbol",
+              source: "openfreemap-attribution",
+              layout: { "text-field": "" }
+            },
+            {
+              id: "openfreemap-attribution-layer",
+              type: "circle",
+              source: "openfreemap-attribution",
+              paint: { "circle-opacity": 0 }
+            },
+            {
+              id: "top-label",
+              type: "symbol",
+              source: "openfreemap-attribution",
+              layout: { "text-field": "" }
+            }
+          ]
+        })
+      });
+      return;
+    }
+    await route.abort();
+  });
 }

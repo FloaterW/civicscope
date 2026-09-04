@@ -63,11 +63,14 @@ complete for counts.
 
 ## What the app does today
 
-CMHC metrics in census tract mode are **inherited** (rates) or **allocated** by
-renter-household share (counts) from the parent municipality, and are clearly labeled as
-estimated in the UI (badge "CMHC (estimated allocation)", "municipal rates" / "est."
-notes). This is honest and functional, but it is an estimate where real CT data could be
-used.
+The production loader ingests real CMHC census-tract starts and completions for 1,244
+of 1,334 GTA tracts and validates every metric/CMA/year slice against CMHC's published
+total. Exact tract rows are `official`; pre-2021 parent-tract splits are
+`estimated_parent`; uncovered tracts retain the renter-share municipal allocation.
+Vacancy and average rent use the official CMHC tract-to-survey-zone crosswalk for 1,232
+tracts and a per-value parent-municipality fallback for the remaining 102. Bedroom-rent
+and other RMS fields remain municipality-level until a validated tract/zone source is
+added. The detail panel and CSV export disclose source, method, period, and status.
 
 ## Recommendation (layered, per metric family)
 

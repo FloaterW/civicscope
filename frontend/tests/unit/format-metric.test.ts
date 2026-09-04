@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
+import { formatMetric, getMetricLabel, isCmhcMetric, mapDataCacheKey } from "@/lib/api";
 
 describe("formatMetric", () => {
   it("formats currency for median_income", () => {
@@ -84,5 +84,22 @@ describe("isCmhcMetric", () => {
 
   it("returns false for median_income", () => {
     expect(isCmhcMetric("median_income")).toBe(false);
+  });
+});
+
+describe("mapDataCacheKey", () => {
+  it("reuses census payloads across census and transit metrics", () => {
+    expect(mapDataCacheKey("census_tract", "median_income")).toBe(
+      mapDataCacheKey("census_tract", "transit_score")
+    );
+  });
+
+  it("reuses CMHC payloads by geography and year", () => {
+    expect(mapDataCacheKey("municipality", "vacancy_rate", 2024)).toBe(
+      mapDataCacheKey("municipality", "housing_starts_total", 2024)
+    );
+    expect(mapDataCacheKey("municipality", "vacancy_rate", 2023)).not.toBe(
+      mapDataCacheKey("municipality", "vacancy_rate", 2024)
+    );
   });
 });

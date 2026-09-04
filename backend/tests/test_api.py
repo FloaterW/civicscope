@@ -4,6 +4,20 @@ def test_health_endpoint(client):
     assert response.json()["status"] == "ok"
 
 
+def test_health_endpoint_returns_503_when_database_is_unavailable(
+    client, db_session, monkeypatch
+):
+    def unavailable(_statement):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(db_session, "execute", unavailable)
+    response = client.get("/health")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"
+    assert response.json()["database"] == "unavailable"
+
+
 def test_summary_endpoint(client):
     response = client.get("/api/summary")
     assert response.status_code == 200
@@ -11,6 +25,11 @@ def test_summary_endpoint(client):
     assert payload["region_count"] >= 6
     assert payload["population"] > 0
     assert payload["rent_to_income_ratio"] is not None
+
+
+def test_compare_deduplicates_repeated_identifiers(client):
+    payload = client.get("/api/compare?ids=3520005,3520005").json()
+    assert [item["geoid"] for item in payload["items"]] == ["3520005"]
 
 
 def test_map_data_endpoint(client):
@@ -56,10 +75,47 @@ def test_tract_metrics_expose_field_level_provenance(client):
         "rent_burden_pct",
         "population_growth_pct",
         "affordability_index",
+        "transit_score",
+        "transit_route_count",
     }
     assert expected_keys <= set(quality)
     for status in quality.values():
-        assert status in {"official", "estimated", "unavailable", "low_confidence"}
+        assert status in {"official", "derived", "estimated", "unavailable", "low_confidence"}
+
+
+def test_map_data_includes_metric_catalog_for_local_repaint(client):
+    payload = client.get("/api/map-data?metric=rent_burden&type=census_tract").json()
+    catalog = payload["metadata"]["metric_catalog"]
+
+    assert catalog["median_income"]["data_quality"]["metric_status"] == "official"
+    assert catalog["rent_burden_pct"]["data_quality"]["metric_status"] == "mixed"
+    assert catalog["transit_score"]["data_quality"]["metric_status"] == "derived"
+    assert "GTFS" in catalog["transit_score"]["source"]
+    assert payload["metadata"]["transit_snapshot"]["coverage_status"] == "partial"
+    assert {
+        agency["id"]
+        for agency in payload["metadata"]["transit_snapshot"]["missing_agencies"]
+    } == {"brampton"}
+
+
+def test_transit_snapshot_discloses_actual_agency_coverage(client):
+    routes = client.get("/api/transit-routes").json()
+    manifest = routes["metadata"]
+    assert manifest["coverage_status"] == "partial"
+    assert {agency["id"] for agency in manifest["included_agencies"]} == {
+        "ttc",
+        "miway",
+        "go_transit",
+        "durham",
+    }
+    assert {agency["id"] for agency in manifest["missing_agencies"]} == {"brampton"}
+
+    map_payload = client.get(
+        "/api/map-data?metric=transit_score&type=census_tract"
+    ).json()
+    assert map_payload["metadata"]["data_quality"]["metric_status"] == "derived"
+    assert map_payload["metadata"]["transit_snapshot"] == manifest
+    assert "Brampton Transit" in map_payload["metadata"]["data_quality"]["description"]
 
 
 def test_tract_missing_value_is_unavailable_not_fabricated(client):
@@ -299,3 +355,37 @@ def test_health_reports_database_status(client):
     payload = response.json()
     assert payload["database"] == "ok"
     assert payload["service"] == "civicscope-api"
+
+
+def test_health_supports_head(client):
+    response = client.head("/health")
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+def test_openapi_operation_ids_are_unique(client):
+    schema = client.get("/openapi.json").json()
+    operation_ids = [
+        operation["operationId"]
+        for path in schema["paths"].values()
+        for operation in path.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    ]
+
+    assert operation_ids
+    assert len(operation_ids) == len(set(operation_ids))
+    assert schema["paths"]["/health"]["get"]["operationId"] == "health_check"
+    assert "head" not in schema["paths"]["/health"]
+
+
+def test_api_responses_include_security_headers(client):
+    response = client.get("/health")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
+def test_api_security_headers_on_data_endpoints(client):
+    response = client.get("/api/summary")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"

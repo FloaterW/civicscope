@@ -60,4 +60,4 @@ geoid,year,median_income,median_rent,population,previous_population,renter_house
 - Rename the legacy `county` column to a clearer parent geography field in a future migration.
 - Source official tract-level dwelling-type/tenure characteristics if a future DF_CT extract includes them, then re-enable the tract Housing Stock section.
 
-Done in this iteration: null/suppressed counts are documented (see Data Dictionary), tract metrics are field-level labeled, low-confidence growth is flagged, the stale-volume reseed is automatic, and CMHC tract values stay labeled as estimated (rates inherited, counts allocated by renter-household share).
+Done in this iteration: null/suppressed counts are documented (see Data Dictionary), tract metrics are field-level labeled, low-confidence growth is flagged, stale-volume reseeding is bidirectional, official CMHC tract starts/completions are used where available, survey-zone vacancy/rent is used where matched, and every fallback remains explicitly labeled.

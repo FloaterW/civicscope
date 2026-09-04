@@ -55,6 +55,15 @@ CHARACTERISTIC_IDS = {
 CHARACTERISTIC_TO_FIELD = {v: k for k, v in CHARACTERISTIC_IDS.items()}
 
 BATCH_SIZE = 40  # DGUIDs per API request to avoid URL length limits
+MIN_COVERAGE_PCT = 99.0  # fail-closed: require nearly all requested tracts
+FIELD_MIN_COVERAGE_PCT = {
+    "population": 99.0,
+    "previous_population": 99.0,
+    "median_income": 99.0,
+    "median_rent": 98.0,
+    "renter_households": 99.0,
+    "rent_burden_pct": 95.0,
+}
 
 
 def ctuid_to_dguid(ctuid: str) -> str:
@@ -173,9 +182,60 @@ def fetch_all_tract_metrics(geoids: list[str]) -> list[TractMetric]:
     return sorted(all_metrics, key=lambda m: m.geoid)
 
 
+def validate_tract_coverage(
+    metrics: list[TractMetric],
+    geoids: list[str],
+    *,
+    allow_partial: bool = False,
+) -> dict[str, Any]:
+    """Validate row and field-level coverage before replacing official data."""
+    expected_geoids = set(geoids)
+    unique_geoids = {metric.geoid for metric in metrics}
+    matched_geoids = unique_geoids & expected_geoids
+    missing_geoids = expected_geoids - unique_geoids
+    unexpected_geoids = unique_geoids - expected_geoids
+    row_coverage = 100 * len(matched_geoids) / len(expected_geoids) if expected_geoids else 0.0
+    duplicate_count = len(metrics) - len(unique_geoids)
+    field_coverage = {
+        field: (
+            100 * sum(getattr(metric, field) is not None for metric in metrics) / len(metrics)
+            if metrics
+            else 0.0
+        )
+        for field in FIELD_MIN_COVERAGE_PCT
+    }
+    problems = []
+    if row_coverage < MIN_COVERAGE_PCT:
+        problems.append(
+            f"row coverage {row_coverage:.1f}% is below {MIN_COVERAGE_PCT:.1f}%"
+        )
+    if duplicate_count:
+        problems.append(f"{duplicate_count} duplicate tract rows")
+    if unexpected_geoids:
+        problems.append(f"{len(unexpected_geoids)} unexpected tract identifiers")
+    if any(metric.year != 2021 for metric in metrics):
+        problems.append("rows contain a year other than the 2021 census vintage")
+    for field, minimum in FIELD_MIN_COVERAGE_PCT.items():
+        if field_coverage[field] < minimum:
+            problems.append(
+                f"{field} coverage {field_coverage[field]:.1f}% is below {minimum:.1f}%"
+            )
+    if problems and not allow_partial:
+        raise ValueError("; ".join(problems))
+    return {
+        "row_coverage_pct": round(row_coverage, 1),
+        "field_coverage_pct": {k: round(v, 1) for k, v in field_coverage.items()},
+        "duplicate_rows": duplicate_count,
+        "missing_geoids": len(missing_geoids),
+        "unexpected_geoids": len(unexpected_geoids),
+        "partial": bool(problems),
+    }
+
+
 def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
     """Write normalized CSV compatible with load_census.py --csv."""
-    with output_path.open("w", newline="", encoding="utf-8") as f:
+    temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
+    with temporary_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([
             "geoid", "year", "median_income", "median_rent",
@@ -202,6 +262,7 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
                 m.dwellings_apt_high_rise if m.dwellings_apt_high_rise is not None else "",
                 m.owner_households if m.owner_households is not None else "",
             ])
+    temporary_path.replace(output_path)
 
 
 def update_seed_with_official_metrics(
@@ -260,7 +321,11 @@ def update_seed_with_official_metrics(
         "fetched via the SDMX DF_CT dataflow.",
     ]
 
-    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    temporary_path = seed_path.with_suffix(f"{seed_path.suffix}.tmp")
+    temporary_path.write_text(
+        json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
+    )
+    temporary_path.replace(seed_path)
     return updated
 
 
@@ -271,8 +336,28 @@ TRACT_METRIC_FIELDS = (
     "previous_population",
     "renter_households",
     "rent_burden_pct",
+    "dwellings_total",
+    "dwellings_single_detached",
+    "dwellings_semi_detached",
+    "dwellings_row_house",
+    "dwellings_apt_duplex",
+    "dwellings_apt_low_rise",
+    "dwellings_apt_high_rise",
+    "owner_households",
 )
-_INT_FIELDS = {"population", "previous_population", "renter_households"}
+_INT_FIELDS = {
+    "population",
+    "previous_population",
+    "renter_households",
+    "dwellings_total",
+    "dwellings_single_detached",
+    "dwellings_semi_detached",
+    "dwellings_row_house",
+    "dwellings_apt_duplex",
+    "dwellings_apt_low_rise",
+    "dwellings_apt_high_rise",
+    "owner_households",
+}
 
 
 def apply_csv_metrics_to_seed(seed: dict[str, Any], rows: list[dict[str, Any]]) -> int:
@@ -307,6 +392,33 @@ def sync_seed_from_csv(seed_path: Path, csv_path: Path) -> int:
     seed = json.loads(seed_path.read_text(encoding="utf-8"))
     with csv_path.open(newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.DictReader(handle))
+    metrics = [
+        TractMetric(
+            geoid=str(row.get("geoid", "")).strip(),
+            year=_optional_int(row.get("year")) or 2021,
+            population=_optional_int(row.get("population")),
+            previous_population=_optional_int(row.get("previous_population")),
+            median_income=_optional_float(row.get("median_income")),
+            median_rent=_optional_float(row.get("median_rent")),
+            renter_households=_optional_int(row.get("renter_households")),
+            rent_burden_pct=_optional_float(row.get("rent_burden_pct")),
+            dwellings_total=_optional_int(row.get("dwellings_total")),
+            dwellings_single_detached=_optional_int(row.get("dwellings_single_detached")),
+            dwellings_semi_detached=_optional_int(row.get("dwellings_semi_detached")),
+            dwellings_row_house=_optional_int(row.get("dwellings_row_house")),
+            dwellings_apt_duplex=_optional_int(row.get("dwellings_apt_duplex")),
+            dwellings_apt_low_rise=_optional_int(row.get("dwellings_apt_low_rise")),
+            dwellings_apt_high_rise=_optional_int(row.get("dwellings_apt_high_rise")),
+            owner_households=_optional_int(row.get("owner_households")),
+        )
+        for row in rows
+    ]
+    expected_geoids = [
+        item["geoid"]
+        for item in seed["geographies"]
+        if item.get("type") == "census_tract"
+    ]
+    coverage = validate_tract_coverage(metrics, expected_geoids)
     updated = apply_csv_metrics_to_seed(seed, rows)
     seed["metadata"]["source"] = "statistics_canada_2021_census_profile_csd_and_ct_seed"
     seed["metadata"]["notes"] = [
@@ -319,7 +431,12 @@ def sync_seed_from_csv(seed_path: Path, csv_path: Path) -> int:
         "unavailable values are stored as null; rent burden is estimated from rent and "
         "income only as a clearly labeled fallback at serialization time.",
     ]
-    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    seed["metadata"]["tract_metric_coverage"] = coverage
+    temporary_path = seed_path.with_suffix(f"{seed_path.suffix}.tmp")
+    temporary_path.write_text(
+        json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
+    )
+    temporary_path.replace(seed_path)
     return updated
 
 
@@ -360,6 +477,11 @@ def main() -> None:
         default=PROJECT_ROOT / "app" / "data" / "statcan_ct_metrics.csv",
         help="Output CSV path (default: app/data/statcan_ct_metrics.csv).",
     )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow writing results even when coverage is below the minimum threshold.",
+    )
     args = parser.parse_args()
 
     if args.from_csv:
@@ -385,6 +507,26 @@ def main() -> None:
     has_pop = sum(1 for m in metrics if m.population is not None)
     has_burden = sum(1 for m in metrics if m.rent_burden_pct is not None)
     print(f"Coverage: income={has_income}, rent={has_rent}, population={has_pop}, burden={has_burden}")
+
+    try:
+        coverage = validate_tract_coverage(
+            metrics, geoids, allow_partial=args.allow_partial
+        )
+    except ValueError as exc:
+        print(
+            f"ABORTING: {exc}. Re-run with --allow-partial only for diagnostic output. "
+            "No files were written.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"Coverage validation: {json.dumps(coverage, sort_keys=True)}")
+    if coverage["partial"]:
+        print("WARNING: writing partial tract data by explicit request.", file=sys.stderr)
+        canonical_output = PROJECT_ROOT / "app" / "data" / "statcan_ct_metrics.csv"
+        if args.update_seed:
+            parser.error("Partial diagnostic data cannot update the canonical seed.")
+        if args.generate_csv and args.output.resolve() == canonical_output.resolve():
+            parser.error("Partial diagnostic data requires an explicit noncanonical --output path.")
 
     if args.generate_csv:
         write_csv(metrics, args.output)

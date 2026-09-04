@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "packaged_at": "2026-06-24T11:48:17-04:00",
+  "coverage_status": "partial",
+  "method_version": "routes-within-800m-v1",
+  "buffer_meters": 800,
+  "included_agencies": [
+    {"id": "ttc", "name": "TTC", "route_features": 227, "feed_retrieved_at": null},
+    {"id": "miway", "name": "MiWay", "route_features": 72, "feed_retrieved_at": null},
+    {"id": "go_transit", "name": "GO Transit", "route_features": 43, "feed_retrieved_at": null},
+    {"id": "durham", "name": "Durham Region Transit", "route_features": 39, "feed_retrieved_at": null}
+  ],
+  "missing_agencies": [
+    {"id": "brampton", "name": "Brampton Transit"}
+  ],
+  "artifacts": {
+    "transit_routes.geojson": {
+      "sha256": "8c67ae86b00b7e7a384a1f289d152ba18ee3b46d035582f7fac8d95a164e3294",
+      "feature_count": 381
+    },
+    "transit_scores.csv": {
+      "sha256": "62052b525500398f0171da10f1647228f1744ca5f2664550c1e460830a44f6a2"
+    }
+  },
+  "notes": [
+    "This legacy packaged snapshot did not record upstream feed retrieval timestamps.",
+    "Scores are derived from unique scheduled routes with a stop within 800 metres of a census tract boundary; they do not measure service frequency or travel time."
+  ]
+}

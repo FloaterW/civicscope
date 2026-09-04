@@ -15,8 +15,16 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1320, height: 1142 } });
 
 async function waitForDashboard() {
-  await page.goto(baseURL);
-  await page.getByText("$1,554", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+  await page.goto(baseURL, { waitUntil: "networkidle" });
+  await page.getByTestId("summary-panel").waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForFunction(() => {
+    const map = document.querySelector('[data-testid="civic-map"]');
+    return Number(map?.getAttribute("data-feature-count") ?? 0) > 0;
+  });
+  await page.evaluate(() => document.fonts.ready);
+  await page.addStyleTag({
+    content: "*,*::before,*::after{animation:none!important;transition:none!important}"
+  });
 }
 
 async function save(name) {
@@ -28,13 +36,12 @@ async function save(name) {
 
 await waitForDashboard();
 await page.getByLabel("Map metric").selectOption("rent_burden_pct");
-await page.getByText("51.2", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
+await page.getByTestId("civic-map").waitFor({ state: "visible" });
 await save("overview-dashboard.png");
 
 await page.getByLabel("Map metric").selectOption("median_income");
-await page.getByText("141K", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
 await page.getByTestId("geography-search").fill("Toronto");
-await page.getByRole("button").filter({ hasText: "3520005" }).click();
+await page.getByRole("option").filter({ hasText: "3520005" }).click();
 await page.getByTestId("detail-panel").getByText("Toronto", { exact: true }).waitFor({
   state: "visible",
   timeout: 15_000
@@ -42,16 +49,16 @@ await page.getByTestId("detail-panel").getByText("Toronto", { exact: true }).wai
 await save("selected-toronto.png");
 
 await page.getByLabel("Map metric").selectOption("population_growth_pct");
-await page.getByText("44.4", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
+await page.getByTestId("civic-map").waitFor({ state: "visible" });
 await save("population-growth.png");
 
 await page.getByRole("button", { name: "Census tracts" }).click();
 await page.getByLabel("Map metric").selectOption("rent_burden_pct");
-await page.getByText("1,334 GTA census tracts", { exact: true }).waitFor({
-  state: "visible",
-  timeout: 30_000
+await page.getByTestId("civic-map").waitFor({ state: "visible" });
+await page.waitForFunction(() => {
+  const map = document.querySelector('[data-testid="civic-map"]');
+  return map?.getAttribute("data-feature-count") === "1334";
 });
-await page.getByText("57.6", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
 await save("census-tracts.png");
 
 await browser.close();
