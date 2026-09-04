@@ -230,6 +230,7 @@ test.describe("CivicScope dashboard regressions", () => {
   test("search results dismiss outside and Escape preserves the user's query", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
     const search = page.getByTestId("geography-search");
 
     await search.fill("Toronto");
@@ -1085,6 +1086,7 @@ test.describe("CivicScope dashboard regressions", () => {
   test("search with no matches shows a no-results message", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
     const search = page.getByTestId("geography-search");
     await search.click();
     await search.fill("zzzznomatch");
@@ -1129,6 +1131,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await blockExternalMapAssets(page);
     await page.route(`${API_BASE}/api/geographies**`, (route) => route.abort("failed"));
     await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
     await page.getByTestId("geography-search").fill("Toronto");
 
     await expect(page.getByTestId("search-error")).toContainText("temporarily unavailable");
@@ -1159,6 +1162,7 @@ test.describe("CivicScope dashboard regressions", () => {
   test("keyboard focus is visibly indicated on primary controls", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
+    await expect(page.getByTestId("dashboard-root")).toHaveAttribute("data-url-state-ready", "true");
 
     const metric = page.getByLabel("Map metric");
     await metric.focus();

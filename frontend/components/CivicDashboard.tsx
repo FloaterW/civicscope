@@ -674,6 +674,7 @@ export function CivicDashboard() {
       data-testid="dashboard-root"
       data-selected-year={selectedYear ?? ""}
       data-pending-year={pendingUrlYear ?? ""}
+      data-url-state-ready={urlStateReady ? "true" : "false"}
       className="min-h-screen bg-civic-surface"
     >
       <header className="border-b border-civic-line bg-civic-panel">
@@ -738,6 +739,7 @@ export function CivicDashboard() {
                   }
                 }}
                 onKeyDown={handleSearchKeyDown}
+                disabled={!urlStateReady}
                 placeholder={geographyLabel.search}
                 data-testid="geography-search"
                 role="combobox"
@@ -750,7 +752,7 @@ export function CivicDashboard() {
                     ? `search-option-${visibleResults[searchHighlight]?.geoid}`
                     : undefined
                 }
-                className="h-10 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2"
+                className="h-10 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2 disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
               />
               {searchOpen && (
                 <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-civic-panel shadow-panel">
@@ -808,9 +810,14 @@ export function CivicDashboard() {
             <GeographyLevelSelector
               value={geographyLevel}
               onChange={handleGeographyLevelChange}
+              disabled={!urlStateReady}
               municipalityDisabled={isTransit}
             />
-            <MetricSelector value={metric} onChange={handleMetricChange} />
+            <MetricSelector
+              value={metric}
+              onChange={handleMetricChange}
+              disabled={!urlStateReady}
+            />
             <div className="flex flex-col gap-1">
               <span className="px-1 text-[11px] font-semibold uppercase tracking-wide text-civic-muted">
                 {isCmhc ? "CMHC year" : "Census year"}
@@ -818,7 +825,7 @@ export function CivicDashboard() {
               <YearSelector
                 value={displayYear}
                 availableYears={isCmhc ? displayedYearOptions : [2021]}
-                disabled={!isCmhc || pendingUrlYear !== null}
+                disabled={!urlStateReady || !isCmhc || pendingUrlYear !== null}
                 label={isCmhc ? "CMHC data year" : "Census data year"}
                 onChange={(year) => {
                   setPendingUrlYear(null);

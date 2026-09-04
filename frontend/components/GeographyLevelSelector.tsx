@@ -7,6 +7,7 @@ import type { GeographyLevel } from "@/types";
 type Props = {
   value: GeographyLevel;
   onChange: (level: GeographyLevel) => void;
+  disabled?: boolean;
   municipalityDisabled?: boolean;
 };
 
@@ -15,7 +16,12 @@ const options: Array<{ value: GeographyLevel; label: string }> = [
   { value: "census_tract", label: "Census tracts" }
 ];
 
-export function GeographyLevelSelector({ value, onChange, municipalityDisabled = false }: Props) {
+export function GeographyLevelSelector({
+  value,
+  onChange,
+  disabled = false,
+  municipalityDisabled = false
+}: Props) {
   return (
     <div className="flex flex-col gap-1">
       <div
@@ -26,15 +32,16 @@ export function GeographyLevelSelector({ value, onChange, municipalityDisabled =
         <Layers className="ml-2 h-4 w-4 text-civic-muted" aria-hidden="true" />
         {options.map((option) => {
           const isActive = option.value === value;
-          const isDisabled = option.value === "municipality" && municipalityDisabled;
+          const isTransitDisabled = option.value === "municipality" && municipalityDisabled;
+          const isDisabled = disabled || isTransitDisabled;
           return (
             <button
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
               disabled={isDisabled}
-              aria-describedby={isDisabled ? "transit-geography-note" : undefined}
-              title={isDisabled ? "Transit metrics are available by census tract" : undefined}
+              aria-describedby={isTransitDisabled ? "transit-geography-note" : undefined}
+              title={isTransitDisabled ? "Transit metrics are available by census tract" : undefined}
               className={`h-9 rounded px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-not-allowed disabled:opacity-50 ${
                 isActive
                   ? "bg-civic-teal text-white dark:text-slate-900"
