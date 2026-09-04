@@ -10,6 +10,21 @@ permissions:
   contents: read
 
 jobs:
+  dependency-review:
+    name: Review high-severity dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
   test:
     name: Backend, frontend, and browser checks
     runs-on: ubuntu-latest
@@ -45,10 +60,6 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-
-      - name: Audit frontend dependencies
-        working-directory: frontend
-        run: npm audit --audit-level=high
 
       - name: Install Playwright browser
         working-directory: frontend
