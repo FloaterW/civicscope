@@ -47,6 +47,24 @@ test.describe("launch comparison journeys", () => {
     expect(new URL(page.url()).searchParams.get("compare")).toBe(shared.searchParams.get("compare"));
   });
 
+  test("search and comparisons remain usable when WebGL2 is unavailable", async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+        value: function (this: HTMLCanvasElement, kind: string, options?: unknown) {
+          return kind === "webgl2" ? null : Reflect.apply(original, this, [kind, options]);
+        }
+      });
+    });
+    await page.goto("/");
+    await expect(page.getByRole("alert")).toContainText("WebGL2");
+    await selectArea(page, "Oakville");
+    const panel = page.getByTestId("comparison-panel");
+    await panel.getByRole("button", { name: "Add selected area to comparison" }).click();
+    await expect(panel.locator("tbody tr")).toHaveCount(1);
+    await expect(panel.locator("tbody")).toContainText("Oakville");
+  });
+
   test("comparison CSV preserves Census period and source for selected areas", async ({ page }) => {
     await page.goto("/?metric=population");
     const panel = page.getByTestId("comparison-panel");

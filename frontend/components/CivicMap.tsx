@@ -271,6 +271,7 @@ export function CivicMap({
   const initialViewportAppliedRef = useRef(false);
   const pendingViewportFitRef = useRef(true);
   const [transitOpen, setTransitOpen] = useState(false);
+  const [mapInitializationError, setMapInitializationError] = useState<string | null>(null);
   const [transitFilters, setTransitFilters] = useState<TransitFilters>({
     ...TRANSIT_FILTERS_OFF
   });
@@ -375,7 +376,8 @@ export function CivicMap({
     const initialData = data;
 
     async function initializeMap() {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
+      maplibregl.setWorkerUrl(`/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
       if (cancelled || !containerRef.current) {
         return;
       }
@@ -426,7 +428,7 @@ export function CivicMap({
       };
       map.on("style.load", handleStyleLoad);
 
-      map.on("styleimagemissing", ({ id }) => {
+      map.setMissingStyleImageResolver((id) => {
         if (!map.hasImage(id)) {
           map.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
         }
@@ -522,7 +524,9 @@ export function CivicMap({
       mapRef.current = map;
     }
 
-    initializeMap();
+    void initializeMap().catch(() => {
+      if (!cancelled) setMapInitializationError("The interactive map could not start. Use a browser with WebGL2 enabled, or continue with search, area details and comparisons below.");
+    });
 
     return () => {
       cancelled = true;
@@ -624,6 +628,7 @@ export function CivicMap({
       }. Use the search box to inspect a specific geography.`}
       className="relative h-full w-full"
     >
+      {mapInitializationError && <div role="alert" className="absolute inset-0 z-10 grid place-items-center bg-civic-panel p-6 text-center text-sm text-civic-ink">{mapInitializationError}</div>}
       {!data && loading && (
         <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel text-sm text-civic-muted">
           <div className="flex flex-col items-center gap-3">
@@ -721,7 +726,7 @@ export function CivicMap({
           {transitOpen && (
             <div
               id="transit-layer-panel"
-              className="animate-fade-in min-w-56 rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+              className="min-w-56 rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
             >
               <div className="mb-2 flex items-center justify-between gap-4">
                 <span className="font-semibold text-civic-ink">Transit Lines</span>
