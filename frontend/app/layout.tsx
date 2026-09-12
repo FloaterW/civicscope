@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/public-sans/wght.css";
 import "./globals.css";
+import { Monitoring } from "@/components/Monitoring";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -43,7 +44,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>{children}{process.env.VERCEL_ENV === "production" && <Monitoring />}</body>
     </html>
   );
 }

@@ -125,6 +125,13 @@ def fetch_official_gta_metrics(csd_uids: list[str] | None = None) -> list[Metric
 
 
 def validate_official_metrics(metrics: list[MetricInput], expected_geoids: list[str]) -> None:
+    actual_geoids = [metric.geoid for metric in metrics]
+    if len(actual_geoids) != len(set(actual_geoids)):
+        raise ValueError("Statistics Canada response contains duplicate CSDUIDs")
+    if set(actual_geoids) - set(expected_geoids):
+        raise ValueError("Statistics Canada response contains unexpected CSDUIDs")
+    if any(metric.year != 2021 for metric in metrics):
+        raise ValueError("Statistics Canada response must contain only Census 2021 metrics")
     by_geoid = {metric.geoid: metric for metric in metrics}
     missing = sorted(set(expected_geoids) - set(by_geoid))
     if missing:
@@ -341,7 +348,9 @@ def update_seed_metrics(seed_path: Path, metrics: list[MetricInput]) -> int:
         "Municipal geometries are Statistics Canada 2021 cartographic census subdivision boundaries.",
         "Metrics are loaded from official Statistics Canada 2021 Census Profile characteristics: population 2021, population 2016, median household income, tenant households, tenant rent burden, and median monthly shelter costs for rented dwellings.",
     ]
-    seed_path.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    temporary = seed_path.with_suffix(seed_path.suffix + ".tmp")
+    temporary.write_text(json.dumps(seed, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    temporary.replace(seed_path)
     return updated
 
 

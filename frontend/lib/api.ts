@@ -6,6 +6,7 @@ import type {
   MetricKey,
   Summary
 } from "@/types";
+import { reportClientError } from "@/lib/error-reporting";
 import {
   isTransitFeatureCollection,
   type TransitFeatureCollection
@@ -102,12 +103,15 @@ export async function fetchJson<T>(
       signal: requestController.signal
     });
     if (!response.ok) {
-      let message: string;
+      reportClientError("api_response");
+      const text = await response.text();
+      let message = text;
       try {
-        const body = await response.json();
-        message = body?.detail ?? body?.message ?? JSON.stringify(body);
+        const body = JSON.parse(text);
+        const detail = body?.detail ?? body?.message ?? body;
+        message = typeof detail === "string" ? detail : JSON.stringify(detail);
       } catch {
-        message = await response.text();
+        // The body is consumed once; plain-text proxy errors remain readable.
       }
       throw new Error(message || `Request failed: ${response.status}`);
     }
@@ -115,6 +119,7 @@ export async function fetchJson<T>(
   } catch (error) {
     if (requestController.signal.aborted) {
       if (timedOut) {
+        reportClientError("api_timeout");
         throw new Error(
           `The CivicScope API did not respond within ${Math.max(1, Math.ceil(effectiveTimeoutMs / 1000))} seconds. Try again.`
         );
@@ -122,6 +127,7 @@ export async function fetchJson<T>(
       throw error;
     }
     if (!response) {
+      reportClientError("api_network");
       throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
     }
     throw error;

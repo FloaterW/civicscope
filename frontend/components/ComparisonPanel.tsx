@@ -1,6 +1,6 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { Download, Link as LinkIcon, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import {
   Bar,
@@ -15,9 +15,9 @@ import {
 
 import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
 import { COMPARISON_BAR_COLOR } from "@/lib/colors";
-import { rowsToCsv } from "@/lib/csv-export";
+import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
 import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
-import type { CompareResponse, GeographyLevel, MetricKey, TransitSnapshot } from "@/types";
+import type { CompareResponse, Geography, GeographyLevel, MetricKey, TransitSnapshot } from "@/types";
 
 type Props = {
   comparison: CompareResponse | null;
@@ -27,6 +27,10 @@ type Props = {
   displayYear?: number;
   isUserSelection?: boolean;
   transitSnapshot?: TransitSnapshot;
+  hasInspectedSelection?: boolean;
+  selectedGeography?: Geography | null;
+  pinnedIds?: string[];
+  onPinnedIdsChange?: (ids: string[]) => void;
 };
 
 const defaultComparisonNouns: Record<GeographyLevel, string> = {
@@ -34,8 +38,9 @@ const defaultComparisonNouns: Record<GeographyLevel, string> = {
   census_tract: "the most populous census tracts"
 };
 
-export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot }: Props) {
+export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot, hasInspectedSelection = false, selectedGeography, pinnedIds = [], onPinnedIdsChange }: Props) {
   const [chartTooltipActive, setChartTooltipActive] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
   const isCmhc = isCmhcMetric(metric);
   const isTransit = isTransitMetric(metric);
   const showsRentRatio = !isCmhc && !isTransit;
@@ -71,7 +76,9 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   const lowConfidenceCount = comparisonRows.filter((item) => item.lowConfidence).length;
   const cohortDescription = isUserSelection
     ? `selected ${geographyLevel === "municipality" ? "municipalities" : "census tracts"}`
-    : defaultComparisonNouns[geographyLevel];
+    : hasInspectedSelection
+      ? geographyLevel === "municipality" ? "the inspected municipality and default GTA peers" : "the inspected census tract"
+      : defaultComparisonNouns[geographyLevel];
   const comparisonYear = displayYear ?? comparison?.year ?? 2021;
 
   const handleExportCsv = useCallback(() => {
@@ -85,6 +92,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
       "Geoid",
       metricLabel,
       "Status",
+      "Period", "Source", "Method",
       ...transitHeaders,
       ...(showsRentRatio ? ["Rent-to-income ratio"] : [])
     ]];
@@ -94,11 +102,15 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
       const lowConfidence =
         metric === "population_growth_pct" &&
         item.metrics.data_quality?.population_growth_pct === "low_confidence";
+      const exportLabel = metric === "median_income" ? "Median household income" : metric === "average_rent_total" ? "Average rent" : metric === "housing_starts_total" ? "Housing starts" : metric === "housing_completions" ? "Housing completions" : metricLabel;
+      const provenance = buildGeographyExportRows(geographyLevel, item.metrics, item.cmhc_metrics, comparison.cmhc_year, transitSnapshot)
+        .find((row) => row[0] === exportLabel);
       const row = [
         item.name,
         item.geoid,
         val != null ? String(val) : "",
-        val == null ? "unavailable" : lowConfidence ? "low_confidence" : "available",
+        val == null ? "unavailable" : lowConfidence ? "low_confidence" : provenance?.[5] ?? "available",
+        provenance?.[2] ?? String(comparisonYear), provenance?.[3] ?? "", provenance?.[4] ?? "",
         ...(isTransit
           ? [
               transitSnapshot?.coverage_status ?? "unknown",
@@ -116,12 +128,12 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `civicscope-${metric}-${geographyLevel}.csv`;
+    a.download = `civicscope-${metric}-${geographyLevel}-${isTransit ? "snapshot" : comparisonYear}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [comparison, metric, geographyLevel, isTransit, showsRentRatio, transitSnapshot]);
+  }, [comparison, metric, geographyLevel, isTransit, showsRentRatio, transitSnapshot, comparisonYear]);
 
   return (
     <div data-testid="comparison-panel" className="p-4">
@@ -142,7 +154,11 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="inline-flex items-center gap-1 rounded-md border border-civic-line px-2.5 py-1.5 text-xs text-civic-ink" onClick={async () => {
+            try { await navigator.clipboard.writeText(window.location.href); setShareMessage("View link copied."); }
+            catch { setShareMessage("Copy the address from your browser to share this view."); }
+          }}><LinkIcon className="h-3.5 w-3.5" aria-hidden="true" />Copy view link</button>
           {hasRows && (
             <button
               type="button"
@@ -159,6 +175,25 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
           </span>
         </div>
       </div>
+
+      {onPinnedIdsChange && <div className="mb-4 space-y-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" disabled={!selectedGeography || pinnedIds.length >= 6 || pinnedIds.includes(selectedGeography.geoid)}
+            className="inline-flex items-center gap-1 rounded-md border border-civic-line px-2.5 py-1.5 text-civic-ink disabled:opacity-50"
+            onClick={() => selectedGeography && onPinnedIdsChange([...pinnedIds, selectedGeography.geoid])}>
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />Add selected area to comparison
+          </button>
+          <span className="text-civic-muted">Select an area on the map or in search, then add it. Up to 6 areas.</span>
+          {pinnedIds.length > 0 && <button type="button" className="underline text-civic-teal" onClick={() => onPinnedIdsChange([])}>Reset comparison</button>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {pinnedIds.map((id) => {
+            const name = comparison?.items.find((item) => item.geoid === id)?.name ?? id;
+            return <button key={id} type="button" className="inline-flex items-center gap-1 rounded-md border border-civic-line bg-civic-subtle px-2 py-1 text-civic-ink" aria-label={`Remove ${name} from comparison`} onClick={() => onPinnedIdsChange(pinnedIds.filter((value) => value !== id))}>{name}<X className="h-3 w-3" aria-hidden="true" /></button>;
+          })}
+        </div>
+      </div>}
+      <p role="status" className="text-xs text-civic-muted">{shareMessage}</p>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div

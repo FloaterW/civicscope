@@ -1,16 +1,34 @@
-name: Keep Backend Alive
+name: Production health checks
 
-permissions: {}
+permissions:
+  contents: read
+  issues: write
 
 on:
   schedule:
-    # Ping every 14 minutes to prevent Render free-tier spin-down
+    # Best effort only: scheduled jobs may be delayed; free hosting still sleeps.
     - cron: "*/14 * * * *"
   workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
-      - name: Ping backend health endpoint
-        run: curl --fail-with-body --show-error --silent --retry 3 --retry-delay 10 --retry-all-errors https://civicscope.onrender.com/health
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Check frontend, database, API data and coverage
+        id: monitor
+        run: python scripts/monitor.py
+      - name: Open or resolve one incident issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_RESULT: ${{ steps.monitor.outcome }}
+        run: python scripts/workflow_alert.py --title 'Production monitoring incident' --result "$CHECK_RESULT"

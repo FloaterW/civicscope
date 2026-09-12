@@ -728,7 +728,7 @@ export function CivicMap({
                 {transitLoadState.status === "loaded" && (
                   <button
                     type="button"
-                    className="min-h-8 rounded px-2 py-1 text-[11px] text-civic-muted hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                    className="min-h-8 rounded px-2 py-1 text-[11px] text-civic-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
                     onClick={() => {
                       const allOn = allTransitFiltersEnabled(transitFilters);
                       setTransitFilters({

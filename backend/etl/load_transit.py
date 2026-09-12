@@ -366,6 +366,7 @@ def main() -> None:
     parser.add_argument("--db-url", default=None, help="Database URL (default: from env/settings)")
     parser.add_argument("--output", type=Path, help="CSV output path (default: packaged transit_scores.csv)")
     parser.add_argument("--manifest-output", type=Path, help="Manifest output path")
+    parser.add_argument("--routes-output", type=Path, help="Also regenerate route shapes from these exact feeds.")
     parser.add_argument(
         "--allow-partial",
         action="store_true",
@@ -442,8 +443,7 @@ def main() -> None:
     print("\n3. Computing transit scores via PostGIS spatial join...")
     scores = compute_scores_postgis(merged, db_url)
     if not scores:
-        print("  No scores computed (PostGIS spatial join returned empty)")
-        return
+        raise ValueError("No scores computed; transit refresh cannot succeed without tract coverage")
 
     values = [s[0] for s in scores.values()]
     print(f"  Scored {len(scores)} tracts")
@@ -458,6 +458,13 @@ def main() -> None:
             else output_path.with_suffix(".manifest.json")
         )
         write_manifest(manifest_path, agencies_with_data, output_path, len(scores))
+        if args.routes_output:
+            from etl.transit_routes import write_routes
+            feature_count = write_routes(agencies_with_data, args.routes_output)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["artifacts"][args.routes_output.name] = {"sha256": _sha256(args.routes_output), "feature_count": feature_count}
+            manifest["notes"].append("Overlay shows the most frequently scheduled shape per route; scores use all stop-route relationships from the same feeds.")
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote transit provenance manifest to {manifest_path}")
     else:
         print("\n4. Updating metrics table...")

@@ -12,6 +12,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import logging
+import json
+from time import perf_counter
 
 from app.api.routes import router as api_router
 from app.core.config import settings, validate_environment
@@ -75,7 +77,16 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
 
     @app.middleware("http")
     async def security_and_cache_headers(request: Request, call_next):
-        response: Response = await call_next(request)
+        started = perf_counter()
+        try:
+            response: Response = await call_next(request)
+        except Exception:
+            logger.error(json.dumps({"event": "api_error", "method": request.method, "route": getattr(request.scope.get("route"), "path", "unmatched"), "duration_ms": round((perf_counter() - started) * 1000)}))
+            raise
+        elapsed = round((perf_counter() - started) * 1000)
+        response.headers["Server-Timing"] = f"app;dur={elapsed}"
+        if response.status_code >= 500 or elapsed >= 2000:
+            logger.warning(json.dumps({"event": "api_response", "status": response.status_code, "route": getattr(request.scope.get("route"), "path", "unmatched"), "duration_ms": elapsed}))
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("X-Frame-Options", "DENY")

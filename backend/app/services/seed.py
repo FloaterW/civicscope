@@ -36,34 +36,32 @@ def _demo_seed_content_changed(db: Session, seed: dict[str, Any]) -> bool:
 
     Guards against the stale-volume bug where an old Docker volume keeps
     superseded (e.g. estimated) tract metrics even though the packaged seed has
-    been updated to official values.  We compare verbatim official fields
-    (income, rent, population) for a deterministic spread of geographies; rent
-    burden is intentionally excluded because it has a serialization-time
-    estimate fallback.
+    been updated to official values. All published census fields are compared;
+    suppressed rent burden remains null, with estimation only at serialization.
     """
-    geographies = seed["geographies"]
-    if not geographies:
-        return False
-    step = max(1, len(geographies) // 40)
-    # First few rows plus an even spread across the file, de-duplicated so a
-    # geography is never checked twice (index 0 appears in both slices).
-    sample = list({id(g): g for g in geographies[:5] + geographies[::step]}.values())
-    compared_fields = ("median_income", "median_rent", "population", "previous_population")
-    for item in sample:
-        metrics = item.get("metrics")
-        if not metrics:
-            continue
-        seed_metric = metrics[0]
-        db_row = (
-            db.query(Metric)
-            .filter(Metric.geoid == item["geoid"], Metric.year == seed_metric["year"])
-            .first()
-        )
-        if db_row is None:
-            return True
-        for field in compared_fields:
-            if _value_differs(seed_metric.get(field), getattr(db_row, field, None)):
+    # Compare all published fields in one query. Sampling misses corrections to
+    # rent burden, dwelling types, tenure, or less frequently selected areas.
+    rows = {(row.geoid, row.year): row for row in db.query(Metric).all()}
+    compared_fields = (
+        "median_income", "median_rent", "population", "previous_population",
+        "renter_households", "rent_burden_pct", "dwellings_total",
+        "dwellings_single_detached", "dwellings_semi_detached", "dwellings_row_house",
+        "dwellings_apt_duplex", "dwellings_apt_low_rise", "dwellings_apt_high_rise",
+        "owner_households",
+    )
+    for item in seed["geographies"]:
+        for seed_metric in item.get("metrics", []):
+            db_row = rows.get((item["geoid"], seed_metric["year"]))
+            if db_row is None:
                 return True
+            for field in compared_fields:
+                expected = seed_metric.get(field)
+                actual = getattr(db_row, field, None)
+                if expected is None or actual is None:
+                    if expected != actual:
+                        return True
+                elif abs(float(expected) - float(actual)) > 1e-6:
+                    return True
     return False
 
 

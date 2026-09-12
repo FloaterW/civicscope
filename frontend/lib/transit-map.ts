@@ -6,6 +6,7 @@ export type TransitFilters = {
   go_transit: boolean;
   miway: boolean;
   durham_rt: boolean;
+  brampton: boolean;
 };
 
 export const TRANSIT_LAYERS = [
@@ -13,7 +14,8 @@ export const TRANSIT_LAYERS = [
   { key: "ttc_other" as const, label: "TTC Bus / Streetcar", color: "#888888" },
   { key: "go_transit" as const, label: "GO Transit", color: "#5C8A4D" },
   { key: "miway" as const, label: "MiWay", color: "#8C7356" },
-  { key: "durham_rt" as const, label: "Durham RT", color: "#7A6B8C" }
+  { key: "durham_rt" as const, label: "Durham RT", color: "#7A6B8C" },
+  { key: "brampton" as const, label: "Brampton Transit", color: "#A36343" }
 ] as const;
 
 const TRANSIT_CATEGORIES = new Set(TRANSIT_LAYERS.map((layer) => layer.key));
@@ -88,7 +90,8 @@ export const TRANSIT_FILTERS_OFF: TransitFilters = {
   ttc_other: false,
   go_transit: false,
   miway: false,
-  durham_rt: false
+  durham_rt: false,
+  brampton: false
 };
 
 export const TRANSIT_FILTERS_ON: TransitFilters = {
@@ -96,7 +99,8 @@ export const TRANSIT_FILTERS_ON: TransitFilters = {
   ttc_other: true,
   go_transit: true,
   miway: true,
-  durham_rt: true
+  durham_rt: true,
+  brampton: true
 };
 
 export function anyTransitFilterEnabled(filters: TransitFilters): boolean {

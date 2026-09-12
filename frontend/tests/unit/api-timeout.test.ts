@@ -23,6 +23,11 @@ function pendingFetch() {
 
 
 describe("fetchJson request deadlines", () => {
+  it.each([['Service temporarily unavailable', 'Service temporarily unavailable'], ['{"detail":"Invalid year"}', 'Invalid year'], ['', 'Request failed: 503']])("preserves error response %s", async (body, message) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 503 })));
+    await expect(fetchJson("/failed")).rejects.toThrow(message);
+  });
+
   it("falls back to a safe deadline for invalid configuration", () => {
     expect(normalizeApiTimeout(Number.NaN)).toBe(60_000);
     expect(normalizeApiTimeout(0)).toBe(60_000);

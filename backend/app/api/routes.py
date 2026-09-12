@@ -40,6 +40,12 @@ from app.services.transit_provenance import (
 
 router = APIRouter(prefix="/api", tags=["civic data"])
 
+
+@router.get("/data-status")
+def data_status(db: Session = Depends(get_db)):
+    from app.services.data_status import build_data_status
+    return JSONResponse(build_data_status(db), headers={"Cache-Control": "no-store"})
+
 DEFAULT_GEOGRAPHY_TYPE = "municipality"
 SUPPORTED_GEOGRAPHY_TYPES = {"municipality", "census_tract"}
 
@@ -84,11 +90,11 @@ def _load_tract_zone_crosswalk() -> dict[str, str]:
     return result
 
 
-def _load_zone_rms() -> dict[str, dict[str, float | None]]:
+def _load_zone_rms() -> dict[tuple[str, int], dict[str, float | None]]:
     path = _DATA_DIR / "cmhc_zone_rms.csv"
     if not path.exists():
         return {}
-    result: dict[str, dict[str, float | None]] = {}
+    result: dict[tuple[str, int], dict[str, float | None]] = {}
     with open(path, newline="") as f:
         for row in csv.DictReader(f):
             def _float(s: str) -> float | None:
@@ -96,7 +102,7 @@ def _load_zone_rms() -> dict[str, dict[str, float | None]]:
                     return float(s) if s else None
                 except ValueError:
                     return None
-            result[row["zone_name"]] = {
+            result[(row["zone_name"], int(row["year"]))] = {
                 "vacancy_rate": _float(row["vacancy_rate"]),
                 "average_rent_total": _float(row["average_rent_total"]),
                 "rental_universe": _float(row["rental_universe"]),
@@ -105,7 +111,7 @@ def _load_zone_rms() -> dict[str, dict[str, float | None]]:
 
 
 TRACT_ZONE_CROSSWALK: dict[str, str] = _load_tract_zone_crosswalk()
-ZONE_RMS: dict[str, dict[str, float | None]] = _load_zone_rms()
+ZONE_RMS: dict[tuple[str, int], dict[str, float | None]] = _load_zone_rms()
 
 
 def load_real_tract_cmhc(db: Session, year: int) -> dict[str, CmhcTractMetric]:
@@ -278,7 +284,7 @@ def serialize_cmhc_metric(
         "housing_completions", _alloc("housing_completions", cmhc.housing_completions)
     )
 
-    zone_data = ZONE_RMS.get(zone_name) if zone_name else None
+    zone_data = ZONE_RMS.get((zone_name, cmhc.year)) if zone_name else None
     vacancy = zone_data["vacancy_rate"] if zone_data and zone_data["vacancy_rate"] is not None else cmhc.vacancy_rate
     avg_rent = zone_data["average_rent_total"] if zone_data and zone_data["average_rent_total"] is not None else cmhc.average_rent_total
     shared_municipal_zone = CMHC_RMS_SHARED_ZONES.get(cmhc.geoid)
@@ -700,7 +706,7 @@ def get_map_data(
             values = []
             for geography, _ in records:
                 zone = TRACT_ZONE_CROSSWALK.get(geography.geoid)
-                zd = ZONE_RMS.get(zone) if zone else None
+                zd = ZONE_RMS.get((zone, cmhc_year)) if zone else None
                 if zd and zd.get(metric_key) is not None:
                     values.append(zd[metric_key])
                 elif geography.county:
@@ -745,7 +751,7 @@ def get_map_data(
         "cmhc_year": cmhc_year,
         "domain": domain,
         "geography_type": normalized_type,
-        "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key),
+        "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key, year=cmhc_year),
         "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "available_years": available_cmhc_years(db),
         # All non-CMHC metrics share one client-side map payload. Keep the small
@@ -758,6 +764,7 @@ def get_map_data(
                     normalized_type,
                     cmhc=is_cmhc_metric(candidate),
                     metric_key=candidate,
+                    year=cmhc_year,
                 ),
                 "source": map_data_source(
                     normalized_type,
@@ -800,7 +807,7 @@ def get_map_data(
                     allocated_counts.get(metric_key) if allocated_counts is not None else None
                 )
             elif is_tract_inherited and metric_key in CMHC_ZONE_RATE_METRICS:
-                zd = ZONE_RMS.get(zone) if zone else None
+                zd = ZONE_RMS.get((zone, cmhc_year)) if zone else None
                 if zd and zd.get(metric_key) is not None:
                     props["value"] = zd[metric_key]
                 else:
@@ -871,6 +878,7 @@ def data_quality(
     geography_type: str | None,
     cmhc: bool = False,
     metric_key: str | None = None,
+    year: int | None = None,
 ) -> dict[str, str]:
     if cmhc and geography_type == "census_tract":
         if metric_key is not None and metric_key in CMHC_REAL_TRACT_METRICS:
@@ -893,7 +901,7 @@ def data_quality(
                     "renter households, so values vary per tract."
                 ),
             }
-        if metric_key is not None and metric_key in CMHC_ZONE_RATE_METRICS and TRACT_ZONE_CROSSWALK:
+        if metric_key is not None and metric_key in CMHC_ZONE_RATE_METRICS and TRACT_ZONE_CROSSWALK and any(zone_year == year for _, zone_year in ZONE_RMS):
             return {
                 "metric_status": "mixed",
                 "label": "CMHC survey-zone values + municipal fallback",
