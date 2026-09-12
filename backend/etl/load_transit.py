@@ -214,7 +214,10 @@ def compute_scores_postgis(
                 batch,
             )
 
-        db.execute(text("CREATE INDEX ON _gtfs_stops USING GIST (geom)"))
+        # Match the geography cast used by the metre-based distance query.
+        # A geometry index cannot accelerate this geography expression.
+        db.execute(text("CREATE INDEX ON _gtfs_stops USING GIST ((geom::geography))"))
+        db.execute(text("ANALYZE _gtfs_stops"))
 
         result = db.execute(text("""
             SELECT g.geoid, COUNT(DISTINCT s.route_id) as route_count
