@@ -14,7 +14,9 @@ def gh(*args):
 def alert(title, failed):
     repo = os.environ["GITHUB_REPOSITORY"]
     issues = json.loads(gh("issue", "list", "--repo", repo, "--state", "open", "--search", f'"{title}" in:title', "--json", "number,title,author", "--limit", "100"))
-    existing = next((issue for issue in issues if issue["title"] == title and issue["author"]["login"] == "github-actions[bot]"), None)
+    # gh's GraphQL output may represent a Bot as app/github-actions, while
+    # REST output uses github-actions[bot]. Neither is a human account name.
+    existing = next((issue for issue in issues if issue["title"] == title and issue["author"]["login"] in {"github-actions[bot]", "app/github-actions"}), None)
     if failed and not existing:
         url = f"https://github.com/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
         with tempfile.TemporaryDirectory() as directory:
