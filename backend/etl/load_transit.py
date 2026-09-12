@@ -39,7 +39,8 @@ GTFS_FEEDS: dict[str, str] = {
     "ttc": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/7795b45e-e65a-4465-81fc-c36b9dfff169/resource/cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/TTC%20Routes%20and%20Schedules%20Data.zip",
     "miway": "https://www.miapp.ca/GTFS/google_transit.zip",
     "go_transit": "https://assets.metrolinx.com/raw/upload/Documents/Metrolinx/Open%20Data/GO-GTFS.zip",
-    "brampton": "https://www.brampton.ca/EN/City-Hall/OpenGov/Open-Data-Catalogue/Documents/Google_Transit.zip",
+    # City of Brampton Open Data item; the former brampton.ca ZIP URL is retired.
+    "brampton": "https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data",
     "durham": "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip",
 }
 
