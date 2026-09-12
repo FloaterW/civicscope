@@ -382,6 +382,12 @@ export function CivicMap({
         return;
       }
 
+      // v6.4 can emit its GPU error during construction, before listeners can
+      // attach. Detect unsupported devices first so the fallback is reliable.
+      const probe = document.createElement("canvas").getContext("webgl2");
+      if (!probe) throw new Error("WebGL2 unavailable");
+      probe.getExtension("WEBGL_lose_context")?.loseContext();
+
       const theme = currentTheme();
       themeRef.current = theme;
       const map = new maplibregl.Map({

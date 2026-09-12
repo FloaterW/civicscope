@@ -57,7 +57,7 @@ test.describe("launch comparison journeys", () => {
       });
     });
     await page.goto("/");
-    await expect(page.getByRole("alert")).toContainText("WebGL2");
+    await expect(page.getByTestId("civic-map").getByRole("alert")).toContainText("WebGL2");
     await selectArea(page, "Oakville");
     const panel = page.getByTestId("comparison-panel");
     await panel.getByRole("button", { name: "Add selected area to comparison" }).click();
