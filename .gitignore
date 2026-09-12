@@ -11,6 +11,7 @@ __pycache__/
 *.log
 *.tsbuildinfo
 node_modules/
+frontend/public/maplibre/
 .next/
 playwright-report/
 test-results/

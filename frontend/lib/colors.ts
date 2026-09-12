@@ -1,4 +1,5 @@
 import type { MapData } from "@/types";
+import type { ExpressionSpecification } from "maplibre-gl";
 
 // Civic map color ramps. Comparison bars deliberately use one neutral teal so
 // a small comparison cohort cannot be mistaken for the map's full-data scale.
@@ -185,7 +186,7 @@ export function buildChoroplethScale(data: MapData): ChoroplethScale {
 }
 
 /** MapLibre expression that exactly matches buildChoroplethScale's classes. */
-export function choroplethColorExpression(data: MapData): unknown[] {
+export function choroplethColorExpression(data: MapData): ExpressionSpecification {
   const scale = buildChoroplethScale(data);
 
   if (scale.classes.length === 0) {

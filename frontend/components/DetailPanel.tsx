@@ -307,7 +307,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
         period={cmhcYear ? `Oct ${cmhcYear} RMS` : undefined}
         note={
           geographyLevel === "census_tract"
-            ? cmhcMetrics.survey_zone
+            ? cmhcMetrics.vacancy_rate_source === "survey_zone" || cmhcMetrics.average_rent_total_source === "survey_zone"
               ? "survey-zone vacancy and average rent; other fields use parent municipality"
               : "parent-municipality values"
             : cmhcMetrics.survey_zone
@@ -318,7 +318,8 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       {marketFields.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 text-sm">
           {marketFields.map((m) => (
-            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} metricKey={m.metricKey} />
+            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} metricKey={m.metricKey}
+              sourceLabel={geographyLevel === "census_tract" ? ((m.key === "vacancy_rate" ? cmhcMetrics.vacancy_rate_source : m.key === "average_rent_total" ? cmhcMetrics.average_rent_total_source : cmhcMetrics.other_rms_source) === "survey_zone" ? "Survey zone" : "Parent municipality") : undefined} />
           ))}
           {hasUniverse && (
             <MetricLine
@@ -333,7 +334,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       {unitFields.length > 0 && (
         <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
           {unitFields.map((m) => (
-            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} />
+            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} sourceLabel={geographyLevel === "census_tract" ? "Parent municipality" : undefined} />
           ))}
         </div>
       )}
@@ -347,8 +348,8 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
       {geographyLevel === "census_tract" && cmhcMetrics.survey_zone && marketFields.length > 0 && (
         <p data-testid="survey-zone-note" className="mt-2 text-xs leading-5 text-civic-muted">
           CMHC survey zone: <strong>{cmhcMetrics.survey_zone}</strong>.
-          Vacancy rate and average rent reflect this zone&apos;s surveyed values; bedroom rents,
-          availability, turnover, and counts use the labeled parent-municipality fallback.
+          Zone values are used only when published for the selected year. Other rental
+          values use the labeled parent-municipality fallback; counts may be allocated estimates.
         </p>
       )}
     </div>
@@ -406,12 +407,14 @@ function MetricLine({
   value,
   status,
   cmhcSource,
+  sourceLabel,
   metricKey
 }: {
   label: string;
   value: string;
   status?: MetricFieldStatus;
   cmhcSource?: CmhcCountSource;
+  sourceLabel?: string;
   metricKey?: string;
 }) {
   return (
@@ -477,6 +480,7 @@ function MetricLine({
           </span>
         )}
       </span>
+      {sourceLabel && <span className="block text-[11px] text-civic-muted">{sourceLabel}</span>}
     </div>
   );
 }

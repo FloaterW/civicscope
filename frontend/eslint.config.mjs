@@ -8,6 +8,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     ".next/**",
     "node_modules/**",
+    "public/maplibre/**", // Generated, version-matched third-party worker assets.
     "out/**",
     "build/**",
     "next-env.d.ts",

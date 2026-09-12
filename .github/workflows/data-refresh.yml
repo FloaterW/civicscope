@@ -1,0 +1,70 @@
+name: Validate data refresh
+
+on:
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Source to refresh
+        type: choice
+        default: all
+        options: [all, census, cmhc, transit]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: data-refresh-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [census, cmhc, transit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: refresh
+          POSTGRES_USER: refresh
+          POSTGRES_PASSWORD: local-refresh-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U refresh -d refresh'
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies
+        if: github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source
+        run: python -m pip install --require-hashes -r backend/requirements.lock
+      - name: Fetch and validate isolated candidate
+        id: refresh
+        if: github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source
+        env:
+          REFRESH_SOURCE: ${{ matrix.source }}
+          REFRESH_POSTGIS_URL: postgresql+psycopg://refresh:local-refresh-only@127.0.0.1:5432/refresh
+        run: python backend/etl/refresh_candidate.py --source "$REFRESH_SOURCE" --output "out/candidate-$REFRESH_SOURCE"
+      - name: Save validated candidate for review
+        if: success() && (github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source)
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-${{ matrix.source }}
+          path: out/candidate-${{ matrix.source }}
+          if-no-files-found: error
+          retention-days: 30
+      - name: Open or resolve a source refresh incident
+        if: always() && (github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REFRESH_SOURCE: ${{ matrix.source }}
+          CHECK_RESULT: ${{ job.status }}
+        run: python scripts/workflow_alert.py --title "Data refresh incident - $REFRESH_SOURCE" --result "$CHECK_RESULT"

@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
+import { reportClientError } from "@/lib/error-reporting";
 
 type Props = { children: ReactNode; fallback?: ReactNode };
 type State = { error: Error | null };
@@ -10,6 +11,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error) {
     return { error };
+  }
+
+  componentDidCatch() {
+    reportClientError("render");
   }
 
   render() {

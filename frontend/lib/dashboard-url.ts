@@ -10,6 +10,7 @@ export type DashboardUrlState = {
   metric: MetricKey;
   year?: number;
   geoid?: string;
+  compareIds?: string[];
   adjustedForTransit: boolean;
 };
 
@@ -36,6 +37,10 @@ function isGeoidForLevel(value: string, level: GeographyLevel): boolean {
   return level === "municipality" ? /^\d{7}$/.test(value) : /^\d{7}\.\d{2}$/.test(value);
 }
 
+export function normalizeCompareIds(ids: string[], level: GeographyLevel): string[] {
+  return [...new Set(ids.map((id) => id.trim()).filter((id) => isGeoidForLevel(id, level)))].slice(0, 6);
+}
+
 /** Parse and validate CivicScope-owned query parameters. */
 export function parseDashboardUrl(search: string): DashboardUrlState {
   const params = new URLSearchParams(search);
@@ -48,6 +53,7 @@ export function parseDashboardUrl(search: string): DashboardUrlState {
   const adjustedForTransit = isTransitMetric(metric) && requestedLevel !== "census_tract";
   const level: GeographyLevel = adjustedForTransit ? "census_tract" : requestedLevel;
   const requestedGeoid = params.get("geoid")?.trim();
+  const compareIds = normalizeCompareIds((params.get("compare") ?? "").split(","), level);
 
   return {
     level,
@@ -55,7 +61,8 @@ export function parseDashboardUrl(search: string): DashboardUrlState {
     year: isCmhcMetric(metric) ? parseYear(params.get("year")) : undefined,
     geoid:
       requestedGeoid && isGeoidForLevel(requestedGeoid, level) ? requestedGeoid : undefined,
-    adjustedForTransit
+    adjustedForTransit,
+    ...(compareIds.length ? { compareIds } : {})
   };
 }
 
@@ -67,6 +74,9 @@ export function buildDashboardUrl(
   const url = new URL(currentHref);
   url.searchParams.set("level", state.level);
   url.searchParams.set("metric", state.metric);
+  const compareIds = normalizeCompareIds(state.compareIds ?? (url.searchParams.get("compare") ?? "").split(","), state.level);
+  if (compareIds.length) url.searchParams.set("compare", compareIds.join(","));
+  else url.searchParams.delete("compare");
 
   if (isCmhcMetric(state.metric) && state.year !== undefined) {
     url.searchParams.set("year", String(state.year));

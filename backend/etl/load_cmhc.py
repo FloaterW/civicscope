@@ -1027,8 +1027,7 @@ def update_seed(
         all_metrics.append(row)
 
     if not all_metrics:
-        print("No data fetched. Seed file not updated.")
-        return 0
+        raise ValueError("No CMHC data fetched; seed file not updated")
 
     coverage = validate_seed_coverage(
         all_metrics, known_geoids, years, allow_partial=allow_partial

@@ -44,6 +44,7 @@ const DetailPanel = dynamic(
 );
 
 import { DataQualityBadge } from "./DataQualityBadge";
+import { DataStatus } from "./DataStatus";
 import { GeographyLevelSelector } from "./GeographyLevelSelector";
 import { MetricSelector } from "./MetricSelector";
 import { CivicMap } from "./CivicMap";
@@ -98,6 +99,7 @@ function commitDashboardUrl(
     metric: MetricKey;
     year?: number;
     geoid?: string;
+    compareIds?: string[];
   },
   mode: UrlHistoryMode
 ) {
@@ -128,6 +130,7 @@ export function CivicDashboard() {
   const [summaryState, setSummaryState] = useState<RequestState<Summary> | null>(null);
   const [comparisonState, setComparisonState] = useState<RequestState<CompareResponse> | null>(null);
   const [selected, setSelected] = useState<Geography | null>(null);
+  const [pinnedCompareIds, setPinnedCompareIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Geography[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -166,6 +169,7 @@ export function CivicDashboard() {
       : availableYears;
 
   const comparisonIds = useMemo(() => {
+    if (pinnedCompareIds.length) return pinnedCompareIds;
     if (geographyLevel === "census_tract") {
       return selectedGeoid ? [selectedGeoid] : [];
     }
@@ -173,7 +177,7 @@ export function CivicDashboard() {
       return defaultCompareIds;
     }
     return [selectedGeoid, ...defaultCompareIds.filter((geoid) => geoid !== selectedGeoid)];
-  }, [geographyLevel, selectedGeoid]);
+  }, [geographyLevel, selectedGeoid, pinnedCompareIds]);
 
   const mapRequestKey = `${activeMapKey}:${retryKey}`;
   const summaryRequestKey = `${geographyLevel}:${selectedGeoid ?? "all"}:${isCmhc ? selectedYear ?? "latest" : "census"}:${retryKey}`;
@@ -211,6 +215,7 @@ export function CivicDashboard() {
       : parsed.year;
 
     setMetric(parsed.metric);
+    setPinnedCompareIds(parsed.compareIds ?? []);
     setGeographyLevel(parsed.level);
     setSelectedYear(yearIsAvailable ? parsed.year : undefined);
     setPendingUrlYear(hasResolvedCmhcYears ? null : (parsed.year ?? null));
@@ -266,6 +271,7 @@ export function CivicDashboard() {
       metric: MetricKey;
       year: number | undefined;
       geoid: string | undefined;
+      compareIds: string[];
     }>,
     mode: UrlHistoryMode = "push"
   ) {
@@ -274,7 +280,8 @@ export function CivicDashboard() {
         level: overrides.level ?? geographyLevel,
         metric: overrides.metric ?? metric,
         year: "year" in overrides ? overrides.year : currentShareableYear(),
-        geoid: "geoid" in overrides ? overrides.geoid : selectedGeoid
+        geoid: "geoid" in overrides ? overrides.geoid : selectedGeoid,
+        compareIds: overrides.compareIds ?? pinnedCompareIds
       },
       mode
     );
@@ -297,6 +304,8 @@ export function CivicDashboard() {
       return;
     }
     setGeographyLevel(level);
+    setPinnedCompareIds([]);
+    setContextAnnouncement(`Showing ${geographyLabels[level].plural}. Selection and custom comparison cleared.`);
     setSelected(null);
     setPendingUrlGeoid(null);
     setSearch("");
@@ -305,7 +314,7 @@ export function CivicDashboard() {
     setSearchError(null);
     setSearchExpanded(false);
     setDetailsPanelOpen(false);
-    updateDashboardUrl({ level, geoid: undefined });
+    updateDashboardUrl({ level, geoid: undefined, compareIds: [] });
   }
 
   function handleMetricChange(nextMetric: MetricKey) {
@@ -314,8 +323,10 @@ export function CivicDashboard() {
     const changesGeography = nextLevel !== geographyLevel;
 
     setMetric(nextMetric);
+    setContextAnnouncement("");
     if (changesGeography) {
       setGeographyLevel(nextLevel);
+      setPinnedCompareIds([]);
       setSelected(null);
       setPendingUrlGeoid(null);
       setSearch("");
@@ -330,7 +341,7 @@ export function CivicDashboard() {
           : "Transit data is available by census tract, so the view changed to census tracts."
       );
     }
-    updateDashboardUrl({ metric: nextMetric, level: nextLevel, geoid: changesGeography ? undefined : selectedGeoid });
+    updateDashboardUrl({ metric: nextMetric, level: nextLevel, geoid: changesGeography ? undefined : selectedGeoid, compareIds: changesGeography ? [] : pinnedCompareIds });
   }
 
   function retryRequests() {
@@ -602,6 +613,7 @@ export function CivicDashboard() {
   }, []);
 
   function handleFeatureSelect(feature: MapFeature["properties"]) {
+    setContextAnnouncement(`Selected ${feature.name}.`);
     setSelected(geographyFromFeature(feature));
     setPendingUrlGeoid(null);
     setSearch(feature.name);
@@ -612,6 +624,7 @@ export function CivicDashboard() {
   }
 
   function selectSearchResult(geography: Geography) {
+    setContextAnnouncement(`Selected ${geography.name}.`);
     setSelected(geography);
     setPendingUrlGeoid(null);
     setSearch(geography.name);
@@ -911,8 +924,8 @@ export function CivicDashboard() {
               {geographyLevel === "census_tract" &&
                 visibleMapData?.metadata.data_quality?.label?.includes("inherited") && (
                   <p className="mt-1 max-w-prose text-xs leading-5 text-amber-700 dark:text-amber-400">
-                    Showing each tract&apos;s municipal average. CMHC does not publish this
-                    metric at the survey-zone level.
+                    Showing each tract&apos;s municipal average. A matching survey-zone value
+                    is not available in this dataset for the selected metric and year.
                   </p>
                 )}
             </div>
@@ -978,6 +991,7 @@ export function CivicDashboard() {
             transitSnapshot={visibleMapData?.metadata.transit_snapshot}
             onClear={() => {
               setSelected(null);
+              setContextAnnouncement("Selection cleared. Showing the regional overview.");
               setPendingUrlGeoid(null);
               setSearch("");
               setSearchResults([]);
@@ -995,7 +1009,15 @@ export function CivicDashboard() {
             geographyLevel={geographyLevel}
             loading={comparisonLoading && !comparison}
             displayYear={isCmhc ? displayYear : undefined}
-            isUserSelection={Boolean(selectedGeoid)}
+            isUserSelection={pinnedCompareIds.length > 0}
+            hasInspectedSelection={Boolean(selectedGeoid)}
+            selectedGeography={selected}
+            pinnedIds={pinnedCompareIds}
+            onPinnedIdsChange={(ids) => {
+              setPinnedCompareIds(ids);
+              updateDashboardUrl({ compareIds: ids });
+              setContextAnnouncement(ids.length ? `${ids.length} areas in your comparison.` : "Default comparison restored.");
+            }}
             transitSnapshot={visibleMapData?.metadata.transit_snapshot}
           />
         </section>
@@ -1018,6 +1040,7 @@ export function CivicDashboard() {
             Tract CMHC values use survey zones and published tract construction counts where
             available; inherited or allocated fallbacks are labeled per value.
           </p>
+          <DataStatus />
           <nav aria-label="Project documentation" className="flex flex-wrap gap-x-4 gap-y-1">
             <ExternalFooterLink href="https://github.com/FloaterW/civicscope/blob/main/docs/etl.md">
               Data methodology

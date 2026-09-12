@@ -418,7 +418,7 @@ def test_standalone_municipality_has_no_survey_zone(client):
 
 def test_tract_rms_values_expose_per_field_granularity(client):
     payload = client.get(
-        "/api/map-data?metric=average_rent_total&type=census_tract&detail=display"
+        "/api/map-data?metric=average_rent_total&type=census_tract&detail=display&year=2024"
     ).json()
     cmhc_rows = [
         feature["properties"].get("cmhc_metrics")

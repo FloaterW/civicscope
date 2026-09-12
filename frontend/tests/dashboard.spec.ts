@@ -999,7 +999,7 @@ test.describe("CivicScope dashboard regressions", () => {
 
   test("census tract CMHC rent varies by survey zone, not flat per city", async ({ request }) => {
     const response = await request.get(
-      `${API_BASE}/api/map-data?metric=average_rent_total&type=census_tract&detail=display`
+      `${API_BASE}/api/map-data?metric=average_rent_total&type=census_tract&detail=display&year=2024`
     );
     expect(response.ok()).toBeTruthy();
     const payload = (await response.json()) as MapPayload;
@@ -1060,7 +1060,7 @@ test.describe("CivicScope dashboard regressions", () => {
 
   test("CMHC rate metric in tract mode shows survey-zone badge", async ({ page }) => {
     await blockExternalMapAssets(page);
-    await page.goto("/");
+    await page.goto("/?year=2024&metric=average_rent_total&level=census_tract");
     await page.getByRole("button", { name: "Census tracts" }).click();
     const map = page.getByTestId("civic-map");
     await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
