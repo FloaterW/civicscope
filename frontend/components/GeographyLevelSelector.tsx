@@ -25,11 +25,11 @@ export function GeographyLevelSelector({
   return (
     <div className="flex flex-col gap-1">
       <div
-        className="flex min-h-11 items-center gap-1 rounded-md border border-civic-line bg-civic-panel p-1 shadow-panel"
+        className="flex h-11 items-center gap-1 rounded-md border border-civic-line bg-civic-panel p-1 shadow-panel"
         role="group"
         aria-label="Geography level"
       >
-        <Layers className="ml-2 h-4 w-4 text-civic-muted" aria-hidden="true" />
+        <Layers className="ml-1 h-4 w-4 shrink-0 text-civic-muted" aria-hidden="true" />
         {options.map((option) => {
           const isActive = option.value === value;
           const isTransitDisabled = option.value === "municipality" && municipalityDisabled;
@@ -42,7 +42,7 @@ export function GeographyLevelSelector({
               disabled={isDisabled}
               aria-describedby={isTransitDisabled ? "transit-geography-note" : undefined}
               title={isTransitDisabled ? "Transit metrics are available by census tract" : undefined}
-              className={`h-9 rounded px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`h-full min-w-0 flex-1 whitespace-nowrap rounded px-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-not-allowed disabled:opacity-50 ${
                 isActive
                   ? "bg-civic-teal text-white dark:text-slate-900"
                   : "text-civic-muted hover:bg-civic-subtle hover:text-civic-ink disabled:hover:bg-transparent disabled:hover:text-civic-muted"
@@ -55,7 +55,7 @@ export function GeographyLevelSelector({
         })}
       </div>
       {municipalityDisabled && (
-        <span id="transit-geography-note" className="px-1 text-[11px] text-civic-muted">
+        <span id="transit-geography-note" className="sr-only">
           Transit metrics use census tracts.
         </span>
       )}

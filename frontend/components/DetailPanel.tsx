@@ -1,9 +1,9 @@
 "use client";
 
 import { Download, MapPin, MousePointerClick, X } from "lucide-react";
-import { useCallback } from "react";
+import { Children, createContext, isValidElement, useCallback, useContext, type ReactNode } from "react";
 
-import { formatMetric, isCmhcMetric } from "@/lib/api";
+import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
 import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
 import {
   transitAgencyNames,
@@ -43,14 +43,14 @@ const emptyCopy: Record<GeographyLevel, string> = {
 
 const censusCopy: Record<GeographyLevel, string> = {
   municipality:
-    "The map shows GTA municipalities with 2021 Census Profile affordability metrics when loaded. Select a geography to inspect local values.",
+    "Explore household income, rent and affordability from the 2021 Census Profile.",
   census_tract:
-    "The map shows GTA census tracts with official 2021 Census Profile affordability metrics. Select a tract to inspect local values."
+    "Explore 2021 Census Profile metrics. Estimated and unavailable tract values are labeled."
 };
 
 const cmhcCopy: Record<GeographyLevel, string> = {
   municipality:
-    "The map shows GTA municipalities with CMHC Rental Market Survey data. Select a geography to inspect local values.",
+    "Explore CMHC rental-market and construction data. Each topic shows its own reference period.",
   census_tract:
     "The map shows CMHC survey-zone values, published tract construction counts, and clearly labeled fallbacks. Select a tract to inspect the source of each value."
 };
@@ -63,11 +63,38 @@ const transitCopy: Record<GeographyLevel, string> = {
 };
 
 const TRANSIT_METRIC_KEYS = new Set(["transit_score", "transit_route_count"]);
+const SelectedMetric = createContext<MetricKey>("rent_burden_pct");
+
+function metricTopic(metric: MetricKey): string {
+  if (metric === "population" || metric === "population_growth_pct") return "population";
+  if (TRANSIT_METRIC_KEYS.has(metric)) return "transit";
+  if (metric.startsWith("housing_") || metric === "units_under_construction" || metric === "unabsorbed_units") return "construction";
+  return isCmhcMetric(metric) ? "rental" : "census";
+}
+
+// Sort the actual DOM, not just the visual order, so keyboard navigation follows the page.
+function TopicSections({ children }: { children: ReactNode }) {
+  const activeTopic = metricTopic(useContext(SelectedMetric));
+  const priority = (child: ReactNode) => isValidElement<{ topic: string }>(child) && child.props.topic === activeTopic ? 0 : 1;
+  return <div className="mt-4 space-y-3">{Children.toArray(children).sort((a, b) => priority(a) - priority(b))}</div>;
+}
+
+function TopicSection({ topic, title, period, children }: { topic: string; title: string; period?: string; children: ReactNode }) {
+  const active = metricTopic(useContext(SelectedMetric)) === topic;
+  return (
+    <details open={active} data-topic={topic} data-active-topic={active || undefined} className="group border-t border-civic-line pt-3">
+      <summary className="cursor-pointer rounded-sm text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+        {title}
+        {period && <span className="ml-2 text-xs font-normal text-civic-muted"> {period}</span>}
+      </summary>
+      <div className="mt-3">{children}</div>
+    </details>
+  );
+}
 
 export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
-  const hasAnyRentalData = cmhcMetrics ? rentalMarketMetrics.some((m) => cmhcMetrics[m.key] != null) : false;
 
   const handleExportCsv = useCallback(() => {
     if (!geography || !metrics) return;
@@ -84,41 +111,34 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
   }, [geography, geographyLevel, metrics, cmhcMetrics, cmhcYear, transitSnapshot]);
-  const hasAnySupplyData =
-    cmhcMetrics?.housing_starts_total != null ||
-    cmhcMetrics?.housing_completions != null ||
-    cmhcMetrics?.units_under_construction != null ||
-    cmhcMetrics?.unabsorbed_units != null;
-
   return (
+    <SelectedMetric.Provider value={metric}>
     <section
       data-testid="detail-panel"
-      className="rounded-lg border border-civic-line bg-civic-panel p-4 shadow-panel"
+      className={`rounded-lg border border-civic-line bg-civic-panel p-4 shadow-panel ${geography ? "xl:flex xl:h-full xl:min-h-0 xl:flex-col xl:overflow-hidden" : ""}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div data-testid="detail-panel-header" className="flex shrink-0 items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
             <MapPin className="h-4 w-4" aria-hidden="true" />
-            Selected Geography
+            {geography ? "Selected Geography" : "Explore the map"}
           </div>
           <h2 className="mt-1 text-lg font-semibold text-civic-ink">
             {geography?.name ?? "GTA overview"}
           </h2>
-          <p className="text-xs text-civic-muted">
-            {geography
-              ? `${geography.type === "census_tract" ? "Census tract" : "Municipality"} - ${geography.geoid}`
-              : emptyCopy[geographyLevel]}
-          </p>
-          <div className="mt-2">
+          {geography && <p className="text-xs text-civic-muted">
+            {`${geography.type === "census_tract" ? "Census tract" : "Municipality"} - ${geography.geoid}`}
+          </p>}
+          {geography && <div className="mt-2">
             <DataQualityBadge geographyLevel={geographyLevel} dataQualityLabel={dataQualityLabel} metricStatus={metricStatus} />
-          </div>
+          </div>}
         </div>
         {geography && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-civic-line px-2.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
               aria-label="Export geography data as CSV"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -127,7 +147,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
             <button
               type="button"
               onClick={onClear}
-              className="rounded-md border border-civic-line p-2 text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              className="grid h-9 w-9 place-items-center rounded-md border border-civic-line text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
               aria-label="Clear selected geography"
             >
               <X className="h-4 w-4" aria-hidden="true" />
@@ -137,16 +157,21 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
       </div>
 
       {geography ? (
-        <div className="animate-fade-in">
+        <div
+          key={`${geography.geoid}:${metric}`}
+          data-testid="detail-panel-scroll"
+          role="region"
+          aria-label="Selected geography statistics"
+          tabIndex={0}
+          className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-gutter:stable]"
+        >
+        <TopicSections key={`${geography.geoid}:${metric}`}>
           {/* Census Profile */}
-          <div className="mt-4" data-section="census">
-            <SectionHeader title="Household & Housing Profile" period="2021 Census" />
-            <div className="grid grid-cols-3 gap-2 text-sm">
+          <TopicSection topic="census" title="Household & housing profile" period="2021 Census">
+            <div data-section="census" className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
               <MetricLine label="Median household income" value={formatMetric("median_income", metrics?.median_income)} status={quality?.median_income} metricKey="median_income" />
               <MetricLine label="Median rent" value={formatMetric("median_rent", metrics?.median_rent)} status={quality?.median_rent} metricKey="median_rent" />
               <MetricLine label="Rent burden" value={formatMetric("rent_burden_pct", metrics?.rent_burden_pct)} status={quality?.rent_burden_pct} metricKey="rent_burden_pct" />
-              <MetricLine label="Pop. growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} status={quality?.population_growth_pct} metricKey="population_growth_pct" />
-              <MetricLine label="Population" value={formatMetric("population", metrics?.population)} status={quality?.population} metricKey="population" />
               <MetricLine label="Affordability index" value={formatMetric("affordability_index", metrics?.affordability_index)} status={quality?.affordability_index} metricKey="affordability_index" />
             </div>
             {quality?.rent_burden_pct === "estimated" && (
@@ -154,38 +179,41 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                 Rent burden estimated from median rent and income (Statistics Canada value suppressed for this tract).
               </p>
             )}
+          </TopicSection>
+          <TopicSection topic="population" title="Population & growth" period="2021 Census">
+            <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
+              <MetricLine label="Population" value={formatMetric("population", metrics?.population)} status={quality?.population} metricKey="population" />
+              <MetricLine label="Population growth" value={formatMetric("population_growth_pct", metrics?.population_growth_pct)} status={quality?.population_growth_pct} metricKey="population_growth_pct" />
+            </div>
+            <p className="mt-2 text-xs leading-5 text-civic-muted">Growth compares the 2016 and 2021 Census populations; it is not an annual growth rate.</p>
             {quality?.population_growth_pct === "low_confidence" && (
               <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-400">
                 Population growth computed off a very small 2016 base; treat the percentage with caution.
               </p>
             )}
-          </div>
+          </TopicSection>
 
           {/* Dwelling Type & Tenure */}
           {metrics?.dwellings_total != null && (
-            <HousingStockSection metrics={metrics} />
+            <TopicSection topic="stock" title="Dwelling types & tenure" period="2021 Census"><HousingStockSection metrics={metrics} /></TopicSection>
           )}
 
           {/* CMHC Rental Market */}
-          {cmhcMetrics && (hasAnyRentalData || hasAnySupplyData) ? (
-            <>
-              {hasAnyRentalData ? (
+          <TopicSection topic="rental" title="Rental market" period={cmhcYear ? `Oct ${cmhcYear} · CMHC` : "CMHC"}>
+              {cmhcMetrics ? (
                 <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
+              ) : metricTopic(metric) === "rental" ? (
+                <MetricLine label={getMetricLabel(metric)} value="Not available" metricKey={metric} sourceLabel="No rental value for this area/year" />
               ) : (
                 <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
-                  {cmhcMetrics.rms_surveyed
-                    ? "Rental market data suppressed for confidentiality in this survey zone."
-                    : "Not covered by the CMHC Rental Market Survey."}
+                  No CMHC rental value is available for this area and year.
                 </div>
               )}
-
-              {hasAnySupplyData && (
-                <div className="mt-4">
-                  <SectionHeader
-                    title="Housing Construction"
-                    period={cmhcYear ? `Calendar year ${cmhcYear}` : undefined}
-                  />
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+          </TopicSection>
+          <TopicSection topic="construction" title="Housing construction" period={cmhcYear ? `Calendar year ${cmhcYear}` : "CMHC"}>
+              {cmhcMetrics ? (
+                <div>
+                  <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
                     <MetricLine
                       label="Starts"
                       value={formatMetric("housing_starts_total", cmhcMetrics.housing_starts_total)}
@@ -198,8 +226,8 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                       cmhcSource={cmhcSourceFor(cmhcMetrics.completions_source, geographyLevel)}
                       metricKey="housing_completions"
                     />
-                    <MetricLine label="Under const." value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
-                    <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} status={geographyLevel === "census_tract" ? "estimated" : undefined} />
+                    <MetricLine label="Under construction" value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} cmhcSource={geographyLevel === "census_tract" && cmhcMetrics.units_under_construction != null ? "estimated" : undefined} metricKey="units_under_construction" />
+                    <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} cmhcSource={geographyLevel === "census_tract" && cmhcMetrics.unabsorbed_units != null ? "estimated" : undefined} metricKey="unabsorbed_units" />
                   </div>
                   {geographyLevel === "census_tract" && (
                     <p className="mt-2 text-xs leading-5 text-civic-muted">
@@ -210,21 +238,21 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                     </p>
                   )}
                 </div>
-              )}
-            </>
-          ) : (
+              ) : metricTopic(metric) === "construction" ? (
+                <MetricLine label={getMetricLabel(metric)} value="Not available" metricKey={metric} sourceLabel="No construction value for this area/year" />
+              ) : (
             <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
               {geographyLevel === "census_tract"
                 ? "No CMHC value is available for this tract and year."
                 : "No CMHC survey coverage for this municipality."}
             </div>
-          )}
+              )}
+          </TopicSection>
 
           {/* Transit Accessibility */}
           {geographyLevel === "census_tract" && metrics && (
-            <div className="mt-4">
-              <SectionHeader title="Transit Accessibility" note="GTFS" />
-              <div className="grid grid-cols-2 gap-2 text-sm">
+            <TopicSection topic="transit" title="Transit accessibility" period="GTFS snapshot">
+              <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
                 <MetricLine
                   label="Access score"
                   value={formatMetric("transit_score", metrics.transit_score)}
@@ -247,12 +275,14 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                   ? ` Not included: ${transitAgencyNames(transitSnapshot.missing_agencies)}.`
                   : ""} Snapshot date: {transitSnapshotDate(transitSnapshot)}.
               </p>
-            </div>
+            </TopicSection>
           )}
 
-          <div className="mt-4 rounded-md border border-dashed border-civic-line bg-civic-subtle p-3 text-xs leading-5 text-civic-muted">
-            {geography.geometry_source}
-          </div>
+          <TopicSection topic="sources" title="Boundary & source details">
+            <p className="text-xs leading-5 text-civic-muted">{geography.geometry_source}</p>
+            <p className="mt-2 text-xs leading-5 text-civic-muted">Census and CMHC measure different periods and housing samples. Expand a topic to see its own reference period. CSV exports include the full profile, including collapsed topics.</p>
+          </TopicSection>
+        </TopicSections>
         </div>
       ) : (
         <div className="mt-6 flex flex-col items-center gap-3 py-4 text-center">
@@ -268,16 +298,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
         </div>
       )}
     </section>
-  );
-}
-
-function SectionHeader({ title, period, note }: { title: string; period?: string; note?: string }) {
-  return (
-    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-civic-teal">
-      {title}
-      {period && <span className="ml-1 font-normal normal-case text-civic-muted">- {period}</span>}
-      {note && <span className="ml-1 font-normal normal-case text-civic-muted">- {note}</span>}
-    </h3>
+    </SelectedMetric.Provider>
   );
 }
 
@@ -296,16 +317,16 @@ const rentByUnitMetrics: Array<{ key: keyof CmhcMetricValues; metricKey: MetricK
 ];
 
 function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetrics: CmhcMetricValues; cmhcYear?: number; geographyLevel: GeographyLevel }) {
-  const marketFields = rentalMarketMetrics.filter((m) => cmhcMetrics[m.key] != null);
+  const selectedMetric = useContext(SelectedMetric);
+  const marketFields = rentalMarketMetrics.filter((m) => cmhcMetrics[m.key] != null || m.metricKey === selectedMetric);
   const unitFields = rentByUnitMetrics.filter((m) => cmhcMetrics[m.key] != null);
   const hasUniverse = cmhcMetrics.rental_universe != null;
 
   return (
     <div className="mt-4">
-      <SectionHeader
-        title="Rental Market"
-        period={cmhcYear ? `Oct ${cmhcYear} RMS` : undefined}
-        note={
+      <p className="mb-2 text-xs leading-5 text-civic-muted">
+        {cmhcYear ? `October ${cmhcYear} Rental Market Survey. ` : "Rental Market Survey. "}
+        {
           geographyLevel === "census_tract"
             ? cmhcMetrics.vacancy_rate_source === "survey_zone" || cmhcMetrics.average_rent_total_source === "survey_zone"
               ? "survey-zone vacancy and average rent; other fields use parent municipality"
@@ -314,25 +335,26 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
               ? "shared survey-zone values"
               : undefined
         }
-      />
-      {marketFields.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 text-sm">
+      </p>
+      {marketFields.length > 0 || hasUniverse ? (
+        <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
           {marketFields.map((m) => (
-            <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} metricKey={m.metricKey}
-              sourceLabel={geographyLevel === "census_tract" ? ((m.key === "vacancy_rate" ? cmhcMetrics.vacancy_rate_source : m.key === "average_rent_total" ? cmhcMetrics.average_rent_total_source : cmhcMetrics.other_rms_source) === "survey_zone" ? "Survey zone" : "Parent municipality") : undefined} />
+            <MetricLine key={m.key} label={m.label} value={cmhcMetrics[m.key] == null ? "Not published" : formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} metricKey={m.metricKey}
+              sourceLabel={cmhcMetrics[m.key] == null ? "Unavailable for this area/year" : geographyLevel === "census_tract" ? ((m.key === "vacancy_rate" ? cmhcMetrics.vacancy_rate_source : m.key === "average_rent_total" ? cmhcMetrics.average_rent_total_source : cmhcMetrics.other_rms_source) === "survey_zone" ? "Survey zone" : "Parent municipality") : undefined} />
           ))}
           {hasUniverse && (
             <MetricLine
               label={cmhcMetrics.allocated ? "Rental universe (est.)" : "Rental universe"}
               value={formatMetric("rental_universe", cmhcMetrics.rental_universe)}
+              metricKey="rental_universe"
             />
           )}
         </div>
       ) : (
-        <p className="text-xs text-civic-muted">Not surveyed by CMHC Rental Market Survey.</p>
+        <p className="text-xs text-civic-muted">{cmhcMetrics.rms_surveyed ? "Rental figures are suppressed or not published for this area and year." : "Not surveyed by CMHC Rental Market Survey."}</p>
       )}
       {unitFields.length > 0 && (
-        <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+        <div className="mt-2 grid auto-rows-fr grid-cols-2 gap-2 text-sm">
           {unitFields.map((m) => (
             <MetricLine key={m.key} label={m.label} value={formatMetric(m.metricKey, cmhcMetrics[m.key] as number)} sourceLabel={geographyLevel === "census_tract" ? "Parent municipality" : undefined} />
           ))}
@@ -361,32 +383,30 @@ function pct(part: number | null | undefined, total: number | null | undefined):
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
+function completeTotal(...values: Array<number | null | undefined>): number | null {
+  // A suppressed component is unknown, not zero; do not manufacture a percentage.
+  return values.some((value) => value == null) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+}
+
 function HousingStockSection({ metrics }: { metrics: MetricValues }) {
   const total = metrics.dwellings_total;
   if (total == null) return null;
 
-  const groundOriented =
-    (metrics.dwellings_single_detached ?? 0) +
-    (metrics.dwellings_semi_detached ?? 0) +
-    (metrics.dwellings_row_house ?? 0);
-  const apartment =
-    (metrics.dwellings_apt_high_rise ?? 0) +
-    (metrics.dwellings_apt_low_rise ?? 0) +
-    (metrics.dwellings_apt_duplex ?? 0);
+  const groundOriented = completeTotal(metrics.dwellings_single_detached, metrics.dwellings_semi_detached, metrics.dwellings_row_house);
+  const apartment = completeTotal(metrics.dwellings_apt_high_rise, metrics.dwellings_apt_low_rise, metrics.dwellings_apt_duplex);
 
-  const occupied = (metrics.owner_households ?? 0) + (metrics.renter_households ?? 0);
+  const occupied = completeTotal(metrics.owner_households, metrics.renter_households);
   const ownerPct = pct(metrics.owner_households, occupied || null);
   const renterPct = pct(metrics.renter_households, occupied || null);
 
   return (
     <div className="mt-4">
-      <SectionHeader title="Housing Stock" period="2021 Census" />
-      <div className="grid grid-cols-3 gap-2 text-sm">
+      <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
         <MetricLine label="Total dwellings" value={total.toLocaleString("en-CA")} />
         <MetricLine label="Owner" value={ownerPct} />
         <MetricLine label="Renter" value={renterPct} />
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+      <div className="mt-2 grid auto-rows-fr grid-cols-2 gap-2 text-sm">
         <MetricLine label="Single-detached" value={pct(metrics.dwellings_single_detached, total)} />
         <MetricLine label="Semi-detached" value={pct(metrics.dwellings_semi_detached, total)} />
         <MetricLine label="Row house" value={pct(metrics.dwellings_row_house, total)} />
@@ -395,8 +415,8 @@ function HousingStockSection({ metrics }: { metrics: MetricValues }) {
         <MetricLine label="Apt. in duplex" value={pct(metrics.dwellings_apt_duplex, total)} />
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-        <MetricLine label="Ground-oriented" value={`${pct(groundOriented, total)} (${groundOriented.toLocaleString("en-CA")})`} />
-        <MetricLine label="Apartment" value={`${pct(apartment, total)} (${apartment.toLocaleString("en-CA")})`} />
+        <MetricLine label="Ground-oriented" value={groundOriented == null ? "Not available" : `${pct(groundOriented, total)} (${groundOriented.toLocaleString("en-CA")})`} />
+        <MetricLine label="Apartment" value={apartment == null ? "Not available" : `${pct(apartment, total)} (${apartment.toLocaleString("en-CA")})`} />
       </div>
     </div>
   );
@@ -417,13 +437,15 @@ function MetricLine({
   sourceLabel?: string;
   metricKey?: string;
 }) {
+  const selected = useContext(SelectedMetric) === metricKey;
   return (
-    <div className="rounded-md border border-civic-line bg-civic-panel px-3 py-2">
+    <div data-metric={metricKey} data-selected-metric={selected || undefined} className={`flex min-h-24 min-w-0 flex-col rounded-md border px-3 py-3 ${selected ? "border-civic-teal bg-[var(--civic-accent-subtle)]" : "border-civic-line bg-civic-panel"}`}>
       <span className="flex items-center gap-1 text-xs text-civic-muted">
         {label}
         {metricKey && <MetricTooltip metricKey={metricKey} />}
       </span>
-      <span className="mt-1 block text-base font-semibold text-civic-ink">
+      {selected && <span className="sr-only">Selected map metric</span>}
+      <span className="mt-auto block pt-2 text-lg font-semibold tabular-nums text-civic-ink">
         {value}
         {status === "estimated" && (
           <span
@@ -437,7 +459,7 @@ function MetricLine({
         {status === "derived" && (
           <span
             data-testid="derived-flag"
-            className="ml-1 align-middle text-xs font-medium text-indigo-600 dark:text-indigo-400"
+            className="ml-1 align-middle text-xs font-medium text-indigo-600 dark:text-indigo-300"
             title="Calculated from published source values; not separately published by the source agency."
           >
             derived
@@ -480,7 +502,7 @@ function MetricLine({
           </span>
         )}
       </span>
-      {sourceLabel && <span className="block text-[11px] text-civic-muted">{sourceLabel}</span>}
+      <span aria-hidden={sourceLabel ? undefined : true} className="block min-h-4 text-[11px] text-civic-muted">{sourceLabel}</span>
     </div>
   );
 }

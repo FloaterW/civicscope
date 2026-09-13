@@ -78,10 +78,10 @@ test.describe("CivicScope dashboard regressions", () => {
     // badge must disclose that — not claim every value is official.
     await expect(
       page.getByTestId("data-quality-badge").filter({ hasText: "Official + estimated tract metrics" })
-    ).toHaveCount(2);
+    ).toHaveCount(1);
     await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
     await expect(map).toHaveAttribute("data-feature-count", "1334", { timeout: 30000 });
-    await expect(page.getByTestId("detail-panel")).toContainText("official 2021 Census Profile");
+    await expect(page.getByTestId("detail-panel")).toContainText("Estimated and unavailable tract values are labeled");
 
     await page.getByTestId("geography-search").fill("5350001.00");
     const tractResult = page.getByRole("option").filter({ hasText: "5350001.00" });
@@ -221,7 +221,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(torontoResult).toHaveCount(1);
     await torontoResult.click();
 
-    await expect(page.getByTestId("summary-panel")).toContainText("Toronto");
+    await expect(page.getByTestId("summary-panel")).toHaveCount(0);
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
     await expect(page.getByTestId("detail-panel")).not.toContainText("No data");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
@@ -235,7 +235,9 @@ test.describe("CivicScope dashboard regressions", () => {
 
     await search.fill("Toronto");
     await expect(page.getByRole("option").filter({ hasText: "3520005" })).toBeVisible();
-    await page.getByRole("heading", { name: "GTA housing data map" }).click();
+    // The full-width toolbar's dropdown legitimately overlays the map heading.
+    // Exercise an actual outside click, not a click through the open dropdown.
+    await page.getByRole("heading", { level: 1 }).click();
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expect(search).toHaveValue("Toronto");
 
@@ -402,10 +404,11 @@ test.describe("CivicScope dashboard regressions", () => {
 
     const select = page.getByLabel("Map metric");
     const optgroups = select.locator("optgroup");
-    await expect(optgroups).toHaveCount(3);
+    await expect(optgroups).toHaveCount(4);
     await expect(optgroups.nth(0)).toHaveAttribute("label", "Census Profile");
     await expect(optgroups.nth(1)).toHaveAttribute("label", "CMHC Rental Market");
-    await expect(optgroups.nth(2)).toHaveAttribute("label", "Transit Access");
+    await expect(optgroups.nth(2)).toHaveAttribute("label", "CMHC Construction");
+    await expect(optgroups.nth(3)).toHaveAttribute("label", "Transit Access");
 
     await select.selectOption("vacancy_rate");
     await expect(page.getByText("Vacancy rate by municipality")).toBeVisible();
@@ -416,7 +419,9 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "transit_score");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-geography-type", "census_tract");
     await expect(page.getByRole("button", { name: "Municipalities" })).toBeDisabled();
-    await expect(page.getByText("Transit metrics use census tracts.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Municipalities" })).toHaveAttribute("aria-describedby", "transit-geography-note");
+    await expect(page.getByLabel("Census data year", { exact: true })).toHaveCount(0);
+    await expect(page.getByTestId("dashboard-toolbar")).toContainText("GTFS snapshot");
     const coverage = page.getByTestId("transit-coverage-notice");
     await expect(coverage).toContainText("Partial transit snapshot");
     await expect(coverage).toContainText("TTC");
@@ -876,6 +881,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await result.click();
 
     const panel = page.getByTestId("detail-panel");
+    await page.getByLabel("Map metric").selectOption("population_growth_pct");
     await expect(panel.getByTestId("low-confidence-flag").first()).toBeVisible();
     await expect(panel).toContainText("very small 2016 base");
 

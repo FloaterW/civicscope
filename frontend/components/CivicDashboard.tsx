@@ -691,7 +691,7 @@ export function CivicDashboard() {
       className="min-h-screen bg-civic-surface"
     >
       <header className="border-b border-civic-line bg-civic-panel">
-        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:px-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <BrandMark className="h-7 w-7 shrink-0" />
@@ -707,10 +707,12 @@ export function CivicDashboard() {
               1,334 census tracts.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <div data-testid="dashboard-toolbar" className="grid grid-cols-[minmax(0,1fr)_44px] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] xl:grid-cols-[minmax(180px,1fr)_280px_minmax(220px,1fr)_120px_44px]">
+            <div className="col-span-2 min-w-0 sm:col-span-1">
+              <label htmlFor="geography-search" className="mb-1 block text-xs font-medium text-civic-muted">Find an area</label>
             <div
               ref={searchContainerRef}
-              className="relative w-full sm:w-80"
+              className="relative w-full"
               onBlurCapture={() => {
                 // Safari can report a null relatedTarget while focus is moving
                 // from the input to a result button. Defer the containment
@@ -729,6 +731,7 @@ export function CivicDashboard() {
                 aria-hidden="true"
               />
               <input
+                id="geography-search"
                 ref={searchInputRef}
                 value={search}
                 onChange={(event) => {
@@ -765,7 +768,7 @@ export function CivicDashboard() {
                     ? `search-option-${visibleResults[searchHighlight]?.geoid}`
                     : undefined
                 }
-                className="h-10 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2 disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
+                className="h-11 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2 disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
               />
               {searchOpen && (
                 <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-civic-panel shadow-panel">
@@ -820,21 +823,31 @@ export function CivicDashboard() {
                   : ""}
               </div>
             </div>
+            </div>
+            <div className="col-span-2 min-w-0 sm:col-span-1">
+              <span className="mb-1 block text-xs font-medium text-civic-muted">Geography level</span>
             <GeographyLevelSelector
               value={geographyLevel}
               onChange={handleGeographyLevelChange}
               disabled={!urlStateReady}
               municipalityDisabled={isTransit}
             />
+            </div>
+            <div className="col-span-2 min-w-0 sm:col-span-1 sm:row-start-2 xl:row-start-auto">
+              <span className="mb-1 block text-xs font-medium text-civic-muted">Map metric</span>
             <MetricSelector
               value={metric}
               onChange={handleMetricChange}
               disabled={!urlStateReady}
             />
-            <div className="flex flex-col gap-1">
-              <span className="px-1 text-[11px] font-semibold uppercase tracking-wide text-civic-muted">
-                {isCmhc ? "CMHC year" : "Census year"}
+            </div>
+            <div className="flex min-w-0 flex-col gap-1 sm:col-start-2 sm:row-start-2 xl:col-start-auto xl:row-start-auto">
+              <span className="text-xs font-medium text-civic-muted">
+                {isTransit ? "Transit period" : isCmhc ? "CMHC year" : "Census year"}
               </span>
+              {isTransit ? (
+                <div className="flex h-11 items-center rounded-md border border-civic-line bg-civic-subtle px-3 text-sm text-civic-muted">GTFS snapshot</div>
+              ) : (
               <YearSelector
                 value={displayYear}
                 availableYears={isCmhc ? displayedYearOptions : [2021]}
@@ -846,8 +859,9 @@ export function CivicDashboard() {
                   updateDashboardUrl({ year });
                 }}
               />
+              )}
             </div>
-            <ThemeToggle />
+            <div className="sm:col-start-3 sm:row-start-2 xl:col-start-auto xl:row-start-auto"><ThemeToggle /></div>
           </div>
         </div>
       </header>
@@ -892,18 +906,18 @@ export function CivicDashboard() {
         </div>
       )}
 
-      <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.45fr)_430px] lg:px-6">
-        <div className="order-1 xl:col-start-2 xl:row-start-1">
+      <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 [--workspace-panel-height:clamp(560px,72dvh,760px)] xl:grid-cols-[minmax(0,1.45fr)_430px] lg:px-6">
+        {!selected && <div className="order-1 xl:col-start-2 xl:row-start-1">
           <SummaryCards
             summary={summary}
             geographyLevel={geographyLevel}
             loading={summaryLoading && !summary}
           />
-        </div>
+        </div>}
 
         <section
           data-testid="map-panel"
-          className="order-2 flex min-h-[400px] flex-col overflow-hidden rounded-lg border border-civic-line bg-civic-panel shadow-panel xl:col-start-1 xl:row-span-2 xl:row-start-1 xl:min-h-[560px]"
+          className="order-2 flex min-h-[400px] flex-col overflow-hidden rounded-lg border border-civic-line bg-civic-panel shadow-panel xl:col-start-1 xl:row-span-2 xl:row-start-1 xl:h-[var(--workspace-panel-height)] xl:self-start"
         >
           <div className="flex flex-col gap-2 border-b border-civic-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -944,7 +958,7 @@ export function CivicDashboard() {
               </div>
             </div>
           </div>
-          <div className="min-h-[360px] flex-1 xl:min-h-[520px]">
+          <div className="min-h-[360px] flex-1 xl:min-h-0">
             <CivicMap
               key={geographyLevel}
               data={visibleMapData}
@@ -978,14 +992,14 @@ export function CivicDashboard() {
         <aside
           id="selected-geography-details"
           aria-label={selected ? `Details for ${selected.name}` : "Map guidance"}
-          className={`${detailsPanelOpen ? "block" : "hidden xl:block"} order-3 xl:col-start-2 xl:row-start-2`}
+          className={`${detailsPanelOpen ? "block" : "hidden xl:block"} order-3 min-w-0 xl:col-start-2 ${selected ? "xl:row-span-2 xl:row-start-1 xl:h-[var(--workspace-panel-height)] xl:min-h-0" : "xl:row-start-2"}`}
         >
           <DetailPanel
             geography={selected}
             metric={metric}
             geographyLevel={geographyLevel}
             cmhcMetrics={selectedCmhcMetrics}
-            cmhcYear={selectedCmhcYear}
+            cmhcYear={selectedCmhcYear ?? (isCmhc ? displayYear : undefined)}
             dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
             metricStatus={visibleMapData?.metadata.data_quality?.metric_status}
             transitSnapshot={visibleMapData?.metadata.transit_snapshot}

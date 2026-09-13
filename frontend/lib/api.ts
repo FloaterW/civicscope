@@ -33,8 +33,8 @@ export const metricOptions: Array<{ key: MetricKey; label: string; shortLabel: s
   { key: "population_growth_pct", label: "Population growth", shortLabel: "Growth", group: "Census Profile" },
   { key: "vacancy_rate", label: "Vacancy rate", shortLabel: "Vacancy", group: "CMHC Rental Market" },
   { key: "average_rent_total", label: "Average rent (CMHC)", shortLabel: "CMHC Rent", group: "CMHC Rental Market" },
-  { key: "housing_starts_total", label: "Housing starts", shortLabel: "Starts", group: "CMHC Rental Market" },
-  { key: "housing_completions", label: "Completions", shortLabel: "Compl.", group: "CMHC Rental Market" },
+  { key: "housing_starts_total", label: "Housing starts", shortLabel: "Starts", group: "CMHC Construction" },
+  { key: "housing_completions", label: "Completions", shortLabel: "Compl.", group: "CMHC Construction" },
   { key: "transit_score", label: "Transit access score", shortLabel: "Transit", group: "Transit Access" },
   { key: "transit_route_count", label: "Transit routes nearby", shortLabel: "Routes", group: "Transit Access" },
 ];
