@@ -25,6 +25,7 @@
 - Frontend unit tests: 66 passed. Type check, lint and production build passed.
 - Browser regression: 79 Chromium + 3 Firefox + 3 WebKit passed with no retries on the full rerun.
 - First focused browser pass exposed an overly broad new tooltip test locator, corrected before the clean full rerun; no failing result hidden.
+- First release CI run (`34982250123`) completed with 84 browser tests passing immediately and one passing on retry. Merge was held. The unpublished-rental test began its 15-second assertion before the intercepted tract response completed; an injected 16-second response reproduced the same missing-element failure while the page correctly showed loading. The test now awaits the matching successful response before asserting the missing-value copy, includes a delayed-response case, and CI treats any flaky test as a failure. This establishes the test's timing weakness; the original CI failure had no uploaded trace because the old job was considered successful.
 - Local production build loaded the selected Toronto profile with no captured browser errors. New tests cover persistent tooltip visibility, pending CMHC state, mobile transit containment, retained search focus, error-copy sanitization, CSV negative decimals, archived responses and supported-period refresh protection.
 - Independent follow-up by the policy agent found no blocking issue in the refresh safety changes (static review).
 - React review checklist applied to the component fixes; no new dependencies or runtime upgrades.

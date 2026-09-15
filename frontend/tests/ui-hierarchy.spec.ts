@@ -164,23 +164,40 @@ test("selected profile is usable without overflow at phone, tablet and desktop s
   await expect(panel.locator('[data-active-topic]')).toHaveAttribute("data-topic", "construction");
 });
 
-test("unpublished selected rental value is explicit, not hidden or shown as zero", async ({ page }) => {
-  await page.route("**/api/map-data?**", async (route) => {
-    const response = await route.fetch();
-    const data = await response.json();
-    for (const feature of data.features) {
-      if (feature.properties.geoid === "5350403.16" && feature.properties.cmhc_metrics) {
-        feature.properties.cmhc_metrics.vacancy_rate = null;
+for (const responseDelay of [0, 16_000]) {
+  test(`unpublished selected rental value is explicit, not hidden or shown as zero (${responseDelay}ms response delay)`, async ({ page }) => {
+    if (responseDelay) test.setTimeout(75_000);
+    await page.route("**/api/map-data?**", async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      for (const feature of data.features) {
+        if (feature.properties.geoid === "5350403.16" && feature.properties.cmhc_metrics) {
+          feature.properties.cmhc_metrics.vacancy_rate = null;
+        }
       }
-    }
-    await route.fulfill({ response, json: data });
+      if (responseDelay) await new Promise((resolve) => setTimeout(resolve, responseDelay));
+      await route.fulfill({ response, json: data });
+    });
+    // Separate network readiness from the assertion about a published/missing value.
+    // This also lets a slow response exercise the loading state without consuming
+    // the entire 15-second UI assertion budget before data arrive.
+    const mapResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/map-data"
+        && url.searchParams.get("type") === "census_tract"
+        && url.searchParams.get("metric") === "vacancy_rate"
+        && url.searchParams.get("year") === "2023";
+    });
+    await page.goto("/?level=census_tract&metric=vacancy_rate&geoid=5350403.16&year=2023");
+    const response = await mapResponse;
+    expect(response.ok()).toBe(true);
+    await response.finished();
+    const selected = page.getByTestId("detail-panel").locator('[data-selected-metric]');
+    await expect(selected).toContainText("Not published");
+    await expect(selected).toContainText("Unavailable for this area/year");
+    await expect(selected).not.toContainText("0.0%");
   });
-  await page.goto("/?level=census_tract&metric=vacancy_rate&geoid=5350403.16&year=2023");
-  const selected = page.getByTestId("detail-panel").locator('[data-selected-metric]');
-  await expect(selected).toContainText("Not published");
-  await expect(selected).toContainText("Unavailable for this area/year");
-  await expect(selected).not.toContainText("0.0%");
-});
+}
 
 test("suppressed housing components do not produce fabricated totals or tenure shares", async ({ page }) => {
   await page.route("**/api/map-data?**", async (route) => {
