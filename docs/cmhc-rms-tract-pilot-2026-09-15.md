@@ -27,6 +27,8 @@ The source page identifies its breakdown field as historical census-tract geogra
 
 CMHC's public [historical census-tract layer](https://geospatial.cmhc-schl.gc.ca/server/rest/services/CMHC_APPS/HMIP_HISTORIC_CAWD/FeatureServer/0) describes annually accumulated boundaries. A read-only distinct-year query for metropolitan area 2270 returned historical years 2010–2016 and a null current-year field. That layer alone therefore does not verify the 2025 export's geometry. Do not assume its latest returned historical year is the export's vintage.
 
+A separate distinct-year query of the [current census-tract layer](https://geospatial.cmhc-schl.gc.ca/server/rest/services/CMHC_APPS/HMIP_CURRENT_CAWD/FeatureServer/0) returned `2026` for both year fields in all three pilot metropolitan areas. Those map-service year labels are not, by themselves, evidence that the 2025 export uses equivalent 2021 Census polygons. The current layer is another candidate verification source, not a completed crosswalk.
+
 Statistics Canada publishes [2021 tract boundaries](https://www150.statcan.gc.ca/n1/en/catalogue/92-168-X2021001) and [geographic correspondence products](https://www150.statcan.gc.ca/n1/en/catalogue/92-156-X). The next integration gate is to identify the export's actual geometry/year, compare it with CivicScope's 2021 geometry, and classify exact matches versus changed/split boundaries. A crosswalk can explain a split; distributing a parent's units across children remains an estimate, not a newly published official tract count.
 
 ## Safety and verification
