@@ -728,11 +728,11 @@ export function CivicMap({
         </div>
       )}
       {data && (
-        <div className="absolute bottom-9 right-3 z-10 flex flex-col items-end gap-1.5">
+        <div className="absolute bottom-9 right-3 top-3 z-10 flex flex-col items-end justify-end gap-1.5 pointer-events-none">
           {transitOpen && (
             <div
               id="transit-layer-panel"
-              className="min-w-56 rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+              className="pointer-events-auto min-h-0 min-w-56 max-w-[calc(100vw-3rem)] overflow-y-auto overscroll-contain rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
             >
               <div className="mb-2 flex items-center justify-between gap-4">
                 <span className="font-semibold text-civic-ink">Transit Lines</span>
@@ -848,7 +848,7 @@ export function CivicMap({
                 setRouteDetailsOpen(false);
               }
             }}
-            className={`flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel ${
+            className={`pointer-events-auto flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel ${
               transitOpen
                 ? "border-civic-teal bg-civic-teal text-white dark:text-slate-950"
                 : "border-civic-line bg-civic-panel text-civic-muted hover:text-civic-ink"

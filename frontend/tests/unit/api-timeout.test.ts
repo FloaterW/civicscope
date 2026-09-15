@@ -23,9 +23,17 @@ function pendingFetch() {
 
 
 describe("fetchJson request deadlines", () => {
-  it.each([['Service temporarily unavailable', 'Service temporarily unavailable'], ['{"detail":"Invalid year"}', 'Invalid year'], ['', 'Request failed: 503']])("preserves error response %s", async (body, message) => {
+  it.each([['Service temporarily unavailable', 'Service temporarily unavailable'], ['{"detail":"Invalid year"}', 'Invalid year'], ['', 'temporarily unavailable (503)']])("preserves error response %s", async (body, message) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 503 })));
     await expect(fetchJson("/failed")).rejects.toThrow(message);
+  });
+  it.each(['<html><body>Proxy failure</body></html>', 'x'.repeat(500)])("does not expose raw proxy errors", async (body) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 502 })));
+    await expect(fetchJson("/failed")).rejects.toThrow("temporarily unavailable (502)");
+  });
+  it("offers nontechnical recovery advice for network failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    await expect(fetchJson("/offline")).rejects.toThrow("Check your connection and try again");
   });
 
   it("falls back to a safe deadline for invalid configuration", () => {

@@ -18,6 +18,20 @@ import { COMPARISON_BAR_COLOR } from "@/lib/colors";
 import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
 import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
 import type { CompareResponse, Geography, GeographyLevel, MetricKey, TransitSnapshot } from "@/types";
+import { MetricTooltip } from "./MetricTooltip";
+
+function exportMetricLabel(metric: MetricKey): string {
+  return metric === "median_income" ? "Median household income" : metric === "average_rent_total" ? "Average rent" : metric === "housing_starts_total" ? "Housing starts" : metric === "housing_completions" ? "Housing completions" : getMetricLabel(metric);
+}
+
+function provenanceLabel(row?: string[]): string {
+  if (!row || row[5] === "unavailable") return "Unavailable";
+  if (row[5] === "estimated_parent") return "Estimated from parent tract";
+  if (row[5] === "estimated") return "Estimated";
+  if (row[4].includes("Inherited")) return "Parent municipality";
+  if (row[4].includes("survey-zone")) return "Survey-zone value";
+  return row[5].replaceAll("_", " ");
+}
 
 type Props = {
   comparison: CompareResponse | null;
@@ -58,6 +72,8 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
         const lowConfidence =
           metric === "population_growth_pct" &&
           item.metrics.data_quality?.population_growth_pct === "low_confidence";
+        const provenance = buildGeographyExportRows(geographyLevel, item.metrics, item.cmhc_metrics, comparison.cmhc_year, transitSnapshot)
+          .find((row) => row[0] === exportMetricLabel(metric));
         return {
           geoid: item.geoid,
           name: chartLabel(item.name, item.type, item.geoid),
@@ -65,6 +81,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
           value: lowConfidence ? null : rawValue,
           rawValue,
           lowConfidence,
+          provenance: provenanceLabel(provenance),
         };
       }) ?? [];
   const chartData = comparisonRows.filter(
@@ -102,7 +119,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
       const lowConfidence =
         metric === "population_growth_pct" &&
         item.metrics.data_quality?.population_growth_pct === "low_confidence";
-      const exportLabel = metric === "median_income" ? "Median household income" : metric === "average_rent_total" ? "Average rent" : metric === "housing_starts_total" ? "Housing starts" : metric === "housing_completions" ? "Housing completions" : metricLabel;
+      const exportLabel = exportMetricLabel(metric);
       const provenance = buildGeographyExportRows(geographyLevel, item.metrics, item.cmhc_metrics, comparison.cmhc_year, transitSnapshot)
         .find((row) => row[0] === exportLabel);
       const row = [
@@ -301,7 +318,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               <tr>
                 <th scope="col" className="px-3 py-2 font-semibold">Area</th>
                 <th scope="col" className="whitespace-nowrap px-3 py-2 text-right font-semibold">{getMetricLabel(metric)}</th>
-                {showsRentRatio && <th scope="col" className="px-3 py-2 text-right font-semibold">Ratio</th>}
+                {showsRentRatio && <th scope="col" className="px-3 py-2 text-right font-semibold">Rent-to-income <MetricTooltip metricKey="rent_to_income_ratio" /></th>}
               </tr>
             </thead>
             <tbody>
@@ -312,6 +329,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                     <td className="px-3 py-2 font-medium text-civic-ink">{source?.name}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-civic-ink">
                       {formatMetric(metric, item.rawValue)}
+                      {!item.lowConfidence && <span className="block text-xs font-normal text-civic-muted">{item.rawValue == null ? "Unavailable" : item.provenance}</span>}
                       {item.lowConfidence && (
                         <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                           Low confidence — very small 2016 base

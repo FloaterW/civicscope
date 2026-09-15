@@ -1,88 +1,32 @@
-# Launch Checklist
+# Release checklist
 
-## 1. Push To GitHub
+CivicScope is already hosted. Do not create a second repository, replace origin, amend old authorship, or provision duplicate services.
 
-This local repo already has clean commits on `main`. To publish it:
+- Repository: https://github.com/FloaterW/civicscope
+- Frontend: https://civicscope-gold.vercel.app/
+- Backend health: https://civicscope.onrender.com/health
+- Hosting stays free; cold starts remain possible. No paid upgrades are authorized.
 
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/civicscope.git
-git push -u origin main
-```
+## Before a release
 
-If using GitHub CLI:
+1. Inspect local changes and preserve unrelated work. Use a focused `codex/` branch and review the diff.
+2. Run frontend unit tests, type check, lint, production build, browser tests and backend tests. CI must also cover PostgreSQL/PostGIS and production containers. Record skipped or flaky checks.
+3. Review data changes separately: periods, boundaries, provenance, suppression, coverage and candidate hashes. Successful refresh does not automatically promote data. Follow [launch operations](launch-operations.md).
+4. Review dependency updates individually. Input manifests and resolved locks must agree; major upgrades require separate validation.
+5. Push the branch and open a PR. Require current review/CI checks; do not bypass branch protection or force-push main.
 
-```bash
-gh repo create civicscope --private --source . --remote origin --push
-```
+## Deploy and verify
 
-Before pushing, update the temporary local commit author if desired:
+1. Merge only after required checks pass. Confirm Git-integrated Vercel and Render deployments refer to the intended commit; merge alone does not prove deployment.
+2. Check backend health and an uncached production dashboard visit. Verify free-host cold-start recovery and clear error/retry messaging.
+3. Test search, geography/metric/year switching, selected details, comparison, shared links and CSV exports.
+4. Expand desktop topics: map size stays stable while details scroll. On mobile, test transit-panel containment, tooltips and keyboard access without horizontal page overflow.
+5. Check data dates and representative values against the approved candidate. Missing values stay missing; zeros stay zero; estimates stay labelled.
+6. Inspect browser errors and relevant server logs. Confirm a healthy Production health checks workflow result.
 
-```bash
-git config user.name "Your Name"
-git config user.email "your.email@example.com"
-git commit --amend --reset-author --no-edit
-```
+## Operations
 
-## 2. Deploy Backend
-
-Recommended path:
-
-1. Create a Render Blueprint from the GitHub repo.
-2. Use the root `render.yaml`.
-3. Confirm the backend service points at `backend/Dockerfile`.
-4. Set `CORS_ORIGINS` after the frontend URL exists.
-5. Confirm `/health` returns `{"status":"ok"}`.
-
-Before deploying, protect `main` in GitHub: require pull requests, at least one approval
-when collaborators are present, conversation resolution, and the CI and CodeQL status
-checks. Enable Dependabot security updates and confirm the scheduled keep-alive workflow
-is active.
-
-The backend Dockerfile runs:
-
-```bash
-alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
-```
-
-## 3. Deploy Frontend
-
-Recommended path:
-
-1. Import the same GitHub repo into Vercel.
-2. Set Root Directory to `frontend`.
-3. Set `NEXT_PUBLIC_API_URL` to the deployed backend URL.
-4. Deploy.
-
-The frontend project includes `frontend/vercel.json` with Next.js build settings.
-
-## 4. Wire CORS
-
-After Vercel deploys, update the backend environment variable:
-
-```text
-CORS_ORIGINS=https://YOUR-VERCEL-APP.vercel.app
-```
-
-Redeploy/restart the backend after changing CORS.
-
-## 5. Smoke Test
-
-- Open the frontend URL.
-- Confirm the municipal map loads.
-- Switch to Census tracts.
-- Search `5350001.00`.
-- Confirm the detail panel shows `Toronto census tract 0001.00`.
-- Open the backend `/health` URL.
-- Open browser devtools and confirm there are no API/CORS errors.
-- Confirm responses include the production Content Security Policy and HSTS headers.
-- Open `/api/transit-routes` and confirm its manifest reports the intended agency coverage.
-- Confirm the uptime monitor or keep-alive workflow records a persistent health failure as a failed check.
-
-## 6. Update Portfolio Links
-
-Update the README with:
-
-- GitHub repository URL
-- Live frontend URL
-- Live backend health URL
-- Demo video or GIF
+- Validate data refresh creates isolated candidates; it never automatically promotes them.
+- Production health checks uses best-effort scheduling and incident/recovery issues, not an always-on guarantee.
+- Keep release and testing evidence dated. Agent simulations are not recruited human testing.
+- Revert confirmed regressions through the reviewed workflow. Do not erase local files or overwrite data to hide a failed check.

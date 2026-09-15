@@ -39,6 +39,27 @@ def test_complete_transit_candidate_passes(artifact_dirs):
     refresh.validate_candidate("transit", *artifact_dirs)
 
 
+def test_cmhc_supported_cells_exclude_unpublished_years_and_keep_zero(tmp_path):
+    path = tmp_path / "tracts.csv"
+    path.write_text("geoid,year,housing_starts_total,housing_completions\n5350001.00,2022,1,0\n5350001.00,2023,2,\n")
+    assert refresh.cmhc_tract_cells(path) == {
+        ("5350001.00", 2022, "housing_starts_total"),
+        ("5350001.00", 2022, "housing_completions"),
+        ("5350001.00", 2023, "housing_starts_total"),
+    }
+
+
+def test_cmhc_candidate_cannot_drop_an_existing_tract_value(artifact_dirs):
+    before, after = artifact_dirs
+    for directory in (before, after):
+        put_json(directory / "cmhc_seed.json", {"metadata": {"years": [2022, 2023]}})
+        (directory / "cmhc_ct_metrics.csv").write_text("geoid,year,housing_starts_total,housing_completions\ntract,2022,1,0\ntract,2023,2,\n")
+    refresh.validate_candidate("cmhc", before, after)
+    (after / "cmhc_ct_metrics.csv").write_text("geoid,year,housing_starts_total,housing_completions\ntract,2022,1,0\ntract,2023,,\n")
+    with pytest.raises(ValueError, match="removed 1 supported CMHC tract cells"):
+        refresh.validate_candidate("cmhc", before, after)
+
+
 @pytest.mark.parametrize("fault", ["partial", "agency", "missing_tract", "duplicate_tract", "hash", "geographies", "missing_artifact"])
 def test_rejects_invalid_transit_candidate(artifact_dirs, fault):
     before, after = artifact_dirs

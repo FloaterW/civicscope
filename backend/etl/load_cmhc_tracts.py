@@ -24,9 +24,11 @@ import io
 import json
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -134,8 +136,17 @@ def _fetch(table_id: str, cma_id: str, year: int) -> str:
         }
     ).encode()
     req = Request(HMIP_EXPORT, data=body, headers={"User-Agent": "civicscope-etl/1.0"})
-    with urlopen(req, timeout=90) as resp:
-        return resp.read().decode("latin1")
+    for attempt in range(3):
+        try:
+            with urlopen(req, timeout=90) as resp:
+                return resp.read().decode("latin1")
+        except (URLError, TimeoutError, ConnectionError) as exc:
+            if isinstance(exc, HTTPError) and exc.code not in (429, 500, 502, 503, 504):
+                raise
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
+    raise AssertionError("unreachable")
 
 
 def fetch_validated_slice(metric: str, cma_id: str, year: int) -> dict[str, int] | None:
@@ -143,13 +154,23 @@ def fetch_validated_slice(metric: str, cma_id: str, year: int) -> dict[str, int]
 
     Returns {short_ct_id: value} (CMHC's own short ids, e.g. "0001.00") only if
     the CT sum equals the published CMA total. Returns None when the slice is
-    empty (not yet published) and raises ValueError on a validation mismatch or
+    empty and raises ValueError on an archived series, a validation mismatch or
     an unparseable published total (never silently writes bad data).
     """
     ct_code, total_code = METRICS[metric]
-    ct_rows = parse_ct_table(_fetch(ct_code, cma_id, year))
+    response = _fetch(ct_code, cma_id, year)
+    context = f"metric={metric}, CMA={cma_id}, year={year}, table={ct_code}"
+    if "this data series is now archived" in response.lower():
+        raise ValueError(
+            f"CMHC archived series ({context}). Existing packaged data must be retained; "
+            "verify an official replacement before refreshing this slice."
+        )
+    if "<html" in response.lower() or "<!doctype html" in response.lower():
+        raise ValueError(f"CMHC returned HTML instead of CSV ({context}).")
+    ct_rows = parse_ct_table(response)
     if not ct_rows:
-        return None  # CMHC has not published this slice yet
+        print(f"CMHC empty or unparseable tract slice ({context})", file=sys.stderr)
+        return None  # Empty is not proof that a series has never been published.
     ct_sum = sum(ct_rows.values())
     published = parse_published_total(_fetch(total_code, cma_id, year))
     if published is None:
@@ -269,7 +290,8 @@ def validate_generation_coverage(
     coverage_pct = 100 * len(covered_tracts) / len(all_tracts) if all_tracts else 0.0
     problems = []
     if skipped_slices:
-        problems.append(f"{len(skipped_slices)}/{expected_slice_count} missing metric slices")
+        details = ", ".join(f"{metric}/CMA {cma}/{year}" for metric, cma, year in skipped_slices)
+        problems.append(f"{len(skipped_slices)}/{expected_slice_count} missing metric slices: {details}")
     if coverage_pct < MIN_TRACT_COVERAGE_PCT:
         problems.append(
             f"tract coverage {coverage_pct:.1f}% is below {MIN_TRACT_COVERAGE_PCT:.1f}%"
@@ -283,13 +305,18 @@ def validate_generation_coverage(
         "coverage_pct": round(coverage_pct, 1),
         "expected_slices": expected_slice_count,
         "skipped_empty_slices": len(skipped_slices),
+        "missing_slices": [{"metric": m, "cma": c, "year": y} for m, c, y in skipped_slices],
         "partial": bool(problems),
     }
 
 
 def generate_csv(
-    years: list[int], output: Path, *, allow_partial: bool = False
+    years: list[int], output: Path, *, allow_partial: bool = False,
+    metric_years: dict[str, list[int]] | None = None,
 ) -> dict[str, Any]:
+    requested_years = metric_years if metric_years is not None else {m: years for m in METRICS}
+    if set(requested_years) != set(METRICS) or any(not values for values in requested_years.values()):
+        raise ValueError("Every CMHC metric requires explicit nonempty supported years")
     our, renter = _load_seed_tracts()
     our_by_prefix: dict[str, list[str]] = {}
     for geoid in our:
@@ -302,7 +329,7 @@ def generate_csv(
     for metric in METRICS:
         for cma_id, prefix in CMA_PREFIX.items():
             our_in_cma = our_by_prefix.get(prefix, [])
-            for year in years:
+            for year in sorted(set(requested_years[metric])):
                 sl = fetch_validated_slice(metric, cma_id, year)
                 if sl is None:
                     skipped_empty.append((metric, cma_id, year))
@@ -314,7 +341,7 @@ def generate_csv(
                     counts[source] += 1
 
     covered = {g for (g, _y) in rows}
-    expected_slice_count = len(METRICS) * len(CMA_PREFIX) * len(years)
+    expected_slice_count = len(CMA_PREFIX) * sum(len(set(values)) for values in requested_years.values())
     coverage = validate_generation_coverage(
         our,
         covered,
@@ -349,6 +376,7 @@ def generate_csv(
         "partial": coverage["partial"],
         "metric_value_counts": counts,
         "years": years,
+        "metric_years": requested_years,
     }
 
 
@@ -368,6 +396,8 @@ def main() -> None:
     p.add_argument("--self-test", action="store_true", help="Offline parser test against the real fixture.")
     p.add_argument("--generate-csv", action="store_true")
     p.add_argument("--years", type=int, nargs="+", default=list(range(2018, 2025)))
+    p.add_argument("--starts-years", type=int, nargs="+")
+    p.add_argument("--completions-years", type=int, nargs="+")
     p.add_argument("--output", type=Path, default=PROJECT_ROOT / "app" / "data" / "cmhc_ct_metrics.csv")
     p.add_argument(
         "--allow-partial",
@@ -387,7 +417,13 @@ def main() -> None:
                 "partial diagnostics cannot replace the packaged CSV."
             )
         print("Fetching + validating real CMHC census-tract SCSS data from HMIP...", file=sys.stderr)
-        report = generate_csv(args.years, args.output, allow_partial=args.allow_partial)
+        if bool(args.starts_years) != bool(args.completions_years):
+            p.error("Provide both --starts-years and --completions-years, or neither")
+        metric_years = {
+            "housing_starts_total": args.starts_years,
+            "housing_completions": args.completions_years,
+        } if args.starts_years else None
+        report = generate_csv(args.years, args.output, allow_partial=args.allow_partial, metric_years=metric_years)
         print(json.dumps(report, indent=2))
         return
     p.error("--self-test or --generate-csv required")

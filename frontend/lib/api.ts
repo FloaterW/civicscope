@@ -105,15 +105,17 @@ export async function fetchJson<T>(
     if (!response.ok) {
       reportClientError("api_response");
       const text = await response.text();
+      const fallback = `The data service is temporarily unavailable (${response.status}). Please try again.`;
       let message = text;
       try {
         const body = JSON.parse(text);
         const detail = body?.detail ?? body?.message ?? body;
-        message = typeof detail === "string" ? detail : JSON.stringify(detail);
+        message = typeof detail === "string" ? detail : fallback;
       } catch {
         // The body is consumed once; plain-text proxy errors remain readable.
       }
-      throw new Error(message || `Request failed: ${response.status}`);
+      if (!message.trim() || message.length > 240 || /[<>]/.test(message)) message = fallback;
+      throw new Error(message);
     }
     return (await response.json()) as T;
   } catch (error) {
@@ -128,7 +130,7 @@ export async function fetchJson<T>(
     }
     if (!response) {
       reportClientError("api_network");
-      throw new Error(`Unable to reach CivicScope API at ${API_BASE}. Is the backend running?`);
+      throw new Error("We couldn’t connect to the data service. Check your connection and try again.");
     }
     throw error;
   } finally {

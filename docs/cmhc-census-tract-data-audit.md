@@ -1,5 +1,7 @@
 # CMHC Census Tract Data Audit
 
+Historical audit. See [September 2026 source review](official-data-source-review-2026-09-15.md) for current evidence and corrections: the CV threshold below is not a universal vacancy-rate suppression rule, coverage includes allocations, and supported completions years differ from starts years.
+
 ## Question
 
 Does CMHC publish rental market and housing supply data at the census tract level for the GTA, or is the app's inheritance/allocation approach the only option?

@@ -16,6 +16,68 @@ const topics = {
   transit_route_count: "transit",
 };
 
+test("metric help stays visible after hover, focus and click activation", async ({ page }) => {
+  await page.goto("/?geoid=3520005");
+  const panel = page.getByTestId("detail-panel");
+  const help = panel.getByRole("button", { name: "What is Median monthly rent?", exact: true });
+  const tooltip = page.getByRole("tooltip").filter({ hasText: "Median monthly rent" });
+  await help.hover();
+  await expect(tooltip).toBeVisible();
+  await help.click();
+  await expect(tooltip).toBeVisible();
+  await help.press("Escape");
+  await expect(tooltip).toHaveCount(0);
+  await help.press("Tab");
+  await help.focus();
+  await expect(tooltip).toBeVisible();
+  await help.press("Enter");
+  await expect(tooltip).toBeVisible();
+});
+
+test("pending CMHC requests do not claim rental data are unavailable", async ({ page }) => {
+  await page.goto("/?geoid=3520005");
+  const panel = page.getByTestId("detail-panel");
+  await expect(panel.locator("[data-selected-metric]")).toBeVisible();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/map-data?**", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.getByLabel("Map metric", { exact: true }).selectOption("average_rent_total");
+    await expect(panel).toContainText("Loading rental data");
+    await expect(panel).not.toContainText("No rental value");
+  } finally {
+    release();
+  }
+  await expect(panel.locator('[data-selected-metric]')).toBeVisible();
+  await expect(panel).not.toContainText("Loading rental data");
+});
+
+test("expanded mobile transit panel stays inside the map and scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?geoid=3520005");
+  await expect(page.getByTestId("detail-panel").locator("[data-selected-metric]")).toBeVisible();
+  await page.getByRole("button", { name: "Transit", exact: true }).click();
+  await page.getByRole("button", { name: /Browse route details/ }).click();
+  const bounds = await page.locator("#transit-layer-panel").evaluate((panel) => {
+    const map = panel.closest('section')!;
+    return {
+      panelTop: panel.getBoundingClientRect().top,
+      mapTop: map.getBoundingClientRect().top,
+      scrollHeight: panel.scrollHeight,
+      clientHeight: panel.clientHeight,
+      overflow: getComputedStyle(panel).overflowY,
+    };
+  });
+  expect(bounds.panelTop).toBeGreaterThanOrEqual(bounds.mapTop);
+  expect(bounds.overflow).toBe("auto");
+  expect(bounds.scrollHeight).toBeGreaterThan(bounds.clientHeight);
+  await page.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Select all", exact: true })).toBeVisible();
+});
+
 for (const level of ["municipality", "census_tract"]) {
   test(`${level}: every dropdown metric opens one relevant, non-duplicated profile`, async ({ page }) => {
     test.setTimeout(90_000);
@@ -42,7 +104,7 @@ for (const level of ["municipality", "census_tract"]) {
     await sources.locator("summary").focus();
     await page.keyboard.press("Enter");
     await expect(sources).toHaveAttribute("open", "");
-    await expect(sources).toContainText("CSV exports include the full profile");
+    await expect(sources).toContainText("CSV exports include the core Census");
     const accessibility = await new AxeBuilder({ page }).include('[data-testid="detail-panel"]').analyze();
     expect(accessibility.violations).toEqual([]);
     await panel.getByRole("button", { name: "Clear selected geography" }).click();
@@ -102,23 +164,40 @@ test("selected profile is usable without overflow at phone, tablet and desktop s
   await expect(panel.locator('[data-active-topic]')).toHaveAttribute("data-topic", "construction");
 });
 
-test("unpublished selected rental value is explicit, not hidden or shown as zero", async ({ page }) => {
-  await page.route("**/api/map-data?**", async (route) => {
-    const response = await route.fetch();
-    const data = await response.json();
-    for (const feature of data.features) {
-      if (feature.properties.geoid === "5350403.16" && feature.properties.cmhc_metrics) {
-        feature.properties.cmhc_metrics.vacancy_rate = null;
+for (const responseDelay of [0, 16_000]) {
+  test(`unpublished selected rental value is explicit, not hidden or shown as zero (${responseDelay}ms response delay)`, async ({ page }) => {
+    if (responseDelay) test.setTimeout(75_000);
+    await page.route("**/api/map-data?**", async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      for (const feature of data.features) {
+        if (feature.properties.geoid === "5350403.16" && feature.properties.cmhc_metrics) {
+          feature.properties.cmhc_metrics.vacancy_rate = null;
+        }
       }
-    }
-    await route.fulfill({ response, json: data });
+      if (responseDelay) await new Promise((resolve) => setTimeout(resolve, responseDelay));
+      await route.fulfill({ response, json: data });
+    });
+    // Separate network readiness from the assertion about a published/missing value.
+    // This also lets a slow response exercise the loading state without consuming
+    // the entire 15-second UI assertion budget before data arrive.
+    const mapResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/map-data"
+        && url.searchParams.get("type") === "census_tract"
+        && url.searchParams.get("metric") === "vacancy_rate"
+        && url.searchParams.get("year") === "2023";
+    });
+    await page.goto("/?level=census_tract&metric=vacancy_rate&geoid=5350403.16&year=2023");
+    const response = await mapResponse;
+    expect(response.ok()).toBe(true);
+    await response.finished();
+    const selected = page.getByTestId("detail-panel").locator('[data-selected-metric]');
+    await expect(selected).toContainText("Not published");
+    await expect(selected).toContainText("Unavailable for this area/year");
+    await expect(selected).not.toContainText("0.0%");
   });
-  await page.goto("/?level=census_tract&metric=vacancy_rate&geoid=5350403.16&year=2023");
-  const selected = page.getByTestId("detail-panel").locator('[data-selected-metric]');
-  await expect(selected).toContainText("Not published");
-  await expect(selected).toContainText("Unavailable for this area/year");
-  await expect(selected).not.toContainText("0.0%");
-});
+}
 
 test("suppressed housing components do not produce fabricated totals or tenure shares", async ({ page }) => {
   await page.route("**/api/map-data?**", async (route) => {

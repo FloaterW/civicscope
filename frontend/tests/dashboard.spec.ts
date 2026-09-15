@@ -246,6 +246,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await search.press("Escape");
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expect(search).toHaveValue("Toronto");
+    await expect(search).toBeFocused();
   });
 
   test("a slower stale search response cannot replace newer results", async ({ page }) => {
