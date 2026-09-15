@@ -112,6 +112,10 @@ describe("rowsToCsv", () => {
 
     expect(csv).toContain(`"'=HYPERLINK(""https://example.test"")"`);
     expect(csv).toContain(`"'+1"`);
-    expect(csv).toContain(`"'-42"`);
+    expect(csv).toContain(`"-42"`);
+  });
+  it("preserves negative decimals but escapes negative-looking formulas", () => {
+    expect(rowsToCsv([["-3.4", "-1+2", "-1e2+3", "@SUM(A1)"]]))
+      .toBe(`"-3.4","'-1+2","'-1e2+3","'@SUM(A1)"`);
   });
 });

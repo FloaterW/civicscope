@@ -633,6 +633,7 @@ export function CivicDashboard() {
     setSearchExpanded(false);
     setDetailsPanelOpen(true);
     updateDashboardUrl({ geoid: geography.geoid });
+    searchInputRef.current?.focus({ preventScroll: true });
   }
 
   const visibleResults = searchResults.slice(0, 8);
@@ -660,7 +661,6 @@ export function CivicDashboard() {
       event.preventDefault();
       setSearchExpanded(false);
       setSearchHighlight(-1);
-      searchInputRef.current?.blur();
       return;
     }
     if (!searchOpen) return;
@@ -759,7 +759,7 @@ export function CivicDashboard() {
                 placeholder={geographyLabel.search}
                 data-testid="geography-search"
                 role="combobox"
-                aria-label="Search geographies"
+                aria-label="Find an area — Search geographies"
                 aria-expanded={searchOpen}
                 aria-controls="geography-search-results"
                 aria-autocomplete="list"
@@ -999,6 +999,8 @@ export function CivicDashboard() {
             metric={metric}
             geographyLevel={geographyLevel}
             cmhcMetrics={selectedCmhcMetrics}
+            cmhcLoading={mapLoading}
+            cmhcError={Boolean(mapError)}
             cmhcYear={selectedCmhcYear ?? (isCmhc ? displayYear : undefined)}
             dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
             metricStatus={visibleMapData?.metadata.data_quality?.metric_status}

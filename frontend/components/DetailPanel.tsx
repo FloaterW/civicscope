@@ -29,6 +29,8 @@ type Props = {
   metric: MetricKey;
   geographyLevel: GeographyLevel;
   cmhcMetrics?: CmhcMetricValues | null;
+  cmhcLoading?: boolean;
+  cmhcError?: boolean;
   cmhcYear?: number;
   dataQualityLabel?: string;
   metricStatus?: "official" | "derived" | "estimated" | "mixed" | "zone";
@@ -92,7 +94,7 @@ function TopicSection({ topic, title, period, children }: { topic: string; title
   );
 }
 
-export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
+export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcLoading = false, cmhcError = false, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
 
@@ -200,7 +202,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
 
           {/* CMHC Rental Market */}
           <TopicSection topic="rental" title="Rental market" period={cmhcYear ? `Oct ${cmhcYear} · CMHC` : "CMHC"}>
-              {cmhcMetrics ? (
+              {cmhcLoading || cmhcError ? (
+                <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading rental data…" : "Rental data could not be loaded. Use Retry above."}</p>
+              ) : cmhcMetrics ? (
                 <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
               ) : metricTopic(metric) === "rental" ? (
                 <MetricLine label={getMetricLabel(metric)} value="Not available" metricKey={metric} sourceLabel="No rental value for this area/year" />
@@ -210,8 +214,10 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                 </div>
               )}
           </TopicSection>
-          <TopicSection topic="construction" title="Housing construction" period={cmhcYear ? `Calendar year ${cmhcYear}` : "CMHC"}>
-              {cmhcMetrics ? (
+          <TopicSection topic="construction" title="Housing construction" period={cmhcYear ? String(cmhcYear) : "CMHC"}>
+              {cmhcLoading || cmhcError ? (
+                <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading construction data…" : "Construction data could not be loaded. Use Retry above."}</p>
+              ) : cmhcMetrics ? (
                 <div>
                   <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
                     <MetricLine
@@ -229,6 +235,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
                     <MetricLine label="Under construction" value={formatMetric("units_under_construction", cmhcMetrics.units_under_construction)} cmhcSource={geographyLevel === "census_tract" && cmhcMetrics.units_under_construction != null ? "estimated" : undefined} metricKey="units_under_construction" />
                     <MetricLine label="Unabsorbed" value={formatMetric("unabsorbed_units", cmhcMetrics.unabsorbed_units)} cmhcSource={geographyLevel === "census_tract" && cmhcMetrics.unabsorbed_units != null ? "estimated" : undefined} metricKey="unabsorbed_units" />
                   </div>
+                  <p className="mt-2 text-xs leading-5 text-civic-muted">Starts and completions are calendar-year totals. Under construction and unabsorbed are December snapshots.</p>
                   {geographyLevel === "census_tract" && (
                     <p className="mt-2 text-xs leading-5 text-civic-muted">
                       &quot;CMHC tract data&quot; = real published census-tract values. &quot;est. (CMHC parent
@@ -280,7 +287,7 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
 
           <TopicSection topic="sources" title="Boundary & source details">
             <p className="text-xs leading-5 text-civic-muted">{geography.geometry_source}</p>
-            <p className="mt-2 text-xs leading-5 text-civic-muted">Census and CMHC measure different periods and housing samples. Expand a topic to see its own reference period. CSV exports include the full profile, including collapsed topics.</p>
+            <p className="mt-2 text-xs leading-5 text-civic-muted">Census and CMHC measure different periods and housing samples. Expand a topic to see its own reference period. CSV exports include the core Census, rental, construction and transit metrics, including collapsed topics; dwelling-type and tenure breakdowns are not included.</p>
           </TopicSection>
         </TopicSections>
         </div>
@@ -324,6 +331,7 @@ function CmhcRentalSection({ cmhcMetrics, cmhcYear, geographyLevel }: { cmhcMetr
 
   return (
     <div className="mt-4">
+      <p className="mb-2 text-xs leading-5 text-civic-muted">Historical survey rents, not current listing prices. CMHC covers purpose-built rentals, including existing tenants; it does not represent every home available to rent.</p>
       <p className="mb-2 text-xs leading-5 text-civic-muted">
         {cmhcYear ? `October ${cmhcYear} Rental Market Survey. ` : "Rental Market Survey. "}
         {

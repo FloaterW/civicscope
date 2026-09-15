@@ -27,6 +27,8 @@ The public Data dates and update status disclosure separates observation years, 
 
 ## User-testing results
 
+The September 15 [five-agent review](agent-usability-review-2026-09-15.md) and [official-source investigation](official-data-source-review-2026-09-15.md) record further findings and verification. CMHC refresh requirements are metric-specific: the packaged tract starts cover 2018–2024, while tract completions cover 2018–2022. Candidates must preserve every previously populated tract/metric/year cell; an archived, never-populated combination is not a required refresh slice.
+
 The September 4 reports in this directory describe agent-simulated resident and researcher workflows, not recruited human participants. They led to year-correct survey values, clearer field-level provenance, corrected selection announcements, selectable comparison groups, shareable links and export period/source/method columns. The test suite also covers mobile accessibility, navigation, downloads, backend validation and refresh failure isolation. Real resident/researcher sessions remain valuable before making broader usability claims.
 
 Comparison groups support up to six areas of one geography level. Changing levels clears the group. Shared links contain the comparison and dashboard state; no account is required.

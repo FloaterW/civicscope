@@ -219,7 +219,10 @@ export function rowsToCsv(rows: string[][]): string {
       row
         .map((cell) => {
           const text = String(cell);
-          const spreadsheetSafe = /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
+          // A strict negative decimal is data, not a formula. Keep other
+          // formula-leading strings escaped, including expressions like -1+2.
+          const negativeNumber = /^-\d+(?:\.\d+)?$/.test(text);
+          const spreadsheetSafe = !negativeNumber && /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
           return `"${spreadsheetSafe.replace(/"/g, '""')}"`;
         })
         .join(",")

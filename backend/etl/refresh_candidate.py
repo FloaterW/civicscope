@@ -24,6 +24,22 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def cmhc_tract_cells(path):
+    """Nonempty supported cells, including genuine zeros, not a year cross-product."""
+    cells = set()
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            for metric in ("housing_starts_total", "housing_completions"):
+                value = row.get(metric, "").strip()
+                if value:
+                    if not value.isdigit():
+                        raise ValueError(f"Invalid CMHC tract count: {metric}")
+                    cells.add((row["geoid"], int(row["year"]), metric))
+    if not cells or {cell[2] for cell in cells} != {"housing_starts_total", "housing_completions"}:
+        raise ValueError("CMHC tract baseline must include both supported metrics")
+    return cells
+
+
 def validate_candidate(source, before, after):
     seed = json.loads((after / "demo_seed.json").read_text(encoding="utf-8"))
     baseline = json.loads((before / "demo_seed.json").read_text(encoding="utf-8"))
@@ -39,6 +55,9 @@ def validate_candidate(source, before, after):
             raise ValueError("Candidate removed supported CMHC years")
         if new["metadata"].get("coverage", {}).get("partial"):
             raise ValueError("Partial CMHC refresh cannot be published")
+        missing = cmhc_tract_cells(before / "cmhc_ct_metrics.csv") - cmhc_tract_cells(after / "cmhc_ct_metrics.csv")
+        if missing:
+            raise ValueError(f"Candidate removed {len(missing)} supported CMHC tract cells")
     if source == "transit":
         manifest = json.loads((after / "transit_manifest.json").read_text(encoding="utf-8"))
         if manifest.get("coverage_status") != "complete":
@@ -84,9 +103,12 @@ def refresh(source, output):
             run("etl/load_tract_census.py", "--generate-csv", "--update-seed")
         elif source == "cmhc":
             run("etl/load_cmhc.py", "--update-seed")
-            with (ROOT / "app/data/cmhc_ct_metrics.csv").open(encoding="utf-8", newline="") as handle:
-                years = sorted({row["year"] for row in csv.DictReader(handle)})
-            run("etl/load_cmhc_tracts.py", "--generate-csv", "--years", *years)
+            cells = cmhc_tract_cells(ROOT / "app/data/cmhc_ct_metrics.csv")
+            starts = sorted({str(year) for _, year, metric in cells if metric == "housing_starts_total"})
+            completions = sorted({str(year) for _, year, metric in cells if metric == "housing_completions"})
+            years = sorted(set(starts + completions))
+            run("etl/load_cmhc_tracts.py", "--generate-csv", "--years", *years,
+                "--starts-years", *starts, "--completions-years", *completions)
         else:
             run("-m", "alembic", "upgrade", "head", transit=True)
             run("etl/seed_demo_data.py", transit=True)

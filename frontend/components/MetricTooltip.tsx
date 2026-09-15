@@ -152,7 +152,6 @@ function InfoTooltip({ term, definition, source }: { term: string; definition: s
   const showPreview = useCallback(() => {
     clearCloseTimer();
     if (!clickLocked) {
-      setPosition(null);
       setOpen(true);
     }
   }, [clearCloseTimer, clickLocked]);
@@ -271,7 +270,6 @@ function InfoTooltip({ term, definition, source }: { term: string; definition: s
             close();
           } else {
             clearCloseTimer();
-            setPosition(null);
             setOpen(true);
             setClickLocked(true);
           }

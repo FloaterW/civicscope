@@ -16,6 +16,68 @@ const topics = {
   transit_route_count: "transit",
 };
 
+test("metric help stays visible after hover, focus and click activation", async ({ page }) => {
+  await page.goto("/?geoid=3520005");
+  const panel = page.getByTestId("detail-panel");
+  const help = panel.getByRole("button", { name: "What is Median monthly rent?", exact: true });
+  const tooltip = page.getByRole("tooltip").filter({ hasText: "Median monthly rent" });
+  await help.hover();
+  await expect(tooltip).toBeVisible();
+  await help.click();
+  await expect(tooltip).toBeVisible();
+  await help.press("Escape");
+  await expect(tooltip).toHaveCount(0);
+  await help.press("Tab");
+  await help.focus();
+  await expect(tooltip).toBeVisible();
+  await help.press("Enter");
+  await expect(tooltip).toBeVisible();
+});
+
+test("pending CMHC requests do not claim rental data are unavailable", async ({ page }) => {
+  await page.goto("/?geoid=3520005");
+  const panel = page.getByTestId("detail-panel");
+  await expect(panel.locator("[data-selected-metric]")).toBeVisible();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/map-data?**", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.getByLabel("Map metric", { exact: true }).selectOption("average_rent_total");
+    await expect(panel).toContainText("Loading rental data");
+    await expect(panel).not.toContainText("No rental value");
+  } finally {
+    release();
+  }
+  await expect(panel.locator('[data-selected-metric]')).toBeVisible();
+  await expect(panel).not.toContainText("Loading rental data");
+});
+
+test("expanded mobile transit panel stays inside the map and scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?geoid=3520005");
+  await expect(page.getByTestId("detail-panel").locator("[data-selected-metric]")).toBeVisible();
+  await page.getByRole("button", { name: "Transit", exact: true }).click();
+  await page.getByRole("button", { name: /Browse route details/ }).click();
+  const bounds = await page.locator("#transit-layer-panel").evaluate((panel) => {
+    const map = panel.closest('section')!;
+    return {
+      panelTop: panel.getBoundingClientRect().top,
+      mapTop: map.getBoundingClientRect().top,
+      scrollHeight: panel.scrollHeight,
+      clientHeight: panel.clientHeight,
+      overflow: getComputedStyle(panel).overflowY,
+    };
+  });
+  expect(bounds.panelTop).toBeGreaterThanOrEqual(bounds.mapTop);
+  expect(bounds.overflow).toBe("auto");
+  expect(bounds.scrollHeight).toBeGreaterThan(bounds.clientHeight);
+  await page.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Select all", exact: true })).toBeVisible();
+});
+
 for (const level of ["municipality", "census_tract"]) {
   test(`${level}: every dropdown metric opens one relevant, non-duplicated profile`, async ({ page }) => {
     test.setTimeout(90_000);
@@ -42,7 +104,7 @@ for (const level of ["municipality", "census_tract"]) {
     await sources.locator("summary").focus();
     await page.keyboard.press("Enter");
     await expect(sources).toHaveAttribute("open", "");
-    await expect(sources).toContainText("CSV exports include the full profile");
+    await expect(sources).toContainText("CSV exports include the core Census");
     const accessibility = await new AxeBuilder({ page }).include('[data-testid="detail-panel"]').analyze();
     expect(accessibility.violations).toEqual([]);
     await panel.getByRole("button", { name: "Clear selected geography" }).click();
