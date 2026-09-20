@@ -210,6 +210,7 @@ def test_freshness_uses_verified_checks_not_observation_year(tmp_path, monkeypat
         checked = (datetime.now(UTC) + timedelta(days=days)).isoformat()
     put_json(tmp_path / "refresh_manifest.json", {"sources": {name: {"last_checked_at": checked} for name in ("census", "cmhc", "transit")}})
     monkeypatch.setattr(data_status, "files", lambda package: tmp_path)
+    monkeypatch.setattr(data_status, "verified_sources", lambda directory: json.loads((directory / "refresh_manifest.json").read_text())["sources"])
     monkeypatch.setattr(data_status, "load_transit_manifest", lambda: {"packaged_at": "2026-09-01", "coverage_status": "complete"})
     db = MagicMock()
     db.query.return_value.scalar.side_effect = [2021, 2025]

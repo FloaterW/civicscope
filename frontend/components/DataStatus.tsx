@@ -23,6 +23,6 @@ export function DataStatus() {
         {source.packaged_at ? ` · packaged ${new Date(source.packaged_at).toLocaleDateString("en-CA", { timeZone: "UTC" })}` : ""}
       </li>)}
     </ul> : <p>Update status is currently unavailable.</p>}
-    <p>Source checks confirm a download; they do not change the year the figures describe.</p>
+    <p>Source checks refer to verified packaged files; they do not change the year the figures describe. CMHC checks cover municipality and tract files, not the separately maintained survey-zone snapshot.</p>
   </details>;
 }

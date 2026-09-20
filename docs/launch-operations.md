@@ -25,6 +25,31 @@ Refresh checks preserve configured supported periods. They do not discover every
 
 The public Data dates and update status disclosure separates observation years, source checks, packaging dates and database load times. Missing refresh records remain unknown; deployment alone never marks data freshly checked.
 
+### Recording an unchanged candidate
+
+For a successful, reviewed workflow candidate whose values match production, run
+`python -m etl.record_source_check --source cmhc --candidate ../out/candidate-cmhc`
+from `backend`. Review the JSON output and apply it to `app/data/refresh_manifest.json`.
+The helper checks candidate hashes, rejects changed values, and preserves other source records.
+It only ignores CMHC fetch timestamps/coverage diagnostics and harmless row ordering or line endings;
+it never treats a missing or suppressed number as zero. Other JSON/geometry files must match exactly.
+Changed data still needs the full promotion review above. Do not copy a candidate's check date alone.
+
+The API verifies all required packaged file hashes before accepting a source record.
+Text hashes normalize CRLF to LF for consistent Windows/Linux checkout behavior, and are cached
+for the immutable deployment's process lifetime. Missing, malformed or mismatched evidence stays unknown.
+CMHC verification covers the municipality and tract artifacts, not the separate survey-zone snapshot.
+
+On September 20, the successful September 15 CMHC candidate from workflow
+https://github.com/FloaterW/civicscope/actions/runs/34987098673 was compared against
+the packaged data. All values matched; its original check timestamp was retained.
+No statistics were replaced. Census and the partial transit snapshot remain unverified.
+
+Frontend dependency groups now include only minor/patch upgrades. Major upgrades remain separate
+review items, not silently bundled migrations. The September 20 repair retains the existing major
+versions of Tailwind, Recharts, ESLint, TypeScript, Vitest, Node types and icons. Recharts 2 and
+ESLint 9 report maintenance deprecations; their migrations remain follow-up work, not completed upgrades.
+
 ## User-testing results
 
 The September 15 [five-agent review](agent-usability-review-2026-09-15.md) and [official-source investigation](official-data-source-review-2026-09-15.md) record further findings and verification. CMHC refresh requirements are metric-specific: the packaged tract starts cover 2018–2024, while tract completions cover 2018–2022. Candidates must preserve every previously populated tract/metric/year cell; an archived, never-populated combination is not a required refresh slice.
