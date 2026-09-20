@@ -31,6 +31,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from etl.census_flags import observation_value
+
 SDMX_BASE_URL = (
     "https://api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_CT"
 )
@@ -50,7 +52,7 @@ CHARACTERISTIC_IDS = {
     "dwellings_apt_duplex": "45",
     "dwellings_apt_low_rise": "46",
     "dwellings_apt_high_rise": "47",
-    "owner_households": "1406",
+    "owner_households": "1401",  # Owner; 1406 is "Not condominium".
 }
 CHARACTERISTIC_TO_FIELD = {v: k for k, v in CHARACTERISTIC_IDS.items()}
 
@@ -114,7 +116,7 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
     """Fetch Census Profile metrics for a batch of tract DGUIDs."""
     dguid_str = "+".join(dguids)
     char_str = "+".join(CHARACTERISTIC_IDS.values())
-    url = f"{SDMX_BASE_URL}/A5.{dguid_str}.1.{char_str}.1?format=csv&detail=dataonly"
+    url = f"{SDMX_BASE_URL}/A5.{dguid_str}.1.{char_str}.1?format=csv&detail=full"
 
     try:
         with urlopen(Request(url), timeout=60) as response:
@@ -129,6 +131,8 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
     # Parse SDMX CSV into grouped metrics
     grouped: dict[str, dict[str, Any]] = {}
     reader = csv.DictReader(text.splitlines())
+    if "FLAG" not in (reader.fieldnames or []):
+        raise ValueError("Census response omitted FLAG; request detail=full")
     for row in reader:
         char_id = str(row.get("CHARACTERISTIC", "")).strip()
         field = CHARACTERISTIC_TO_FIELD.get(char_id)
@@ -137,7 +141,7 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
         dguid = str(row["REF_AREA"]).strip()
         ctuid = dguid_to_ctuid(dguid)
         grouped.setdefault(ctuid, {"geoid": ctuid})
-        grouped[ctuid][field] = row.get("OBS_VALUE")
+        grouped[ctuid][field] = observation_value(row)
 
     results = []
     for ctuid, data in grouped.items():
