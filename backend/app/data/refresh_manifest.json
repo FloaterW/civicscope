@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "cmhc": {
+      "last_checked_at": "2026-09-15T15:24:40.666859+00:00",
+      "artifacts": {
+        "cmhc_seed.json": {
+          "sha256": "ac94257f526580e97bcc96b2a58d8f889200cdb95a9ccc35d48947931e888e25",
+          "candidate_sha256": "78077c6ec246e85223c32bcccfaf88118ffda82e869c73e8a080330f6a87ff2c"
+        },
+        "cmhc_ct_metrics.csv": {
+          "sha256": "118a34ea6819a6826349e994d0ea9c15f531f71dfec8cb7afe59d4fe4ee496cb",
+          "candidate_sha256": "4bff7eab279c03e0162a05c31303921f16e6903b05fce3dec1be0eb59e63869b"
+        }
+      }
+    }
+  }
+}

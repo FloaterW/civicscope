@@ -1,16 +1,14 @@
 """Keep observation periods separate from source checks and database loads."""
-import json
 from datetime import UTC, datetime
 from importlib.resources import files
 from sqlalchemy import func
 from app.models import CmhcMetric, ETLRun, Geography, Metric
 from app.services.transit_provenance import load_transit_manifest
+from app.services.refresh_provenance import verified_sources
 
 
 def build_data_status(db):
-    path = files("app.data").joinpath("refresh_manifest.json")
-    manifest = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-    sources = manifest.get("sources", {})
+    sources = verified_sources(files("app.data"))
     transit = load_transit_manifest()
     periods = {
         "census": db.query(func.max(Metric.year)).scalar(),
@@ -47,5 +45,5 @@ def build_data_status(db):
         "sources": status,
         "geography_count": db.query(Geography).count(),
         "last_database_load_at": last_load.isoformat() if last_load else None,
-        "note": "Source checks and database loads are not observation dates. Unknown means no verified refresh record is available.",
+        "note": "Source checks and database loads are not observation dates. Unknown means no matching verified refresh record is available. CMHC checks cover municipality and tract files, not the separately maintained survey-zone snapshot.",
     }
