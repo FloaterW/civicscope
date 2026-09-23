@@ -91,6 +91,7 @@ jobs:
           DATABASE_URL: sqlite:///./ci-civicscope.db
           SEED_ON_STARTUP: "true"
           RATE_LIMIT: 10000/minute
+          CORS_ORIGINS: http://127.0.0.1:3101,http://127.0.0.1:3105
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
           echo $! > backend.pid
