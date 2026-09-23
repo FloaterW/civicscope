@@ -119,12 +119,20 @@ jobs:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: npm run test:e2e
 
-      - name: Upload Playwright report
+      - name: Run gated TRREB preview browser tests with synthetic data
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+        run: npm run test:e2e:trreb
+
+      - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
-          path: frontend/playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
           if-no-files-found: ignore
 
   postgis:

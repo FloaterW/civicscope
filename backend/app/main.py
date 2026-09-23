@@ -16,6 +16,7 @@ import json
 from time import perf_counter
 
 from app.api.routes import router as api_router
+from app.api.trreb_preview import router as trreb_preview_router
 from app.core.config import settings, validate_environment
 from app.db.init_db import init_db
 from app.db.session import SessionLocal, get_db
@@ -113,6 +114,7 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
         return payload
 
     app.include_router(api_router)
+    app.include_router(trreb_preview_router)
     return app
 
 

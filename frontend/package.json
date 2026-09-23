@@ -19,6 +19,7 @@
     "start": "node .next/standalone/server.js",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:trreb": "playwright test --config playwright.trreb.config.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint ."
   },

@@ -6,7 +6,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://${host}:${port}`;
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: ["**/unit/**"],
+  testIgnore: ["**/unit/**", "**/trreb-preview.spec.ts"],
   timeout: 45_000,
   expect: {
     timeout: 15_000

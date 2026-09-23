@@ -23,6 +23,7 @@ import type {
 
 import { DataQualityBadge } from "./DataQualityBadge";
 import { MetricTooltip } from "./MetricTooltip";
+import { TrrebResaleSection } from "./TrrebResaleSection";
 
 type Props = {
   geography: Geography | null;
@@ -201,6 +202,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           )}
 
           {/* CMHC Rental Market */}
+          {process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_TRREB_PREVIEW_ENABLED === "1" && geographyLevel === "municipality" && (
+            <TrrebResaleSection key={geography.geoid} geoid={geography.geoid} />
+          )}
           <TopicSection topic="rental" title="Rental market" period={cmhcYear ? `Oct ${cmhcYear} · CMHC` : "CMHC"}>
               {cmhcLoading || cmhcError ? (
                 <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading rental data…" : "Rental data could not be loaded. Use Retry above."}</p>
