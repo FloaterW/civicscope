@@ -104,9 +104,13 @@ test.describe("critical cross-browser journeys", () => {
         await expect.poll(async () => panel.evaluate((element) => {
           const svg = element.querySelector("svg.recharts-surface")!;
           const bounds = svg.getBoundingClientRect();
+          const container = element.querySelector(".recharts-responsive-container")!.getBoundingClientRect();
           const bars = [...svg.querySelectorAll("path.recharts-rectangle")];
           const labels = [...svg.querySelectorAll(".recharts-label-list .recharts-label")];
-          return bars.length === 5 && labels.length === 5 && bars.every((bar) => {
+          // Do not accept old-width SVG geometry before ResizeObserver catches up.
+          const resized = Math.abs(bounds.width - container.width) <= 1 &&
+            bounds.left >= container.left - 1 && bounds.right <= container.right + 1;
+          return resized && bars.length === 5 && labels.length === 5 && bars.every((bar) => {
             const box = bar.getBoundingClientRect();
             return box.width > 0 && box.height > 0;
           }) && labels.every((label) => {
