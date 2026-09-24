@@ -157,6 +157,9 @@ export function CivicDashboard() {
   const availableYearsRef = useRef<number[]>([2021]);
   const cmhcYearsResolvedRef = useRef(false);
   const selectedGeoid = selected?.geoid;
+  // A shared selection is already valid URL context while its map feature loads.
+  // Unrelated controls must not erase it before selection resolution completes.
+  const shareableGeoid = selectedGeoid ?? pendingUrlGeoid ?? undefined;
   const geographyLabel = geographyLabels[geographyLevel];
   const isCmhc = isCmhcMetric(metric);
   const isTransit = isTransitMetric(metric);
@@ -286,7 +289,7 @@ export function CivicDashboard() {
         level: overrides.level ?? geographyLevel,
         metric: overrides.metric ?? metric,
         year: "year" in overrides ? overrides.year : currentShareableYear(),
-        geoid: "geoid" in overrides ? overrides.geoid : selectedGeoid,
+        geoid: "geoid" in overrides ? overrides.geoid : shareableGeoid,
         compareIds: overrides.compareIds ?? pinnedCompareIds,
         resale: overrides.resale
       },
@@ -348,7 +351,7 @@ export function CivicDashboard() {
           : "Transit data is available by census tract, so the view changed to census tracts."
       );
     }
-    updateDashboardUrl({ metric: nextMetric, level: nextLevel, geoid: changesGeography ? undefined : selectedGeoid, compareIds: changesGeography ? [] : pinnedCompareIds });
+    updateDashboardUrl({ metric: nextMetric, level: nextLevel, geoid: changesGeography ? undefined : shareableGeoid, compareIds: changesGeography ? [] : pinnedCompareIds });
   }
 
   function retryRequests() {
