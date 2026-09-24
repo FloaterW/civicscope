@@ -1,4 +1,5 @@
 import { errorCodes } from "@/lib/error-reporting";
+import { sanitizeErrorContext } from "@/lib/error-context";
 
 // Best-effort per-instance log deduplication; platform limits remain necessary
 // for hostile traffic. No persistent identifiers or user payloads are retained.
@@ -37,7 +38,8 @@ export async function POST(request: Request) {
     const now = Date.now();
     if (now - (lastLogged.get(payload.code) ?? 0) >= 60_000) {
       lastLogged.set(payload.code, now);
-      console.error(JSON.stringify({ event: "client_error", code: payload.code, release: process.env.VERCEL_GIT_COMMIT_SHA ?? "local" }));
+      const context = sanitizeErrorContext("context" in payload ? payload.context : undefined);
+      console.error(JSON.stringify({ event: "client_error", code: payload.code, release: process.env.VERCEL_GIT_COMMIT_SHA ?? "local", ...(Object.keys(context).length ? { context } : {}) }));
     }
     return new Response(null, { status: 204, headers });
   } catch {

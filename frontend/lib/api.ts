@@ -7,6 +7,7 @@ import type {
   Summary
 } from "@/types";
 import { reportClientError } from "@/lib/error-reporting";
+import { apiErrorContext } from "@/lib/error-context";
 import {
   isTransitFeatureCollection,
   type TransitFeatureCollection
@@ -84,6 +85,7 @@ export async function fetchJson<T>(
   signal?: AbortSignal,
   timeoutMs: number = API_TIMEOUT_MS
 ): Promise<T> {
+  const startedAt = Date.now();
   const effectiveTimeoutMs = normalizeApiTimeout(timeoutMs);
   const requestController = new AbortController();
   let timedOut = false;
@@ -103,7 +105,7 @@ export async function fetchJson<T>(
       signal: requestController.signal
     });
     if (!response.ok) {
-      reportClientError("api_response");
+      reportClientError("api_response", apiErrorContext(path, startedAt, "http", response.status));
       const text = await response.text();
       const fallback = `The data service is temporarily unavailable (${response.status}). Please try again.`;
       let message = text;
@@ -117,11 +119,19 @@ export async function fetchJson<T>(
       if (!message.trim() || message.length > 240 || /[<>]/.test(message)) message = fallback;
       throw new Error(message);
     }
-    return (await response.json()) as T;
+    try {
+      return (await response.json()) as T;
+    } catch (error) {
+      if (!requestController.signal.aborted) {
+        reportClientError("api_decode", apiErrorContext(path, startedAt, "decode"));
+        throw new Error("The data service returned unreadable data. Please try again.");
+      }
+      throw error;
+    }
   } catch (error) {
     if (requestController.signal.aborted) {
       if (timedOut) {
-        reportClientError("api_timeout");
+        reportClientError("api_timeout", apiErrorContext(path, startedAt, "timeout"));
         throw new Error(
           `The CivicScope API did not respond within ${Math.max(1, Math.ceil(effectiveTimeoutMs / 1000))} seconds. Try again.`
         );
@@ -129,7 +139,8 @@ export async function fetchJson<T>(
       throw error;
     }
     if (!response) {
-      reportClientError("api_network");
+      const failure = error instanceof Error && error.name === "AbortError" ? "browser_abort" : "network";
+      reportClientError("api_network", apiErrorContext(path, startedAt, failure));
       throw new Error("We couldn’t connect to the data service. Check your connection and try again.");
     }
     throw error;
