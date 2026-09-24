@@ -1,17 +1,24 @@
-# TRREB release readiness — September 23, 2026
+# TRREB release readiness — September 24, 2026
 
 ## Release scope
 
-Code-only, gated development preview. No TRREB PDFs, extracted market values,
-database, audit export or credentials are included in Git. Browser fixtures use
-invented numbers. Production builds omit the resale section; the backend
-rejects production, disabled and non-loopback requests. Public exports and
-automatic updates remain disabled. No paid infrastructure is required.
+The repository now includes a separately gated public resale pathway, backed
+by immutable approved releases in the existing PostgreSQL database. Both
+public flags default off. Importing data does not activate it. See
+[production operations](trreb-production-operations.md) for the explicit
+prepare/import/activate/rollback sequence and technical release gates.
 
-The owner reports written aggregate-statistics permission and has deferred
-providing the permitted-use clauses. This is not a finding that permission is
-absent. Public-display, attribution, retention, redistribution and update
-conditions remain unreviewed, so public activation is blocked.
+No TRREB PDFs, extracted market values, database, audit export, release bundle
+or credentials are included in Git. Browser fixtures use invented numbers.
+The earlier loopback-only development preview remains separate. Public
+downloads, rental display and automatic updates remain disabled. No paid
+infrastructure is required.
+
+The owner confirms aggregate-statistics permission and explicitly authorized
+proceeding without another permission review. Missing clauses are not a
+blocker for this scope. This records the owner's instruction, not an
+independent legal assessment. Source attribution and market/geography
+disclosures remain required implementation safeguards.
 
 ## Geography evidence and limitations
 
@@ -64,7 +71,7 @@ verify source extraction and data delivery. Neither substitutes for the other.
 
 ## Controlled release checklist
 
-### Local verification so far
+### Historical preview verification (September 23)
 
 - Re-extracted 72 monthly tables, six year-end tables and 24 rental tables;
   the strict audit reports no errors, with all source discrepancies retained.
@@ -78,16 +85,23 @@ verify source extraction and data delivery. Neither substitutes for the other.
   their results must be checked on the proposed commit, not inferred from these.
 
 - [ ] All CI checks green on the exact proposed commit.
-- [ ] Permission clauses reviewed for intended display/export/retention/update use.
-- [ ] Geographic use approved as labeled reporting context, or authoritative
-  vintage-specific boundary equivalence established if map joins are desired.
-- [ ] Explicit policy for selecting report revisions; no implicit latest-wins.
-- [ ] Approved artifact stored in durable private storage; do not depend on a
-  workstation path or free-instance ephemeral disk for production data.
-- [ ] Separate implementation/review of production access and release switches.
+- [x] Owner authorized proceeding with aggregate-statistics display.
+- [x] Geographic use limited to labeled reporting context; authoritative
+  vintage-specific boundary equivalence would still be required before any map joins.
+- [x] Explicit per-period SHA selection, including functional selection among
+  multiple retained revisions; no implicit latest-wins.
+- [x] Transactional import and immutable-release/pointer tables implemented in
+  existing PostgreSQL. Local SQLite lifecycle tests are separate from real
+  Postgres CI tests.
+- [x] Read-only public API and independent default-off backend/frontend flags.
+- [ ] Approved artifact imported into production's durable database. This
+  requires an authorized database connection; free Render shell limitations
+  do not justify upgrading hosting or publishing private files in Git.
 - [ ] Preview acceptance, then deliberate production activation and smoke checks.
 - [ ] Rollback rehearsed: disable the section/API and restore the prior approved
   artifact/version, preserving the source archive and audit trail.
 
-Do not merge or deploy this as an enabled TRREB production feature. A successful
-code preview/CI build is release preparation, not permission or boundary approval.
+Code can be deployed with flags off before data activation. Do not enable the
+frontend until the selected backend release is imported, activated and verified.
+Passing local tests or a prepared private bundle does not prove hosted activation.
+No claim of Census polygon equivalence is made.

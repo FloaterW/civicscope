@@ -1,5 +1,11 @@
 # TRREB public-report import pilot
 
+Historical pilot record. For the current approved scope, explicit revision
+selection, public-release implementation and remaining technical activation
+gates, see [release readiness](trreb-release-readiness.md). The owner has since
+authorized proceeding without another permission review; the historical
+permission follow-up below is superseded, not an active blocker.
+
 ## Outcome
 
 Public PDF extraction is feasible. A normal direct HTTPS download succeeded,
