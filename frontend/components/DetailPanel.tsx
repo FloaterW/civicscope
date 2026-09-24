@@ -25,6 +25,7 @@ import type {
 import { DataQualityBadge } from "./DataQualityBadge";
 import { MetricTooltip } from "./MetricTooltip";
 import { TrrebResaleSection } from "./TrrebResaleSection";
+import { TRREB_MODE } from "@/lib/trreb-mode";
 
 type Props = {
   resaleView: ResaleViewState;
@@ -205,7 +206,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
           )}
 
           {/* CMHC Rental Market */}
-          {process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_TRREB_PREVIEW_ENABLED === "1" && geographyLevel === "municipality" && (
+          {TRREB_MODE !== "disabled" && geographyLevel === "municipality" && (
             <TrrebResaleSection geoid={geography.geoid} view={resaleView} onViewChange={onResaleViewChange} />
           )}
           <TopicSection topic="rental" title="Rental market" period={cmhcYear ? `Oct ${cmhcYear} · CMHC` : "CMHC"}>
@@ -410,17 +411,18 @@ function HousingStockSection({ metrics }: { metrics: MetricValues }) {
   const groundOriented = completeTotal(metrics.dwellings_single_detached, metrics.dwellings_semi_detached, metrics.dwellings_row_house);
   const apartment = completeTotal(metrics.dwellings_apt_high_rise, metrics.dwellings_apt_low_rise, metrics.dwellings_apt_duplex);
 
-  const occupied = completeTotal(metrics.owner_households, metrics.renter_households);
+  const occupied = completeTotal(metrics.owner_households, metrics.tenure_renter_households);
   const ownerPct = pct(metrics.owner_households, occupied || null);
-  const renterPct = pct(metrics.renter_households, occupied || null);
+  const renterPct = pct(metrics.tenure_renter_households ?? null, occupied || null);
 
   return (
     <div className="mt-4">
       <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
-        <MetricLine label="Total dwellings" value={total.toLocaleString("en-CA")} />
+        <MetricLine label="Occupied private dwellings" value={total.toLocaleString("en-CA")} />
         <MetricLine label="Owner" value={ownerPct} />
         <MetricLine label="Renter" value={renterPct} />
       </div>
+      <p className="mt-2 text-xs leading-relaxed text-civic-muted">Owner and renter shares use tenure counts (25% Census sample), not the tenant shelter-cost subset. Counts are rounded and may differ from occupied dwelling totals (100% Census data).</p>
       <div className="mt-2 grid auto-rows-fr grid-cols-2 gap-2 text-sm">
         <MetricLine label="Single-detached" value={pct(metrics.dwellings_single_detached, total)} />
         <MetricLine label="Semi-detached" value={pct(metrics.dwellings_semi_detached, total)} />

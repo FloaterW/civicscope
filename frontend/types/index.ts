@@ -73,6 +73,8 @@ export type MetricValues = {
   dwellings_apt_low_rise: number | null;
   dwellings_apt_high_rise: number | null;
   owner_households: number | null;
+  /** Renter tenure (Census 1402), separate from non-farm/non-reserve tenants (1476). */
+  tenure_renter_households?: number | null;
   transit_route_count: number | null;
   transit_score: number | null;
   /** Field-level provenance flags (official / derived / estimated / unavailable / low_confidence). */

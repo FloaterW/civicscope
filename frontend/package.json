@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "22.x"
   },
   "scripts": {
     "predev": "node scripts/copy-maplibre-worker.mjs",
@@ -20,6 +20,7 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:trreb": "playwright test --config playwright.trreb.config.ts",
+    "test:e2e:trreb-public": "playwright test --config playwright.trreb-public.config.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint ."
   },

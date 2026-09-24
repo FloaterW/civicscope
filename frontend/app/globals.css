@@ -76,6 +76,15 @@ select {
   color: var(--civic-blue);
 }
 
+.civic-map .maplibregl-ctrl-bottom-right {
+  max-width: 100%;
+}
+
+.civic-map .maplibregl-ctrl-attrib {
+  max-width: calc(100% - 20px);
+  overflow-wrap: anywhere;
+}
+
 /* Hover tooltip — match the restrained civic panel styling. */
 .civic-map-popup .maplibregl-popup-content {
   padding: 8px 10px;

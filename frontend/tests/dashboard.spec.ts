@@ -130,10 +130,10 @@ test.describe("CivicScope dashboard regressions", () => {
     const map = page.getByTestId("civic-map");
     await expect(page.getByText("Rent burden by census tract")).toBeVisible();
     await expect(page.getByTestId("summary-panel")).toContainText("1,334 GTA census tracts");
-    // Rent burden is the default metric and has an estimated fallback, so the
-    // badge must disclose that — not claim every value is official.
+    // The refreshed Census archive supplies published values wherever reported;
+    // unavailable values stay unavailable, without claiming estimates exist.
     await expect(
-      page.getByTestId("data-quality-badge").filter({ hasText: "Official + estimated tract metrics" })
+      page.getByTestId("data-quality-badge").filter({ hasText: "Official tract metrics" })
     ).toHaveCount(1);
     await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
     await expect(map).toHaveAttribute("data-feature-count", "1334", { timeout: 30000 });
@@ -564,6 +564,35 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
   });
 
+  test("expanded mobile attribution never overlaps the legend or transit control", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await blockExternalMapAssets(page);
+    await page.goto("/?level=municipality&metric=population");
+    const map = page.getByTestId("civic-map");
+    const attribution = map.locator(".maplibregl-ctrl-attrib");
+    const legend = page.getByTestId("map-legend");
+    await expect(attribution).toContainText("OpenStreetMap");
+    if (!(await attribution.getAttribute("class"))?.includes("maplibregl-compact-show")) {
+      await attribution.locator(".maplibregl-ctrl-attrib-button").click();
+    }
+    await expect(attribution).toHaveClass(/maplibregl-compact-show/);
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect.poll(async () => {
+        const creditBox = (await attribution.boundingBox())!;
+        const legendBox = (await legend.boundingBox())!;
+        const transitBox = (await map.getByRole("button", { name: "Transit", exact: true }).boundingBox())!;
+        return Math.min(creditBox.y - legendBox.y - legendBox.height, creditBox.y - transitBox.y - transitBox.height);
+      }).toBeGreaterThanOrEqual(8);
+      const legendBox = (await legend.boundingBox())!;
+      const transitBox = (await map.getByRole("button", { name: "Transit", exact: true }).boundingBox())!;
+      expect(transitBox.x - legendBox.x - legendBox.width).toBeGreaterThanOrEqual(8);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+      await map.screenshot({ path: testInfo.outputPath(`map-attribution-${width}.png`) });
+    }
+    expect((await new AxeBuilder({ page }).include('[data-testid="civic-map"]').analyze()).violations).toEqual([]);
+  });
+
   test("basemap attribution remains visible", async ({ page }) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
@@ -882,9 +911,8 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(response.ok(), await response.text()).toBeTruthy();
     const payload = (await response.json()) as MapPayload;
 
-    // The badge must not flatly claim every tract rent-burden value is official.
-    expect(payload.metadata.data_quality.metric_status).toBe("mixed");
-    expect(payload.metadata.data_quality.label).toContain("estimated");
+    expect(payload.metadata.data_quality.metric_status).toBe("official");
+    expect(payload.metadata.data_quality.label).toBe("Official tract metrics");
 
     const withQuality = payload.features.filter((f) => f.properties.metrics.data_quality);
     expect(withQuality.length).toBe(payload.features.length);
@@ -892,14 +920,29 @@ test.describe("CivicScope dashboard regressions", () => {
     const statuses = new Set(
       payload.features.map((f) => f.properties.metrics.data_quality?.rent_burden_pct)
     );
-    // Official, estimated, and unavailable rent burden all coexist among tracts.
+    // Missing values are not silently imputed in this refreshed archive.
     expect(statuses.has("official")).toBe(true);
-    expect(statuses.has("estimated")).toBe(true);
+    expect(statuses.has("estimated")).toBe(false);
     expect(statuses.has("unavailable")).toBe(true);
   });
 
   test("estimated tract rent burden is visibly flagged, not presented as official", async ({ page }) => {
     await blockExternalMapAssets(page);
+    // Exercise the fallback presentation independently of which source rows
+    // happen to be suppressed in the current official archive.
+    await page.route(`${API_BASE}/api/map-data?**`, async route => {
+      const response = await route.fetch();
+      const payload = (await response.json()) as MapPayload;
+      if (payload.metadata.geography_type === "census_tract") {
+        const fixture = payload.features.find(feature => feature.properties.geoid === "5320105.17");
+        if (fixture) {
+          fixture.properties.metrics.rent_burden_pct = 36;
+          fixture.properties.metrics.data_quality = { ...fixture.properties.metrics.data_quality, rent_burden_pct: "estimated" };
+        }
+        payload.metadata.data_quality = { metric_status: "mixed", label: "Official + estimated tract metrics" };
+      }
+      await route.fulfill({ response, json: payload });
+    });
     await page.goto("/");
     await page.getByRole("button", { name: "Census tracts" }).click();
     await expect(page.getByTestId("civic-map")).toHaveAttribute(
@@ -908,8 +951,7 @@ test.describe("CivicScope dashboard regressions", () => {
       { timeout: 30000 }
     );
 
-    // Whitby tract 0105.17 has a suppressed official rent burden but usable
-    // rent + income, so it is estimated and must say so.
+    // The synthetic estimated value must retain its explicit provenance.
     await page.getByTestId("geography-search").fill("5320105.17");
     const result = page.getByRole("option").filter({ hasText: "5320105.17" });
     await expect(result).toHaveCount(1);
