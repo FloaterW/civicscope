@@ -7,6 +7,7 @@ import type {
   Summary
 } from "@/types";
 import { reportClientError } from "@/lib/error-reporting";
+import { apiErrorContext } from "@/lib/error-context";
 import {
   isTransitFeatureCollection,
   type TransitFeatureCollection
@@ -14,6 +15,9 @@ import {
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+// Bump when a packaged data/schema correction must bypass previously cached
+// core payloads. Revalidate too: frontend and API deployments are not atomic.
+export const CORE_DATA_REVISION = "census-2021-20260924";
 const DEFAULT_API_TIMEOUT_MS = 60_000;
 
 export function normalizeApiTimeout(value: number): number {
@@ -84,6 +88,7 @@ export async function fetchJson<T>(
   signal?: AbortSignal,
   timeoutMs: number = API_TIMEOUT_MS
 ): Promise<T> {
+  const startedAt = Date.now();
   const effectiveTimeoutMs = normalizeApiTimeout(timeoutMs);
   const requestController = new AbortController();
   let timedOut = false;
@@ -100,10 +105,11 @@ export async function fetchJson<T>(
   let response: Response | undefined;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      signal: requestController.signal
+      signal: requestController.signal,
+      cache: /^\/api\/(?:map-data|summary|compare)(?:\?|$)/.test(path) ? "no-cache" : "default",
     });
     if (!response.ok) {
-      reportClientError("api_response");
+      reportClientError("api_response", apiErrorContext(path, startedAt, "http", response.status));
       const text = await response.text();
       const fallback = `The data service is temporarily unavailable (${response.status}). Please try again.`;
       let message = text;
@@ -117,11 +123,19 @@ export async function fetchJson<T>(
       if (!message.trim() || message.length > 240 || /[<>]/.test(message)) message = fallback;
       throw new Error(message);
     }
-    return (await response.json()) as T;
+    try {
+      return (await response.json()) as T;
+    } catch (error) {
+      if (!requestController.signal.aborted) {
+        reportClientError("api_decode", apiErrorContext(path, startedAt, "decode"));
+        throw new Error("The data service returned unreadable data. Please try again.");
+      }
+      throw error;
+    }
   } catch (error) {
     if (requestController.signal.aborted) {
       if (timedOut) {
-        reportClientError("api_timeout");
+        reportClientError("api_timeout", apiErrorContext(path, startedAt, "timeout"));
         throw new Error(
           `The CivicScope API did not respond within ${Math.max(1, Math.ceil(effectiveTimeoutMs / 1000))} seconds. Try again.`
         );
@@ -129,7 +143,8 @@ export async function fetchJson<T>(
       throw error;
     }
     if (!response) {
-      reportClientError("api_network");
+      const failure = error instanceof Error && error.name === "AbortError" ? "browser_abort" : "network";
+      reportClientError("api_network", apiErrorContext(path, startedAt, failure));
       throw new Error("We couldn’t connect to the data service. Check your connection and try again.");
     }
     throw error;
@@ -144,6 +159,7 @@ export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, si
     metric,
     detail: "display",
     type: geographyLevel,
+    data_revision: CORE_DATA_REVISION,
   });
   if (year !== undefined) {
     params.set("year", String(year));
@@ -152,7 +168,7 @@ export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, si
 }
 
 export function getSummary(geoid: string | undefined, geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
-  const params = new URLSearchParams({ type: geographyLevel });
+  const params = new URLSearchParams({ type: geographyLevel, data_revision: CORE_DATA_REVISION });
   if (geoid) {
     params.set("ids", geoid);
   }
@@ -163,7 +179,7 @@ export function getSummary(geoid: string | undefined, geographyLevel: GeographyL
 }
 
 export function getComparison(ids: string[], geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
-  const params = new URLSearchParams({ type: geographyLevel });
+  const params = new URLSearchParams({ type: geographyLevel, data_revision: CORE_DATA_REVISION });
   if (ids.length) {
     params.set("ids", ids.join(","));
   }

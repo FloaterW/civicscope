@@ -167,6 +167,8 @@ def build_metric_quality(row: Any) -> dict[str, str]:
         "population": present(row.population),
         "previous_population": present(row.previous_population),
         "renter_households": present(row.renter_households),
+        "owner_households": present(getattr(row, "owner_households", None)),
+        "tenure_renter_households": present(getattr(row, "tenure_renter_households", None)),
         "rent_burden_pct": rent_burden_status,
         "population_growth_pct": growth_status,
         "affordability_index": (

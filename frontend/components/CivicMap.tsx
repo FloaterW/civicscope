@@ -374,6 +374,7 @@ export function CivicMap({
     }
 
     let cancelled = false;
+    let attributionObserver: ResizeObserver | undefined;
     const initialData = data;
 
     async function initializeMap() {
@@ -459,6 +460,18 @@ export function CivicMap({
       });
 
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
+      // Attribution can expand to several lines on small screens. Keep both
+      // overlays above its measured footprint, including after zoom or resize.
+      const bottomControls = containerRef.current.querySelector<HTMLElement>(".maplibregl-ctrl-bottom-right");
+      const mapPanel = containerRef.current.parentElement;
+      if (bottomControls && mapPanel) {
+        const reserveAttribution = () => mapPanel.style.setProperty(
+          "--civic-map-attribution-height", `${bottomControls.getBoundingClientRect().height}px`
+        );
+        attributionObserver = new ResizeObserver(reserveAttribution);
+        attributionObserver.observe(bottomControls);
+        reserveAttribution();
+      }
       map.on("load", () => {
         mapReadyRef.current = true;
         if (!initialViewportAppliedRef.current) {
@@ -537,6 +550,7 @@ export function CivicMap({
 
     return () => {
       cancelled = true;
+      attributionObserver?.disconnect();
       mapReadyRef.current = false;
       initialViewportAppliedRef.current = false;
       pendingViewportFitRef.current = true;
@@ -633,7 +647,7 @@ export function CivicMap({
           ? "census tract"
           : "municipality"
       }. Use the search box to inspect a specific geography.`}
-      className="relative h-full w-full"
+      className="civic-map relative h-full w-full"
     >
       {mapInitializationError && <div role="alert" className="absolute inset-0 z-10 grid place-items-center bg-civic-panel p-6 text-center text-sm text-civic-ink">{mapInitializationError}</div>}
       {!data && loading && (
@@ -685,7 +699,8 @@ export function CivicMap({
         <div
           data-testid="map-legend"
           aria-label={`${getMetricLabel(metric)} map legend`}
-          className="absolute bottom-3 left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+          className="absolute left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+          style={{ bottom: "calc(var(--civic-map-attribution-height, 24px) + 12px)", maxWidth: "min(230px, calc(100% - 120px))" }}
         >
           <div className="mb-1.5 font-semibold text-civic-ink">{getMetricLabel(metric)}</div>
           {legend.classes.length === 0 ? (
@@ -729,7 +744,8 @@ export function CivicMap({
         </div>
       )}
       {data && (
-        <div className="absolute bottom-9 right-3 top-3 z-10 flex flex-col items-end justify-end gap-1.5 pointer-events-none">
+        <div className="absolute right-3 top-3 z-10 flex flex-col items-end justify-end gap-1.5 pointer-events-none"
+          style={{ bottom: "calc(var(--civic-map-attribution-height, 24px) + 12px)" }}>
           {transitOpen && (
             <div
               id="transit-layer-panel"

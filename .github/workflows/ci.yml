@@ -13,7 +13,7 @@ jobs:
   dependency-review:
     name: Review high-severity dependency changes
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -27,7 +27,8 @@ jobs:
 
   test:
     name: Backend, frontend, and browser checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
 
     steps:
       - name: Check out repository
@@ -126,6 +127,12 @@ jobs:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: npm run test:e2e:trreb
 
+      - name: Run production TRREB browser tests with synthetic data
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+        run: npm run test:e2e:trreb-public
+
       - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v7
@@ -138,7 +145,8 @@ jobs:
 
   postgis:
     name: PostgreSQL/PostGIS migration and geometry checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     services:
       postgres:
         image: postgis/postgis:16-3.4
@@ -184,11 +192,12 @@ jobs:
         working-directory: backend
         run: |
           python etl/seed_demo_data.py
-          pytest -q tests/test_postgis_integration.py
+          pytest -q tests/test_postgis_integration.py tests/test_trreb_postgres.py
 
   containers:
     name: Build production containers
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

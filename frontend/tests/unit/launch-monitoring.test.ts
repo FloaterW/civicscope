@@ -45,4 +45,17 @@ describe("privacy-preserving client error endpoint", () => {
     await POST(request(body));
     expect(log).toHaveBeenCalledTimes(2);
   });
+
+  it("accepts bounded diagnostic fields but strips arbitrary nested values", async () => {
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "test-release");
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { POST } = await import("@/app/api/client-errors/route");
+    const response = await POST(request(JSON.stringify({ code: "api_network", context: {
+      operation: "search", failure: "network", duration: "under_1s", online: false,
+      visibility: "visible", url: "private", message: "private"
+    } })));
+    expect(response.status).toBe(204);
+    expect(JSON.parse(log.mock.calls[0][0])).toEqual({ event: "client_error", code: "api_network", release: "test-release",
+      context: { operation: "search", failure: "network", duration: "under_1s", online: false, visibility: "visible" } });
+  });
 });

@@ -208,7 +208,10 @@ test("suppressed housing components do not produce fabricated totals or tenure s
         Object.assign(feature.properties.metrics, {
           dwellings_total: 100,
           owner_households: 50,
-          renter_households: null,
+          // Shelter-cost tenants belong to a different universe and must not
+          // substitute for a suppressed renter-tenure observation.
+          renter_households: 50,
+          tenure_renter_households: null,
           dwellings_single_detached: 20,
           dwellings_semi_detached: null,
           dwellings_row_house: 10,

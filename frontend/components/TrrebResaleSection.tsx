@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { fetchJson } from "@/lib/api";
 import type { ResaleViewState } from "@/lib/dashboard-url";
+import { TRREB_MODE } from "@/lib/trreb-mode";
 
 type Resale = {
   geoid: string; source_area: string; period: string; period_type: "month" | "year";
@@ -11,6 +12,7 @@ type Resale = {
   warnings: Array<{ area: string; field: string }>;
 };
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const RESALE_ENDPOINT = TRREB_MODE === "public" ? "/api/trreb/resale" : "/api/trreb-preview";
 const format = (value: number | null, currency = false) => value == null ? "Not reported" :
   new Intl.NumberFormat("en-CA", currency ? { style: "currency", currency: "CAD", maximumFractionDigits: 0 } : {}).format(value);
 
@@ -23,18 +25,22 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
   useEffect(() => {
     if (!expanded) return;
     const controller = new AbortController();
-    fetchJson<Resale>(`/api/trreb-preview/${encodeURIComponent(geoid)}?year=${year}${month ? `&month=${month}` : ""}`, controller.signal, 15000)
+    fetchJson<Resale>(`${RESALE_ENDPOINT}/${encodeURIComponent(geoid)}?year=${year}${month ? `&month=${month}` : ""}`, controller.signal, 15000)
       .then(data => { if (!controller.signal.aborted) setResult({ key, data }); })
       .catch(() => { if (!controller.signal.aborted) setResult({ key, error: true }); });
     return () => controller.abort();
   }, [expanded, geoid, year, month, key]);
   const current = result?.key === key ? result : null;
   const data = current?.data;
-  return <details open={expanded} data-topic="resale" className="border-t border-civic-line pt-3" onToggle={event => {
-    if (event.currentTarget.open !== expanded) onViewChange({ ...view, expanded: event.currentTarget.open });
-  }}>
-    <summary className="cursor-pointer text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
-      Resale market — TRREB <span className="ml-2 text-xs font-normal text-civic-muted">Local preview</span>
+  return <details open={expanded} data-topic="resale" className="border-t border-civic-line pt-3">
+    <summary onClick={event => {
+      // A native toggle event is deferred and can be lost to an immediate
+      // navigation. Commit state and the share URL in the activation itself.
+      // Summary's native Enter/Space activation also dispatches this click.
+      event.preventDefault();
+      onViewChange({ ...view, expanded: !expanded });
+    }} className="cursor-pointer text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+      Resale market — TRREB <span className="ml-2 text-xs font-normal text-civic-muted">{TRREB_MODE === "public" ? "Archive · 2020–2025" : "Local preview"}</span>
     </summary>
     {expanded && <div className="mt-3 space-y-3">
       <p className="text-xs leading-5 text-civic-muted">MLS® resale transactions · All home types. Separate from Census and CMHC rental statistics.</p>
@@ -66,7 +72,7 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
           <details className="text-xs text-civic-muted"><summary className="cursor-pointer">Source and interpretation</summary>
             <p className="mt-2 leading-5">{data.geography_note} {data.vintage_note}</p>
           </details>
-          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board, <a className="underline" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a>. Permission conditions pending review; public display and CSV export disabled.</p>
+          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board, <a className="underline" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a>. {TRREB_MODE === "public" ? "Archived 2020–2025 reports; not current market quotes." : "Local preview; public display disabled."} TRREB statistics are not included in CSV downloads.</p>
         </>}
     </div>}
   </details>;

@@ -11,9 +11,19 @@ from .trreb_parser_version import parser_version
 from .trreb_rental import BEDROOMS, expected_rental_areas
 
 
-def audit_history(root):
-    db = sqlite3.connect((root / 'trreb.sqlite').resolve().as_uri() + '?mode=ro', uri=True)
+def audit_history(root, *, database_path=None):
+    # A release audit can use a private, revision-selected SQLite snapshot while
+    # validating the original immutable PDFs in root. Never mutate the archive.
+    database_path = database_path or root / 'trreb.sqlite'
+    db = sqlite3.connect(database_path.resolve().as_uri() + '?mode=ro', uri=True)
     db.row_factory = sqlite3.Row
+    try:
+        return _audit_database(root, database_path, db)
+    finally:
+        db.close()
+
+
+def _audit_database(root, database_path, db):
     expected = {'resale': {f'{y}-{m:02}' for y in range(2020,2026) for m in range(1,13)},
                 'rental': {f'{y}-Q{q}' for y in range(2020,2026) for q in range(1,5)},
                 'resale_annual': {str(y) for y in range(2020,2026)}}
@@ -89,8 +99,7 @@ def audit_history(root):
             'rental_coverage':rental_coverage,'resale_source_total_discrepancies':source_issues,
             'rental_source_total_discrepancies':rental_issues,'year_end_revision_differences':revision_differences,
             'public_display_enabled':False,'public_export_enabled':False}
-    db.close()
-    result['database_sha256']=hashlib.sha256((root/'trreb.sqlite').read_bytes()).hexdigest()
+    result['database_sha256']=hashlib.sha256(database_path.read_bytes()).hexdigest()
     return result
 
 

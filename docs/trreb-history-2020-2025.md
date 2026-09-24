@@ -49,7 +49,7 @@ to the exact report. Uniqueness prevents accidental duplicate observations.
 
 Annual figures come from each December report's year-end table, not
 sums/averages of the monthly snapshots. Extracted market figures and the
-analysis table remain in the ignored local artifacts pending permission review.
+analysis table remain in ignored private artifacts, not the public repository.
 These are nominal, mixed-property statistics, not inflation-adjusted or
 same-home price changes. Reporting coverage and transaction mix can change.
 
@@ -163,9 +163,13 @@ read-only mode and HTTP `no-store`. Production and non-local requests are
 rejected. No TRREB figures were added to existing exports or comparison charts.
 The separate rental importer is complete, but there is no rental UI in this change.
 
-The user reports written aggregate-statistics permission. Exact attribution,
-retention, public-display and redistribution conditions remain unreviewed.
-Consequently public deployment, data downloads and scheduled updates remain off.
+The owner confirms aggregate-statistics permission and authorized proceeding
+without another permission review. As of September 24, a separate default-off
+public resale pathway is implemented using immutable approved releases in the
+existing PostgreSQL database. Production activation requires an audited,
+explicitly selected artifact, authorized database access and verification—not
+another permission-clause request. Data downloads and scheduled updates stay
+off. See [production operations](trreb-production-operations.md).
 
 ## Reproduction
 
@@ -186,6 +190,8 @@ For the local API, set `APP_ENV=development`, `TRREB_PREVIEW_ENABLED=1` and
 allow only the chosen local frontend origin. For the frontend dev server, set
 `NEXT_PUBLIC_TRREB_PREVIEW_ENABLED=1` and point `NEXT_PUBLIC_API_URL` at that API.
 These switches cannot enable the section in a production frontend build.
+The separate public pathway uses `NEXT_PUBLIC_TRREB_ENABLED=1` and
+`TRREB_PUBLIC_ENABLED=1`, and never reads workstation SQLite paths.
 
 ## Verification performed
 

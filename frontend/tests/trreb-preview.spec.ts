@@ -1,13 +1,47 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { request as httpsRequest } from "node:https";
 
 // Synthetic contract fixtures, deliberately not copied from licensed reports.
 const selected = "/?level=municipality&metric=population&geoid=3520005";
+const publicResale = process.env.NEXT_PUBLIC_TRREB_ENABLED === "1";
+const resaleEndpoint = publicResale ? "/api/trreb/resale" : "/api/trreb-preview";
 const section = (page: Page) => page.locator('details[data-topic="resale"]');
+
+if (publicResale) {
+  test("production TLS preserves CSP, same-origin telemetry and a loopback-only proxy", async ({ request }) => {
+    const origin = "https://127.0.0.1:3105";
+    const response = await request.get("/");
+    expect(response.headers()["content-security-policy"]).toContain("upgrade-insecure-requests");
+    const accepted = await request.post("/api/client-errors", {
+      headers: { origin }, data: { code: "api_network" },
+    });
+    expect(accepted.status()).toBe(204);
+    const rejected = await request.post("/api/client-errors", {
+      headers: { origin: "https://unrelated.example" }, data: { code: "api_network" },
+    });
+    expect(rejected.status()).toBe(403);
+    const certificate = await request.get("/__test/certificate.pem");
+    expect(certificate.status()).toBe(200);
+    const ca = await certificate.text();
+    // Send raw request targets; URL clients normalize these before sending.
+    for (const target of ["https://example.invalid/", "//example.invalid/", "/\\example.invalid/"]) {
+      const status = await new Promise<number | undefined>((resolve, reject) => {
+        const probe = httpsRequest(origin, { path: target, ca }, result => {
+          result.resume();
+          result.on("end", () => resolve(result.statusCode));
+        });
+        probe.on("error", reject);
+        probe.end();
+      });
+      expect(status).toBe(400);
+    }
+  });
+}
 
 async function mockResale(page: Page, fail: () => boolean = () => false) {
   const requests: string[] = [];
-  await page.route("**/api/trreb-preview/**", async route => {
+  await page.route(`**${resaleEndpoint}/**`, async route => {
     const url = new URL(route.request().url());
     requests.push(url.pathname + url.search);
     if (fail()) {
@@ -49,11 +83,19 @@ test("lazy request, year/month controls and direct attribution", async ({ page }
   await page.getByLabel("Reporting period", { exact: true }).selectOption("1");
   await expect(section(page)).toContainText("January 2020");
   await expect(section(page)).toContainText("$654,321");
-  expect(requests.at(-1)).toBe("/api/trreb-preview/3520005?year=2020&month=1");
+  expect(requests.at(-1)).toBe(`${resaleEndpoint}/3520005?year=2020&month=1`);
   await expect(section(page).getByRole("link", { name: "Market Watch, page 3" })).toHaveAttribute("href", "https://trreb.ca/synthetic-test-report.pdf");
   await page.getByLabel("Reporting period", { exact: true }).selectOption("");
   await expect(section(page)).toContainText("January–December 2020");
   await expect(section(page)).toContainText("$123,456");
+});
+
+test("resale display identifies its archive or preview mode and excludes CSV", async ({ page }) => {
+  await mockResale(page);
+  await openResale(page);
+  await expect(section(page)).toContainText(publicResale ? "Archive · 2020–2025" : "Local preview");
+  await expect(section(page)).toContainText("TRREB statistics are not included in CSV downloads");
+  await expect(section(page)).not.toContainText("Permission conditions pending");
 });
 
 test("outage hides stale values and retry recovers", async ({ page }) => {
@@ -68,6 +110,21 @@ test("outage hides stale values and retry recovers", async ({ page }) => {
   await section(page).getByRole("button", { name: "Retry resale statistics" }).click();
   await expect(section(page)).toContainText("$123,456");
   await expect(section(page)).toContainText("January–December 2024");
+});
+
+test("collapse commits its share URL during activation before a reload can interrupt it", async ({ page }) => {
+  await mockResale(page);
+  await openResale(page);
+  await expect(page).toHaveURL(/resale_open=1/);
+  // Native details toggle is queued as a later task. Capture the URL in the
+  // activation task itself so navigation cannot hide this lost-update race.
+  const collapsedUrl = await section(page).locator("summary").first().evaluate(summary => {
+    (summary as HTMLElement).click();
+    return window.location.href;
+  });
+  expect(new URL(collapsedUrl).searchParams.has("resale_open")).toBe(false);
+  await page.reload();
+  await expect(section(page)).not.toHaveAttribute("open", "");
 });
 
 test("historical context survives map changes, sharing, reload and history", async ({ page, context }) => {
@@ -162,7 +219,7 @@ for (const width of [390, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).include('details[data-topic="resale"]').analyze()).violations).toEqual([]);
     await summary.focus();
-    await page.keyboard.press("Enter");
+    await page.keyboard.press("Space");
     await expect(section(page)).not.toHaveAttribute("open", "");
   });
 }

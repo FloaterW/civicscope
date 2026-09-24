@@ -3,5 +3,6 @@ from app.models.cmhc_tract_metric import CmhcTractMetric
 from app.models.etl_run import ETLRun
 from app.models.geography import Geography
 from app.models.metric import Metric
+from app.models.trreb import TrrebRelease, TrrebObservation, TrrebPublication, TrrebPublicationEvent
 
-__all__ = ["CmhcMetric", "CmhcTractMetric", "ETLRun", "Geography", "Metric"]
+__all__ = ["CmhcMetric", "CmhcTractMetric", "ETLRun", "Geography", "Metric", "TrrebRelease", "TrrebObservation", "TrrebPublication", "TrrebPublicationEvent"]
