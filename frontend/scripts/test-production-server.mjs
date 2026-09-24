@@ -79,7 +79,8 @@ try {
     const headers = { ...request.headers, host: target.host };
     // Preserve same-origin semantics across local TLS termination. Never
     // rewrite a missing/foreign Origin, which the actual Next route must deny.
-    if (!apiRequest && headers.origin === `https://127.0.0.1:${tlsPort}`) headers.origin = targetOrigin;
+    // NextURL normalizes loopback IPs to localhost in request.url.
+    if (!apiRequest && headers.origin === `https://127.0.0.1:${tlsPort}`) headers.origin = `http://localhost:${frontendPort}`;
     // Constant destination hostname prevents a request target from becoming an
     // arbitrary outbound URL. Only the allowlisted loopback service port varies.
     const forwarded = http.request({
