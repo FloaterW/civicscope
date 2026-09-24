@@ -250,7 +250,8 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             >
               <BarChart
                 data={chartData}
-                margin={{ top: 8, right: 8, bottom: 8, left: 12 }}
+                // Leave room for the value label above the tallest bar.
+                margin={{ top: 24, right: 8, bottom: 8, left: 12 }}
                 onMouseMove={() => setChartTooltipActive(true)}
                 onMouseLeave={() => setChartTooltipActive(false)}
               >
