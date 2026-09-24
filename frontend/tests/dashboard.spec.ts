@@ -943,6 +943,16 @@ test.describe("CivicScope dashboard regressions", () => {
       }
       await route.fulfill({ response, json: payload });
     });
+    await page.route(`${API_BASE}/api/geographies?**`, async route => {
+      const response = await route.fetch();
+      const payload = await response.json() as { items: MapFeaturePayload["properties"][] };
+      const fixture = payload.items.find(item => item.geoid === "5320105.17");
+      if (fixture) {
+        fixture.metrics.rent_burden_pct = 36;
+        fixture.metrics.data_quality = { ...fixture.metrics.data_quality, rent_burden_pct: "estimated" };
+      }
+      await route.fulfill({ response, json: payload });
+    });
     await page.goto("/");
     await page.getByRole("button", { name: "Census tracts" }).click();
     await expect(page.getByTestId("civic-map")).toHaveAttribute(
