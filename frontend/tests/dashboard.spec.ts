@@ -41,6 +41,21 @@ type MapPayload = {
 };
 
 test.describe("CivicScope dashboard regressions", () => {
+  test("Toronto tenure uses the official owner and renter universe on cold load and reload", async ({ page }, testInfo) => {
+    await blockExternalMapAssets(page);
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    for (const load of ["cold", "reload"]) {
+      if (load === "reload") await page.reload();
+      const panel = page.getByTestId("detail-panel");
+      await expect(panel).toContainText("Toronto");
+      const stock = panel.locator('[data-topic="stock"]');
+      await stock.locator("summary").click();
+      await expect(stock.getByText("Owner", { exact: true }).locator("..")).toContainText("51.9%");
+      await expect(stock.getByText("Renter", { exact: true }).locator("..")).toContainText("48.1%");
+      await stock.screenshot({ path: testInfo.outputPath(`toronto-tenure-${load}.png`) });
+    }
+  });
+
   test("metric changes preserve a shared geography while map data is still loading", async ({ page }) => {
     await blockExternalMapAssets(page);
     let releaseMap!: () => void;

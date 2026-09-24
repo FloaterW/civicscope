@@ -11,8 +11,8 @@ import path from "node:path";
 const frontendPort = 3106;
 const tlsPort = 3105;
 const upstream = new URL(process.env.CIVICSCOPE_TEST_API_URL ?? "http://127.0.0.1:8000");
-if (!["127.0.0.1", "localhost", "[::1]"].includes(upstream.hostname) || !["http:", "https:"].includes(upstream.protocol)) {
-  throw new Error("Production browser tests require a loopback backend.");
+if (!["127.0.0.1", "localhost"].includes(upstream.hostname) || upstream.protocol !== "http:") {
+  throw new Error("Production browser tests require an HTTP loopback backend.");
 }
 const openssl = process.platform === "win32" && existsSync("C:/Program Files/Git/usr/bin/openssl.exe")
   ? "C:/Program Files/Git/usr/bin/openssl.exe" : "openssl";
@@ -29,7 +29,7 @@ function stop(code = 0) {
   server?.closeAllConnections();
   child?.kill();
   for (const file of [keyPath, certPath]) if (existsSync(file)) unlinkSync(file);
-  rmdirSync(certificateDir);
+  if (existsSync(certificateDir)) rmdirSync(certificateDir);
   process.exitCode = code;
 }
 process.once("SIGINT", () => stop());
@@ -38,16 +38,28 @@ try {
   execFileSync(openssl, ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
     "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost",
     "-keyout", keyPath, "-out", certPath], { stdio: "ignore", windowsHide: true });
+  const credentials = { key: readFileSync(keyPath), cert: readFileSync(certPath) };
+  // Keep credentials in memory only. Windows test runners can terminate a
+  // process tree without signals, so do not defer file cleanup until shutdown.
+  unlinkSync(keyPath);
+  unlinkSync(certPath);
+  rmdirSync(certificateDir);
   child = spawn(process.execPath, [".next/standalone/server.js"], {
     env: { ...process.env, HOSTNAME: "127.0.0.1", PORT: String(frontendPort) },
     stdio: "inherit", windowsHide: true,
   });
   child.once("exit", code => { if (!stopping) stop(code ?? 1); });
   child.once("error", () => stop(1));
-  server = https.createServer({ key: readFileSync(keyPath), cert: readFileSync(certPath) }, (request, response) => {
+  server = https.createServer(credentials, (request, response) => {
     const requestPath = request.url ?? "/";
     if (!requestPath.startsWith("/") || requestPath.startsWith("//")) {
       response.writeHead(400).end("Origin-form test requests only");
+      return;
+    }
+    if (requestPath === "/__test/certificate.pem" && request.method === "GET") {
+      // Public certificate only, for raw TLS test probes to trust this server.
+      response.writeHead(200, { "Content-Type": "application/x-pem-file", "Cache-Control": "no-store" });
+      response.end(credentials.cert);
       return;
     }
     // Client error reporting belongs to Next.js, all other API paths to FastAPI.
@@ -68,8 +80,12 @@ try {
     // Preserve same-origin semantics across local TLS termination. Never
     // rewrite a missing/foreign Origin, which the actual Next route must deny.
     if (!apiRequest && headers.origin === `https://127.0.0.1:${tlsPort}`) headers.origin = targetOrigin;
-    const transport = target.protocol === "https:" ? https : http;
-    const forwarded = transport.request(target, { method: request.method, headers }, result => {
+    // Constant destination hostname prevents a request target from becoming an
+    // arbitrary outbound URL. Only the allowlisted loopback service port varies.
+    const forwarded = http.request({
+      hostname: "127.0.0.1", port: apiRequest ? Number(upstream.port || 80) : frontendPort,
+      path: `${target.pathname}${target.search}`, method: request.method, headers,
+    }, result => {
       response.writeHead(result.statusCode ?? 502, result.headers);
       result.pipe(response);
     });

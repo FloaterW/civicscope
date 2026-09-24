@@ -77,6 +77,12 @@ promotion. Ship the seed, tract CSV and matching source manifest together.
 Database migration and post-deployment API checks are required to update an
 existing production database; changing importer code alone is insufficient.
 
+Core frontend requests carry a release-specific `data_revision` and request
+HTTP revalidation. This bypasses pre-correction browser/CDN payloads and avoids
+retaining an older API response if the frontend deploys first. Existing
+in-memory map reuse remains unchanged. Already-open tabs running the old
+JavaScript must reload to receive the new data contract.
+
 The corrected corpus has official or unavailable tract rent burden, and no
 estimated burden rows. Map/catalog badges now inspect the actual rows rather
 than always advertising mixed provenance. Synthetic regression fixtures still

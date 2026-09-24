@@ -15,6 +15,9 @@ import {
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+// Bump when a packaged data/schema correction must bypass previously cached
+// core payloads. Revalidate too: frontend and API deployments are not atomic.
+export const CORE_DATA_REVISION = "census-2021-20260924";
 const DEFAULT_API_TIMEOUT_MS = 60_000;
 
 export function normalizeApiTimeout(value: number): number {
@@ -102,7 +105,8 @@ export async function fetchJson<T>(
   let response: Response | undefined;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      signal: requestController.signal
+      signal: requestController.signal,
+      cache: /^\/api\/(?:map-data|summary|compare)(?:\?|$)/.test(path) ? "no-cache" : "default",
     });
     if (!response.ok) {
       reportClientError("api_response", apiErrorContext(path, startedAt, "http", response.status));
@@ -155,6 +159,7 @@ export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, si
     metric,
     detail: "display",
     type: geographyLevel,
+    data_revision: CORE_DATA_REVISION,
   });
   if (year !== undefined) {
     params.set("year", String(year));
@@ -163,7 +168,7 @@ export function getMapData(metric: MetricKey, geographyLevel: GeographyLevel, si
 }
 
 export function getSummary(geoid: string | undefined, geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
-  const params = new URLSearchParams({ type: geographyLevel });
+  const params = new URLSearchParams({ type: geographyLevel, data_revision: CORE_DATA_REVISION });
   if (geoid) {
     params.set("ids", geoid);
   }
@@ -174,7 +179,7 @@ export function getSummary(geoid: string | undefined, geographyLevel: GeographyL
 }
 
 export function getComparison(ids: string[], geographyLevel: GeographyLevel, signal?: AbortSignal, year?: number) {
-  const params = new URLSearchParams({ type: geographyLevel });
+  const params = new URLSearchParams({ type: geographyLevel, data_revision: CORE_DATA_REVISION });
   if (ids.length) {
     params.set("ids", ids.join(","));
   }

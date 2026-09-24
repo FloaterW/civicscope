@@ -21,10 +21,13 @@ if (publicResale) {
       headers: { origin: "https://unrelated.example" }, data: { code: "api_network" },
     });
     expect(rejected.status()).toBe(403);
+    const certificate = await request.get("/__test/certificate.pem");
+    expect(certificate.status()).toBe(200);
+    const ca = await certificate.text();
     // Send raw request targets; URL clients normalize these before sending.
     for (const target of ["https://example.invalid/", "//example.invalid/", "/\\example.invalid/"]) {
       const status = await new Promise<number | undefined>((resolve, reject) => {
-        const probe = httpsRequest(origin, { path: target, rejectUnauthorized: false }, result => {
+        const probe = httpsRequest(origin, { path: target, ca }, result => {
           result.resume();
           result.on("end", () => resolve(result.statusCode));
         });
