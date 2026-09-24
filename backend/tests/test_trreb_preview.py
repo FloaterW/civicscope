@@ -84,3 +84,12 @@ def test_preview_returns_source_and_rejects_bad_inputs(monkeypatch,tmp_path):
     assert c.get('/api/trreb-preview/3520005?month=13').status_code==422
     assert c.get('/api/trreb-preview/5350403.16').status_code==404
     assert c.get('/api/trreb-preview/3520005?year=2025&month=1').status_code==503
+
+
+@pytest.mark.parametrize('manifest', [[], None, 'invalid', 7, True, {}, {'errors': []}])
+def test_wrong_shaped_audit_fails_closed(monkeypatch,tmp_path,manifest):
+    c=client(monkeypatch,tmp_path)
+    (tmp_path/'full-audit.json').write_text(json.dumps(manifest))
+    response=c.get('/api/trreb-preview/3520005')
+    assert response.status_code==503
+    assert response.json()=={'detail':'TRREB preview is unavailable or requires validation'}

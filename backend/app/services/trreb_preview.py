@@ -28,7 +28,7 @@ def read_resale(path: Path, geoid: str, year: int, month: int | None):
     if geoid not in MUNICIPALITIES or not 2020<=year<=2025 or (month is not None and not 1<=month<=12):
         raise ValueError('Unsupported geography or period')
     manifest=json.loads(path.with_name('full-audit.json').read_text())
-    if manifest.get('errors') != [] or manifest.get('database_sha256')!=hashlib.sha256(path.read_bytes()).hexdigest():
+    if not isinstance(manifest, dict) or manifest.get('errors') != [] or manifest.get('database_sha256')!=hashlib.sha256(path.read_bytes()).hexdigest():
         raise ValueError('Historical database requires a fresh successful audit')
     family='resale_annual' if month is None else 'resale'
     period=str(year) if month is None else f'{year}-{month:02}'

@@ -5,12 +5,23 @@ import type { GeographyLevel, MetricKey } from "@/types";
 export const DEFAULT_DASHBOARD_LEVEL: GeographyLevel = "municipality";
 export const DEFAULT_DASHBOARD_METRIC: MetricKey = "rent_burden_pct";
 
+export type ResaleViewState = { year: number; month?: number; expanded: boolean };
+export const DEFAULT_RESALE_VIEW: ResaleViewState = { year: 2025, expanded: false };
+
+function parseResaleView(params: URLSearchParams): ResaleViewState | undefined {
+  const year = params.get("resale_year");
+  const month = params.get("resale_month");
+  if (!year || !/^202[0-5]$/.test(year) || (month !== null && !/^(?:[1-9]|1[0-2])$/.test(month))) return undefined;
+  return { year: Number(year), ...(month === null ? {} : { month: Number(month) }), expanded: params.get("resale_open") === "1" };
+}
+
 export type DashboardUrlState = {
   level: GeographyLevel;
   metric: MetricKey;
   year?: number;
   geoid?: string;
   compareIds?: string[];
+  resale?: ResaleViewState;
   adjustedForTransit: boolean;
 };
 
@@ -54,6 +65,7 @@ export function parseDashboardUrl(search: string): DashboardUrlState {
   const level: GeographyLevel = adjustedForTransit ? "census_tract" : requestedLevel;
   const requestedGeoid = params.get("geoid")?.trim();
   const compareIds = normalizeCompareIds((params.get("compare") ?? "").split(","), level);
+  const resale = parseResaleView(params);
 
   return {
     level,
@@ -62,7 +74,8 @@ export function parseDashboardUrl(search: string): DashboardUrlState {
     geoid:
       requestedGeoid && isGeoidForLevel(requestedGeoid, level) ? requestedGeoid : undefined,
     adjustedForTransit,
-    ...(compareIds.length ? { compareIds } : {})
+    ...(compareIds.length ? { compareIds } : {}),
+    ...(resale ? { resale } : {})
   };
 }
 
@@ -72,6 +85,14 @@ export function buildDashboardUrl(
   state: Omit<DashboardUrlState, "adjustedForTransit">
 ): string {
   const url = new URL(currentHref);
+  // Contextual map changes retain the independent resale research period.
+  const resale = state.resale ?? parseResaleView(url.searchParams);
+  for (const key of ["resale_year", "resale_month", "resale_open"]) url.searchParams.delete(key);
+  if (resale) {
+    url.searchParams.set("resale_year", String(resale.year));
+    if (resale.month !== undefined) url.searchParams.set("resale_month", String(resale.month));
+    if (resale.expanded) url.searchParams.set("resale_open", "1");
+  }
   url.searchParams.set("level", state.level);
   url.searchParams.set("metric", state.metric);
   const compareIds = normalizeCompareIds(state.compareIds ?? (url.searchParams.get("compare") ?? "").split(","), state.level);

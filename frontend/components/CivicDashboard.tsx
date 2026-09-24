@@ -16,7 +16,9 @@ import {
   buildDashboardUrl,
   DEFAULT_DASHBOARD_LEVEL,
   DEFAULT_DASHBOARD_METRIC,
-  parseDashboardUrl
+  DEFAULT_RESALE_VIEW,
+  parseDashboardUrl,
+  type ResaleViewState
 } from "@/lib/dashboard-url";
 import { isTransitMetric } from "@/lib/transit";
 import type {
@@ -100,6 +102,7 @@ function commitDashboardUrl(
     year?: number;
     geoid?: string;
     compareIds?: string[];
+    resale?: ResaleViewState;
   },
   mode: UrlHistoryMode
 ) {
@@ -131,6 +134,7 @@ export function CivicDashboard() {
   const [comparisonState, setComparisonState] = useState<RequestState<CompareResponse> | null>(null);
   const [selected, setSelected] = useState<Geography | null>(null);
   const [pinnedCompareIds, setPinnedCompareIds] = useState<string[]>([]);
+  const [resaleView, setResaleView] = useState<ResaleViewState>(DEFAULT_RESALE_VIEW);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Geography[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -215,6 +219,7 @@ export function CivicDashboard() {
       : parsed.year;
 
     setMetric(parsed.metric);
+    setResaleView(parsed.resale ?? DEFAULT_RESALE_VIEW);
     setPinnedCompareIds(parsed.compareIds ?? []);
     setGeographyLevel(parsed.level);
     setSelectedYear(yearIsAvailable ? parsed.year : undefined);
@@ -272,6 +277,7 @@ export function CivicDashboard() {
       year: number | undefined;
       geoid: string | undefined;
       compareIds: string[];
+      resale: ResaleViewState;
     }>,
     mode: UrlHistoryMode = "push"
   ) {
@@ -281,7 +287,8 @@ export function CivicDashboard() {
         metric: overrides.metric ?? metric,
         year: "year" in overrides ? overrides.year : currentShareableYear(),
         geoid: "geoid" in overrides ? overrides.geoid : selectedGeoid,
-        compareIds: overrides.compareIds ?? pinnedCompareIds
+        compareIds: overrides.compareIds ?? pinnedCompareIds,
+        resale: overrides.resale
       },
       mode
     );
@@ -707,7 +714,9 @@ export function CivicDashboard() {
               1,334 census tracts.
             </p>
           </div>
-          <div data-testid="dashboard-toolbar" className="grid grid-cols-[minmax(0,1fr)_44px] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] xl:grid-cols-[minmax(180px,1fr)_280px_minmax(220px,1fr)_120px_44px]">
+          {/* Firefox restores dynamic disabled states on reload unless autocomplete is off.
+              Let the validated URL state, not native form restoration, own these controls. */}
+          <form autoComplete="off" aria-label="Dashboard controls" onSubmit={event => event.preventDefault()} data-testid="dashboard-toolbar" className="grid grid-cols-[minmax(0,1fr)_44px] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] xl:grid-cols-[minmax(180px,1fr)_280px_minmax(220px,1fr)_120px_44px]">
             <div className="col-span-2 min-w-0 sm:col-span-1">
               <label htmlFor="geography-search" className="mb-1 block text-xs font-medium text-civic-muted">Find an area</label>
             <div
@@ -862,7 +871,7 @@ export function CivicDashboard() {
               )}
             </div>
             <div className="sm:col-start-3 sm:row-start-2 xl:col-start-auto xl:row-start-auto"><ThemeToggle /></div>
-          </div>
+          </form>
         </div>
       </header>
 
@@ -995,6 +1004,11 @@ export function CivicDashboard() {
           className={`${detailsPanelOpen ? "block" : "hidden xl:block"} order-3 min-w-0 xl:col-start-2 ${selected ? "xl:row-span-2 xl:row-start-1 xl:h-[var(--workspace-panel-height)] xl:min-h-0" : "xl:row-start-2"}`}
         >
           <DetailPanel
+            resaleView={resaleView}
+            onResaleViewChange={(view) => {
+              setResaleView(view);
+              updateDashboardUrl({ resale: view });
+            }}
             geography={selected}
             metric={metric}
             geographyLevel={geographyLevel}

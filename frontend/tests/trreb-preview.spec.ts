@@ -70,6 +70,63 @@ test("outage hides stale values and retry recovers", async ({ page }) => {
   await expect(section(page)).toContainText("January–December 2024");
 });
 
+test("historical context survives map changes, sharing, reload and history", async ({ page, context }) => {
+  const hydrationErrors: string[] = [];
+  page.on("console", message => {
+    if (["error", "warning"].includes(message.type()) && /hydration|hydrated/i.test(message.text())) hydrationErrors.push(message.text());
+  });
+  await mockResale(page);
+  await openResale(page);
+  await expect(section(page).getByText(/equivalence to the selected Census boundary is not certified/)).toBeVisible();
+  await page.getByLabel("Report year", { exact: true }).selectOption("2020");
+  await page.getByLabel("Reporting period", { exact: true }).selectOption("1");
+  await expect(section(page)).toContainText("January 2020");
+  await page.getByRole("combobox", { name: "Map metric", exact: true }).selectOption("rent_burden_pct");
+  await expect(section(page)).toHaveAttribute("open", "");
+  await expect(page.getByLabel("Report year", { exact: true })).toHaveValue("2020");
+  await expect(page.getByLabel("Reporting period", { exact: true })).toHaveValue("1");
+  await page.getByTestId("geography-search").fill("Oakville");
+  await page.getByRole("option").filter({ hasText: "Oakville" }).click();
+  await expect(section(page)).toContainText("Oakville · January 2020");
+  const sharedUrl = page.url();
+  expect(new URL(sharedUrl).searchParams.get("resale_year")).toBe("2020");
+  expect(new URL(sharedUrl).searchParams.get("resale_month")).toBe("1");
+  const shared = await context.newPage();
+  await mockResale(shared);
+  await shared.goto(sharedUrl);
+  await expect(section(shared)).toContainText("Oakville · January 2020");
+  await shared.close();
+  await page.reload();
+  await expect(section(page)).toContainText("Oakville · January 2020");
+  await page.getByLabel("Reporting period", { exact: true }).selectOption("2");
+  await expect(section(page)).toContainText("February 2020");
+  await page.goBack();
+  await expect(section(page)).toContainText("January 2020");
+  await page.goForward();
+  await expect(section(page)).toContainText("February 2020");
+  await page.getByLabel("Reporting period", { exact: true }).selectOption("");
+  await expect(section(page)).toContainText("January–December 2020");
+  await section(page).locator("summary").first().click();
+  await page.reload();
+  await expect(section(page)).not.toHaveAttribute("open", "");
+  await section(page).locator("summary").first().click();
+  await expect(page.getByLabel("Report year", { exact: true })).toHaveValue("2020");
+  await expect(page.getByLabel("Reporting period", { exact: true })).toHaveValue("");
+  expect(hydrationErrors).toEqual([]);
+});
+
+test("comparison only shows the rent ratio for housing metrics", async ({ page }) => {
+  await mockResale(page);
+  await page.goto(selected);
+  await expect(page.getByRole("table")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /Rent-to-income/ })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Map metric", exact: true }).selectOption("population_growth_pct");
+  await expect(page.getByRole("table")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /Rent-to-income/ })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Map metric", exact: true }).selectOption("rent_burden_pct");
+  await expect(page.getByRole("columnheader", { name: /Rent-to-income/ })).toBeVisible();
+});
+
 test("municipality selection updates context; census tracts have no resale fallback", async ({ page }) => {
   const requests = await mockResale(page);
   await openResale(page);

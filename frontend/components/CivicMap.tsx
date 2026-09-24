@@ -12,6 +12,7 @@ import {
   type ChoroplethClass
 } from "@/lib/colors";
 import { mapAnimationDuration } from "@/lib/map-motion";
+import { normalizeBasemapStyle } from "@/lib/basemap-style";
 import {
   allTransitFiltersEnabled,
   anyTransitFilterEnabled,
@@ -395,8 +396,7 @@ export function CivicMap({
         center: [-79.45, 43.78],
         zoom: 8.15,
         minZoom: 7,
-        maxZoom: 12.5,
-        style: BASEMAP_STYLES[theme]
+        maxZoom: 12.5
       });
 
       const handleStyleLoad = () => {
@@ -528,6 +528,7 @@ export function CivicMap({
       });
 
       mapRef.current = map;
+      map.setStyle(BASEMAP_STYLES[theme], { transformStyle: (_previous, next) => normalizeBasemapStyle(next) });
     }
 
     void initializeMap().catch(() => {
@@ -598,7 +599,7 @@ export function CivicMap({
       popupRef.current?.remove();
       // Force a full style lifecycle. URL-to-URL diffing can complete without a
       // new map-level style.load event, leaving custom sources absent.
-      map.setStyle(BASEMAP_STYLES[theme], { diff: false });
+      map.setStyle(BASEMAP_STYLES[theme], { diff: false, transformStyle: (_previous, next) => normalizeBasemapStyle(next) });
     });
     observer.observe(document.documentElement, {
       attributes: true,

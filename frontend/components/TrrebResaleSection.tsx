@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { fetchJson } from "@/lib/api";
+import type { ResaleViewState } from "@/lib/dashboard-url";
 
 type Resale = {
   geoid: string; source_area: string; period: string; period_type: "month" | "year";
@@ -13,11 +14,9 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const format = (value: number | null, currency = false) => value == null ? "Not reported" :
   new Intl.NumberFormat("en-CA", currency ? { style: "currency", currency: "CAD", maximumFractionDigits: 0 } : {}).format(value);
 
-export function TrrebResaleSection({ geoid }: { geoid: string }) {
+export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: string; view: ResaleViewState; onViewChange: (view: ResaleViewState) => void }) {
   const id = useId();
-  const [expanded, setExpanded] = useState(false);
-  const [year, setYear] = useState("2025");
-  const [month, setMonth] = useState("");
+  const { expanded, year, month } = view;
   const [retry, setRetry] = useState(0);
   const [result, setResult] = useState<{ key: string; data?: Resale; error?: boolean } | null>(null);
   const key = `${geoid}:${year}:${month}:${retry}`;
@@ -31,22 +30,25 @@ export function TrrebResaleSection({ geoid }: { geoid: string }) {
   }, [expanded, geoid, year, month, key]);
   const current = result?.key === key ? result : null;
   const data = current?.data;
-  return <details data-topic="resale" className="border-t border-civic-line pt-3" onToggle={event => setExpanded(event.currentTarget.open)}>
+  return <details open={expanded} data-topic="resale" className="border-t border-civic-line pt-3" onToggle={event => {
+    if (event.currentTarget.open !== expanded) onViewChange({ ...view, expanded: event.currentTarget.open });
+  }}>
     <summary className="cursor-pointer text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
       Resale market — TRREB <span className="ml-2 text-xs font-normal text-civic-muted">Local preview</span>
     </summary>
     {expanded && <div className="mt-3 space-y-3">
       <p className="text-xs leading-5 text-civic-muted">MLS® resale transactions · All home types. Separate from Census and CMHC rental statistics.</p>
+      <p className="text-xs leading-5 text-civic-muted">TRREB reporting area; equivalence to the selected Census boundary is not certified. No census-tract allocation.</p>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label htmlFor={`${id}-year`} className="text-xs text-civic-muted">Report year</label>
-          <select id={`${id}-year`} value={year} onChange={event => setYear(event.target.value)} className="mt-1 w-full rounded-md border border-civic-line bg-civic-surface p-2 text-sm text-civic-ink">
+          <select id={`${id}-year`} value={year} onChange={event => onViewChange({ ...view, year: Number(event.target.value) })} className="mt-1 w-full rounded-md border border-civic-line bg-civic-surface p-2 text-sm text-civic-ink">
             {[2025,2024,2023,2022,2021,2020].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>
           <label htmlFor={`${id}-period`} className="text-xs text-civic-muted">Reporting period</label>
-          <select id={`${id}-period`} value={month} onChange={event => setMonth(event.target.value)} className="mt-1 w-full rounded-md border border-civic-line bg-civic-surface p-2 text-sm text-civic-ink">
+          <select id={`${id}-period`} value={month ?? ""} onChange={event => onViewChange({ ...view, month: event.target.value ? Number(event.target.value) : undefined })} className="mt-1 w-full rounded-md border border-civic-line bg-civic-surface p-2 text-sm text-civic-ink">
             <option value="">Full year</option>
             {MONTHS.map((name,index) => <option key={name} value={index+1}>{name}</option>)}
           </select>
@@ -64,7 +66,7 @@ export function TrrebResaleSection({ geoid }: { geoid: string }) {
           <details className="text-xs text-civic-muted"><summary className="cursor-pointer">Source and interpretation</summary>
             <p className="mt-2 leading-5">{data.geography_note} {data.vintage_note}</p>
           </details>
-          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board, <a className="underline" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}</a>. Permission conditions pending review; public display and CSV export disabled.</p>
+          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board, <a className="underline" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a>. Permission conditions pending review; public display and CSV export disabled.</p>
         </>}
     </div>}
   </details>;
