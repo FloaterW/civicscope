@@ -185,6 +185,7 @@ def serialize_metric(metric: Metric) -> dict[str, Any]:
         "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
         "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
         "owner_households": metric.owner_households,
+        "tenure_renter_households": metric.tenure_renter_households,
         "transit_route_count": metric.transit_route_count,
         "transit_score": metric.transit_score,
         "data_quality": build_metric_quality(metric),
@@ -745,13 +746,17 @@ def get_map_data(
         "max": max(values) if values else None,
     }
 
+    has_estimated_rent_burden = any(
+        resolve_rent_burden(row.median_rent, row.median_income, row.rent_burden_pct)[1] == "estimated"
+        for _, row in records
+    )
     metadata: dict[str, Any] = {
         "metric": metric_key,
         "year": cmhc_year if cmhc else metric_year,
         "cmhc_year": cmhc_year,
         "domain": domain,
         "geography_type": normalized_type,
-        "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key, year=cmhc_year),
+        "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key, year=cmhc_year, has_estimated_rent_burden=has_estimated_rent_burden),
         "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
         "available_years": available_cmhc_years(db),
         # All non-CMHC metrics share one client-side map payload. Keep the small
@@ -765,6 +770,7 @@ def get_map_data(
                     cmhc=is_cmhc_metric(candidate),
                     metric_key=candidate,
                     year=cmhc_year,
+                    has_estimated_rent_burden=has_estimated_rent_burden,
                 ),
                 "source": map_data_source(
                     normalized_type,
@@ -866,7 +872,7 @@ def map_data_source(geography_type: str | None, cmhc: bool = False, metric_key: 
     if geography_type == "census_tract":
         return (
             "Statistics Canada 2021 census tract cartographic boundaries filtered to the GTA; "
-            "tract metrics are official 2021 Census Profile values fetched via the SDMX DF_CT dataflow."
+            "tract metrics are official 2021 Census Profile values from Statistics Canada."
         )
     return (
         "GTA municipal metrics from the loaded database; packaged seed metrics use "
@@ -879,6 +885,7 @@ def data_quality(
     cmhc: bool = False,
     metric_key: str | None = None,
     year: int | None = None,
+    has_estimated_rent_burden: bool = False,
 ) -> dict[str, str]:
     if cmhc and geography_type == "census_tract":
         if metric_key is not None and metric_key in CMHC_REAL_TRACT_METRICS:
@@ -940,13 +947,13 @@ def data_quality(
             ),
         }
     if geography_type == "census_tract":
-        if metric_key == "rent_burden_pct":
+        if metric_key == "rent_burden_pct" and has_estimated_rent_burden:
             return {
                 "metric_status": "mixed",
                 "label": "Official + estimated tract metrics",
                 "description": (
                     "Census tract geometries and metrics are official Statistics Canada 2021 "
-                    "Census Profile values (SDMX DF_CT). Where Statistics Canada suppressed the "
+                    "Census Profile values. Where Statistics Canada suppressed the "
                     "rent-burden value it is estimated from median rent and income and clearly "
                     "labeled; tracts without enough data show \"Not available\"."
                 ),
@@ -956,7 +963,7 @@ def data_quality(
             "label": "Official tract metrics",
             "description": (
                 "Census tract geometries and metrics are official Statistics Canada 2021 "
-                "Census Profile values fetched via the SDMX DF_CT dataflow. Suppressed values "
+                "Census Profile values. Suppressed values "
                 "show as \"Not available\"; growth computed off a very small base is flagged."
             ),
         }

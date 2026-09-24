@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-09-24T13:17:58.332963+00:00",
+  "source": "Statistics Canada 2021 Census Profile official bulk CSV",
+  "source_archives": [
+    {
+      "url": "https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/details/download-telecharger/comp/GetFile.cfm?FILETYPE=CSV&GEONO=021&Lang=E",
+      "sha256": "f8b76c95ce173fd62e56343d03e32b70c4a3aeb477c75e0202e8805093c879b6"
+    },
+    {
+      "url": "https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/details/download-telecharger/comp/GetFile.cfm?FILETYPE=CSV&GEONO=007&Lang=E",
+      "sha256": "5d29811e5c3171cb16c9564bfbce0a08da45d1584810be2bd74764cbd2329ffc"
+    }
+  ],
+  "municipalities": 25,
+  "tracts": 1334,
+  "coverage": {
+    "row_coverage_pct": 100.0,
+    "field_coverage_pct": {
+      "population": 100.0,
+      "previous_population": 100.0,
+      "median_income": 99.6,
+      "median_rent": 98.7,
+      "renter_households": 99.6,
+      "rent_burden_pct": 99.4
+    },
+    "duplicate_rows": 0,
+    "missing_geoids": 0,
+    "unexpected_geoids": 0,
+    "partial": false
+  },
+  "artifacts": {
+    "demo_seed.json": "0ce30bc45105eb8a83631943ea87d4f79a1a1cdb75290a2482217d9f08b68c9d",
+    "statcan_ct_metrics.csv": "e444dc58fe929bdf147dd64972944eb070e3e572be0172d8c5a2ad8d6b651a7b"
+  }
+}

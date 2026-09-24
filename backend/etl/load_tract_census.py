@@ -31,6 +31,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from etl.census_flags import observation_value
+
 SDMX_BASE_URL = (
     "https://api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_CT"
 )
@@ -50,7 +52,8 @@ CHARACTERISTIC_IDS = {
     "dwellings_apt_duplex": "45",
     "dwellings_apt_low_rise": "46",
     "dwellings_apt_high_rise": "47",
-    "owner_households": "1406",
+    "owner_households": "1401",  # Owner; 1406 is "Not condominium".
+    "tenure_renter_households": "1402",  # Same tenure universe as Owner.
 }
 CHARACTERISTIC_TO_FIELD = {v: k for k, v in CHARACTERISTIC_IDS.items()}
 
@@ -97,6 +100,7 @@ class TractMetric:
     dwellings_apt_low_rise: int | None = None
     dwellings_apt_high_rise: int | None = None
     owner_households: int | None = None
+    tenure_renter_households: int | None = None
 
 
 def load_tract_geoids(seed_path: Path | None = None) -> list[str]:
@@ -114,7 +118,7 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
     """Fetch Census Profile metrics for a batch of tract DGUIDs."""
     dguid_str = "+".join(dguids)
     char_str = "+".join(CHARACTERISTIC_IDS.values())
-    url = f"{SDMX_BASE_URL}/A5.{dguid_str}.1.{char_str}.1?format=csv&detail=dataonly"
+    url = f"{SDMX_BASE_URL}/A5.{dguid_str}.1.{char_str}.1?format=csv&detail=full"
 
     try:
         with urlopen(Request(url), timeout=60) as response:
@@ -129,6 +133,8 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
     # Parse SDMX CSV into grouped metrics
     grouped: dict[str, dict[str, Any]] = {}
     reader = csv.DictReader(text.splitlines())
+    if "FLAG" not in (reader.fieldnames or []):
+        raise ValueError("Census response omitted FLAG; request detail=full")
     for row in reader:
         char_id = str(row.get("CHARACTERISTIC", "")).strip()
         field = CHARACTERISTIC_TO_FIELD.get(char_id)
@@ -137,7 +143,7 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
         dguid = str(row["REF_AREA"]).strip()
         ctuid = dguid_to_ctuid(dguid)
         grouped.setdefault(ctuid, {"geoid": ctuid})
-        grouped[ctuid][field] = row.get("OBS_VALUE")
+        grouped[ctuid][field] = observation_value(row)
 
     results = []
     for ctuid, data in grouped.items():
@@ -159,6 +165,7 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
                 dwellings_apt_low_rise=_optional_int(data.get("dwellings_apt_low_rise")),
                 dwellings_apt_high_rise=_optional_int(data.get("dwellings_apt_high_rise")),
                 owner_households=_optional_int(data.get("owner_households")),
+                tenure_renter_households=_optional_int(data.get("tenure_renter_households")),
             )
         )
     return results
@@ -236,13 +243,13 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
     """Write normalized CSV compatible with load_census.py --csv."""
     temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
     with temporary_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator="\n")
         writer.writerow([
             "geoid", "year", "median_income", "median_rent",
             "population", "previous_population", "renter_households", "rent_burden_pct",
             "dwellings_total", "dwellings_single_detached", "dwellings_semi_detached",
             "dwellings_row_house", "dwellings_apt_duplex", "dwellings_apt_low_rise",
-            "dwellings_apt_high_rise", "owner_households",
+            "dwellings_apt_high_rise", "owner_households", "tenure_renter_households",
         ])
         for m in metrics:
             writer.writerow([
@@ -261,6 +268,7 @@ def write_csv(metrics: list[TractMetric], output_path: Path) -> None:
                 m.dwellings_apt_low_rise if m.dwellings_apt_low_rise is not None else "",
                 m.dwellings_apt_high_rise if m.dwellings_apt_high_rise is not None else "",
                 m.owner_households if m.owner_households is not None else "",
+                m.tenure_renter_households if m.tenure_renter_households is not None else "",
             ])
     temporary_path.replace(output_path)
 
@@ -296,6 +304,7 @@ def update_seed_with_official_metrics(
                 "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
                 "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
                 "owner_households": metric.owner_households,
+                "tenure_renter_households": metric.tenure_renter_households,
             }
         ]
         updated += 1
@@ -344,6 +353,7 @@ TRACT_METRIC_FIELDS = (
     "dwellings_apt_low_rise",
     "dwellings_apt_high_rise",
     "owner_households",
+    "tenure_renter_households",
 )
 _INT_FIELDS = {
     "population",
@@ -357,6 +367,7 @@ _INT_FIELDS = {
     "dwellings_apt_low_rise",
     "dwellings_apt_high_rise",
     "owner_households",
+    "tenure_renter_households",
 }
 
 
@@ -410,6 +421,7 @@ def sync_seed_from_csv(seed_path: Path, csv_path: Path) -> int:
             dwellings_apt_low_rise=_optional_int(row.get("dwellings_apt_low_rise")),
             dwellings_apt_high_rise=_optional_int(row.get("dwellings_apt_high_rise")),
             owner_households=_optional_int(row.get("owner_households")),
+            tenure_renter_households=_optional_int(row.get("tenure_renter_households")),
         )
         for row in rows
     ]

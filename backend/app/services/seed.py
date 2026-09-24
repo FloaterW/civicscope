@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import CmhcMetric, CmhcTractMetric, ETLRun, Geography, Metric
 from app.services.metric_calculations import calculate_affordability_index
 from app.services.postgis import sync_geography_geoms
@@ -47,7 +48,7 @@ def _demo_seed_content_changed(db: Session, seed: dict[str, Any]) -> bool:
         "renter_households", "rent_burden_pct", "dwellings_total",
         "dwellings_single_detached", "dwellings_semi_detached", "dwellings_row_house",
         "dwellings_apt_duplex", "dwellings_apt_low_rise", "dwellings_apt_high_rise",
-        "owner_households",
+        "owner_households", "tenure_renter_households",
     )
     for item in seed["geographies"]:
         for seed_metric in item.get("metrics", []):
@@ -72,6 +73,8 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
     if existing and not force:
         if not _demo_seed_content_changed(db, seed):
             return 0
+        if settings.app_env == "production":
+            raise RuntimeError("Production Census data differs from the packaged seed. Apply an audited data migration; automatic destructive reseeding is disabled.")
 
     if existing:
         db.query(CmhcMetric).delete()
@@ -123,6 +126,7 @@ def seed_demo_data(db: Session, force: bool = False) -> int:
                 dwellings_apt_low_rise=metric_item.get("dwellings_apt_low_rise"),
                 dwellings_apt_high_rise=metric_item.get("dwellings_apt_high_rise"),
                 owner_households=metric_item.get("owner_households"),
+                tenure_renter_households=metric_item.get("tenure_renter_households"),
             )
             db.add(metric)
             row_count += 1

@@ -20,6 +20,7 @@ from app.db.session import SessionLocal
 from app.models import ETLRun, Geography, Metric
 from app.services.metric_calculations import calculate_affordability_index
 from etl.load_geo import GTA_MUNICIPALITIES
+from etl.census_flags import observation_value
 
 PROFILE_BASE_URL = "https://api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_CSD"
 
@@ -38,7 +39,8 @@ OFFICIAL_CHARACTERISTIC_IDS = {
     "dwellings_apt_duplex": "45",
     "dwellings_apt_low_rise": "46",
     "dwellings_apt_high_rise": "47",
-    "owner_households": "1406",
+    "owner_households": "1401",  # Owner; 1406 is "Not condominium".
+    "tenure_renter_households": "1402",  # Same tenure universe as Owner.
 }
 
 DEFAULT_CHARACTERISTIC_IDS = OFFICIAL_CHARACTERISTIC_IDS
@@ -69,6 +71,7 @@ FIELD_ALIASES = {
     "dwellings_apt_low_rise": ("dwellings_apt_low_rise",),
     "dwellings_apt_high_rise": ("dwellings_apt_high_rise",),
     "owner_households": ("owner_households",),
+    "tenure_renter_households": ("tenure_renter_households",),
 }
 
 
@@ -90,6 +93,7 @@ class MetricInput:
     dwellings_apt_low_rise: int | None = None
     dwellings_apt_high_rise: int | None = None
     owner_households: int | None = None
+    tenure_renter_households: int | None = None
 
 
 def csduid_to_dguid(geoid: str) -> str:
@@ -107,7 +111,7 @@ def build_profile_url(csd_uids: list[str], characteristic_ids: list[str] | None 
     characteristics = "+".join(characteristic_ids or list(DEFAULT_CHARACTERISTIC_IDS.values()))
     geographies = "+".join(csduid_to_dguid(geoid) for geoid in csd_uids)
     key = f"A5.{geographies}.1.{characteristics}.1"
-    params = urlencode({"format": "csv", "detail": "dataonly"})
+    params = urlencode({"format": "csv", "detail": "full"})
     return f"{PROFILE_BASE_URL}/{key}?{params}"
 
 
@@ -119,7 +123,7 @@ def fetch_profile_csv(url: str) -> str:
 def fetch_official_gta_metrics(csd_uids: list[str] | None = None) -> list[MetricInput]:
     geoids = csd_uids or list(GTA_MUNICIPALITIES)
     url = build_profile_url(geoids, list(OFFICIAL_CHARACTERISTIC_IDS.values()))
-    metrics = parse_profile_csv_text(fetch_profile_csv(url))
+    metrics = parse_profile_csv_text(fetch_profile_csv(url), require_flags=True)
     validate_official_metrics(metrics, geoids)
     return metrics
 
@@ -161,8 +165,10 @@ def parse_metric_csv(path: Path, default_year: int = 2021) -> list[MetricInput]:
     return [parse_metric_row(row, default_year) for row in rows]
 
 
-def parse_profile_csv_text(text: str, default_year: int = 2021) -> list[MetricInput]:
+def parse_profile_csv_text(text: str, default_year: int = 2021, *, require_flags: bool = False) -> list[MetricInput]:
     rows = csv.DictReader(text.splitlines())
+    if require_flags and "FLAG" not in (rows.fieldnames or []):
+        raise ValueError("Census response omitted FLAG; request detail=full")
     grouped: dict[str, dict[str, Any]] = {}
 
     for row in rows:
@@ -172,7 +178,7 @@ def parse_profile_csv_text(text: str, default_year: int = 2021) -> list[MetricIn
 
         geoid = dguid_to_csduid(str(row["REF_AREA"]).strip())
         grouped.setdefault(geoid, {"geoid": geoid, "year": row.get("TIME_PERIOD") or default_year})
-        grouped[geoid][field] = row.get("OBS_VALUE")
+        grouped[geoid][field] = observation_value(row)
 
     return [parse_metric_row(row, default_year) for row in grouped.values()]
 
@@ -196,6 +202,7 @@ def parse_metric_row(row: dict[str, Any], default_year: int = 2021) -> MetricInp
         dwellings_apt_low_rise=_optional_int(_first_value(row, "dwellings_apt_low_rise")),
         dwellings_apt_high_rise=_optional_int(_first_value(row, "dwellings_apt_high_rise")),
         owner_households=_optional_int(_first_value(row, "owner_households")),
+        tenure_renter_households=_optional_int(_first_value(row, "tenure_renter_households")),
     )
 
 
@@ -230,6 +237,7 @@ def upsert_metrics(db, metrics: list[MetricInput]) -> int:
             "dwellings_apt_low_rise": item.dwellings_apt_low_rise,
             "dwellings_apt_high_rise": item.dwellings_apt_high_rise,
             "owner_households": item.owner_households,
+            "tenure_renter_households": item.tenure_renter_households,
         }
         if metric is None:
             db.add(Metric(**values))
@@ -338,6 +346,7 @@ def update_seed_metrics(seed_path: Path, metrics: list[MetricInput]) -> int:
                 "dwellings_apt_low_rise": metric.dwellings_apt_low_rise,
                 "dwellings_apt_high_rise": metric.dwellings_apt_high_rise,
                 "owner_households": metric.owner_households,
+                "tenure_renter_households": metric.tenure_renter_households,
             }
         ]
         updated += 1

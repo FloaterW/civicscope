@@ -46,7 +46,7 @@ def test_reseed_triggers_when_db_content_is_stale(db_session):
     assert restored.median_income == official_income
 
 
-def test_seed_does_not_bake_estimated_rent_burden_into_db(db_session):
+def test_seed_does_not_bake_estimated_rent_burden_into_db(db_session, monkeypatch):
     # Census tracts whose official rent burden is suppressed must remain NULL in
     # the database; estimation is a clearly-labeled serialization-time fallback,
     # never silently persisted as if it were official.
@@ -55,10 +55,10 @@ def test_seed_does_not_bake_estimated_rent_burden_into_db(db_session):
         geo
         for geo in seed["geographies"]
         if geo["type"] == "census_tract"
-        and geo["metrics"][0].get("rent_burden_pct") is None
-        and geo["metrics"][0].get("median_rent") is not None
-        and geo["metrics"][0].get("median_income") is not None
     )
+    target["metrics"][0].update(rent_burden_pct=None, median_rent=2000, median_income=100000)
+    monkeypatch.setattr("app.services.seed.load_demo_seed", lambda: seed)
+    seed_demo_data(db_session)
     metric = (
         db_session.query(Metric).filter(Metric.geoid == target["geoid"]).one()
     )

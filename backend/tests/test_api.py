@@ -49,9 +49,9 @@ def test_map_data_endpoint_supports_census_tracts(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["metadata"]["geography_type"] == "census_tract"
-    # Rent burden has an estimated fallback, so the badge must NOT claim every
-    # value is official.
-    assert payload["metadata"]["data_quality"]["metric_status"] == "mixed"
+    # This source snapshot has official or unavailable burden, but no estimated
+    # rows. Genuine published zeros must not create a misleading mixed badge.
+    assert payload["metadata"]["data_quality"]["metric_status"] == "official"
     assert len(payload["features"]) > 1000
     assert all(feature["properties"]["type"] == "census_tract" for feature in payload["features"])
     # Most tracts carry official income; at least one does.
@@ -88,7 +88,7 @@ def test_map_data_includes_metric_catalog_for_local_repaint(client):
     catalog = payload["metadata"]["metric_catalog"]
 
     assert catalog["median_income"]["data_quality"]["metric_status"] == "official"
-    assert catalog["rent_burden_pct"]["data_quality"]["metric_status"] == "mixed"
+    assert catalog["rent_burden_pct"]["data_quality"]["metric_status"] == "official"
     assert catalog["transit_score"]["data_quality"]["metric_status"] == "derived"
     assert "GTFS" in catalog["transit_score"]["source"]
     assert payload["metadata"]["transit_snapshot"]["coverage_status"] == "partial"
@@ -129,8 +129,18 @@ def test_tract_missing_value_is_unavailable_not_fabricated(client):
         assert feature["properties"]["metrics"]["data_quality"]["median_rent"] == "unavailable"
 
 
-def test_tract_rent_burden_estimate_is_distinguishable_from_official(client):
+def test_tract_rent_burden_estimate_is_distinguishable_from_official(client, db_session):
+    from app.models import Metric
+    # Exercise the fallback deliberately, independently of changing real source
+    # coverage. Genuine unflagged zeros in the real extract remain official.
+    row = db_session.query(Metric).filter(Metric.geoid == "5350403.16", Metric.year == 2021).one()
+    row.rent_burden_pct = None
+    row.median_rent = 2000
+    row.median_income = 100000
+    db_session.commit()
     response = client.get("/api/map-data?metric=rent_burden&type=census_tract&detail=display")
+    assert response.json()["metadata"]["data_quality"]["metric_status"] == "mixed"
+    assert response.json()["metadata"]["metric_catalog"]["rent_burden_pct"]["data_quality"]["metric_status"] == "mixed"
     metrics = [f["properties"]["metrics"] for f in response.json()["features"]]
 
     official = [m for m in metrics if m["data_quality"]["rent_burden_pct"] == "official"]
