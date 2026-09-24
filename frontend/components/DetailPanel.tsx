@@ -5,6 +5,7 @@ import { Children, createContext, isValidElement, useCallback, useContext, type 
 
 import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
 import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
+import type { ResaleViewState } from "@/lib/dashboard-url";
 import {
   transitAgencyNames,
   transitCoverageLabel,
@@ -23,8 +24,11 @@ import type {
 
 import { DataQualityBadge } from "./DataQualityBadge";
 import { MetricTooltip } from "./MetricTooltip";
+import { TrrebResaleSection } from "./TrrebResaleSection";
 
 type Props = {
+  resaleView: ResaleViewState;
+  onResaleViewChange: (view: ResaleViewState) => void;
   geography: Geography | null;
   metric: MetricKey;
   geographyLevel: GeographyLevel;
@@ -94,7 +98,7 @@ function TopicSection({ topic, title, period, children }: { topic: string; title
   );
 }
 
-export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cmhcLoading = false, cmhcError = false, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
+export function DetailPanel({ resaleView, onResaleViewChange, geography, metric, geographyLevel, cmhcMetrics, cmhcLoading = false, cmhcError = false, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
 
@@ -201,6 +205,9 @@ export function DetailPanel({ geography, metric, geographyLevel, cmhcMetrics, cm
           )}
 
           {/* CMHC Rental Market */}
+          {process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_TRREB_PREVIEW_ENABLED === "1" && geographyLevel === "municipality" && (
+            <TrrebResaleSection geoid={geography.geoid} view={resaleView} onViewChange={onResaleViewChange} />
+          )}
           <TopicSection topic="rental" title="Rental market" period={cmhcYear ? `Oct ${cmhcYear} · CMHC` : "CMHC"}>
               {cmhcLoading || cmhcError ? (
                 <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading rental data…" : "Rental data could not be loaded. Use Retry above."}</p>

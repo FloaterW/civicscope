@@ -13,7 +13,7 @@ import {
   YAxis
 } from "recharts";
 
-import { formatMetric, getMetricLabel, isCmhcMetric } from "@/lib/api";
+import { formatMetric, getMetricLabel } from "@/lib/api";
 import { COMPARISON_BAR_COLOR } from "@/lib/colors";
 import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
 import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
@@ -55,9 +55,8 @@ const defaultComparisonNouns: Record<GeographyLevel, string> = {
 export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot, hasInspectedSelection = false, selectedGeography, pinnedIds = [], onPinnedIdsChange }: Props) {
   const [chartTooltipActive, setChartTooltipActive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
-  const isCmhc = isCmhcMetric(metric);
   const isTransit = isTransitMetric(metric);
-  const showsRentRatio = !isCmhc && !isTransit;
+  const showsRentRatio = ["rent_burden_pct", "affordability_index", "median_income", "median_rent"].includes(metric);
   const snapshotDate = transitSnapshotDate(transitSnapshot);
   const transitPeriodLabel =
     snapshotDate === "Unknown"

@@ -41,6 +41,62 @@ type MapPayload = {
 };
 
 test.describe("CivicScope dashboard regressions", () => {
+  test("metric changes preserve a shared geography while map data is still loading", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    let releaseMap!: () => void;
+    const mapGate = new Promise<void>(resolve => { releaseMap = resolve; });
+    await page.route(`${API_BASE}/api/map-data?**`, async route => {
+      await mapGate;
+      await route.continue();
+    });
+    try {
+      await page.goto("/?level=municipality&metric=population&geoid=3520005");
+      const metric = page.getByRole("combobox", { name: "Map metric", exact: true });
+      await expect(metric).toBeEnabled();
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("aria-busy", "true");
+      await metric.selectOption("rent_burden_pct");
+      await expect(page).toHaveURL(/geoid=3520005/);
+    } finally {
+      releaseMap();
+    }
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
+    await page.reload();
+    await expect(page.getByRole("combobox", { name: "Map metric", exact: true })).toHaveValue("rent_burden_pct");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+    await expect(page).toHaveURL(/geoid=3520005/);
+  });
+
+  test("geography changes clear a shared geography while map data is still loading", async ({ page }) => {
+    await blockExternalMapAssets(page);
+    let releaseMap!: () => void;
+    const mapGate = new Promise<void>(resolve => { releaseMap = resolve; });
+    await page.route(`${API_BASE}/api/map-data?**`, async route => {
+      await mapGate;
+      await route.continue();
+    });
+    try {
+      await page.goto("/?level=municipality&metric=population&geoid=3520005");
+      const tracts = page.getByRole("button", { name: "Census tracts", exact: true });
+      await expect(tracts).toBeEnabled();
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("aria-busy", "true");
+      await tracts.click();
+      await expect(page).toHaveURL(/level=census_tract/);
+      await expect(page).not.toHaveURL(/geoid=/);
+    } finally {
+      releaseMap();
+    }
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract");
+    await expect(map).toHaveAttribute("aria-busy", "false");
+    await expect(map).toHaveAttribute("data-selected-geoid", "");
+    await page.reload();
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract");
+    await expect(map).toHaveAttribute("aria-busy", "false");
+    await expect(map).toHaveAttribute("data-selected-geoid", "");
+    await expect(page).not.toHaveURL(/geoid=/);
+  });
+
   test("map data API returns usable GTA municipality polygons with official metrics", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/map-data?metric=rent_burden&detail=display`);
     expect(response.ok(), await response.text()).toBeTruthy();
