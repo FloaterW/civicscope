@@ -72,6 +72,57 @@ test.describe("critical cross-browser journeys", () => {
     await expect(detailsToggle).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#selected-geography-details")).toBeVisible();
   });
+
+  for (const metric of ["population", "population_growth_pct"]) {
+    test(`comparison bar values fit inside the chart at desktop and mobile widths: ${metric}`, async ({ page }, testInfo) => {
+      if (metric === "population_growth_pct") {
+        // Exercise both signs, including a negative bar at the lower axis bound.
+        // Population retains the actual Toronto payload that exposed the defect.
+        await page.route("**/api/compare?**", async (route) => {
+          const response = await route.fetch();
+          const payload = await response.json();
+          payload.items.forEach((item: { metrics: { population_growth_pct: number; data_quality: Record<string, string> } }, index: number) => {
+            item.metrics.population_growth_pct = [-20, -2.5, 1, 2.5, 20][index];
+            item.metrics.data_quality.population_growth_pct = "derived";
+          });
+          await route.fulfill({ response, json: payload });
+        });
+      }
+      await page.goto(`/?level=municipality&metric=${metric}&geoid=3520005`);
+      const panel = page.getByTestId("comparison-panel");
+      await expect(panel).toContainText(metric === "population" ? "2,794,356" : "-20.0%");
+
+      for (const width of [1440, 390, 320]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await panel.scrollIntoViewIfNeeded();
+        // Labels are mounted after Recharts finishes its bar animation. Require
+        // actual nonzero bars and all five labels before checking their bounds.
+        await expect(panel.locator(".recharts-label-list .recharts-label")).toHaveCount(5);
+        if (metric === "population_growth_pct") {
+          await expect(panel.locator(".recharts-label-list")).toContainText("-20.0%");
+        }
+        await expect.poll(async () => panel.evaluate((element) => {
+          const svg = element.querySelector("svg.recharts-surface")!;
+          const bounds = svg.getBoundingClientRect();
+          const container = element.querySelector(".recharts-responsive-container")!.getBoundingClientRect();
+          const bars = [...svg.querySelectorAll("path.recharts-rectangle")];
+          const labels = [...svg.querySelectorAll(".recharts-label-list .recharts-label")];
+          // Do not accept old-width SVG geometry before ResizeObserver catches up.
+          const resized = Math.abs(bounds.width - container.width) <= 1 &&
+            bounds.left >= container.left - 1 && bounds.right <= container.right + 1;
+          return resized && bars.length === 5 && labels.length === 5 && bars.every((bar) => {
+            const box = bar.getBoundingClientRect();
+            return box.width > 0 && box.height > 0;
+          }) && labels.every((label) => {
+            const box = label.getBoundingClientRect();
+            return box.width > 0 && box.height > 0 && box.top >= bounds.top &&
+              box.bottom <= bounds.bottom && box.left >= bounds.left && box.right <= bounds.right;
+          });
+        })).toBe(true);
+        await panel.screenshot({ path: testInfo.outputPath(`comparison-labels-${width}.png`) });
+      }
+    });
+  }
 });
 
 async function blockExternalMapAssets(page: Page) {
