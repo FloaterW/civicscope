@@ -21,7 +21,16 @@ test("real archive works through the dashboard on desktop and narrow mobile", as
   page.on("response", response => {
     if (response.url().includes("/api/trreb-archive/")) responses.push(response.url());
   });
-  // No interception: both the archive route and normal core API are real.
+  // Keep this archive journey independent of third-party tile/font availability.
+  // MapLibre and the civic geography layers still run; both data APIs are real.
+  // The dashboard suite separately covers basemap layers and attribution.
+  await page.route("https://tiles.openfreemap.org/styles/*", async route => {
+    await route.fulfill({ json: {
+      version: 8,
+      sources: {},
+      layers: [{ id: "background", type: "background", paint: { "background-color": "#eef2ed" } }],
+    } });
+  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?level=municipality&metric=population&geoid=3520005&resale_year=2025&resale_open=1");
   const section = page.locator('details[data-topic="resale"]');
