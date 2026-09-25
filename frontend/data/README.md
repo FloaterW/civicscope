@@ -3,6 +3,8 @@
 The owner explicitly authorized publishing these aggregate figures in the public
 GitHub repository on September 25, 2026. This is not a listing-level dataset.
 Source: Toronto Regional Real Estate Board (TRREB), Market Watch, all home types.
+The project's MIT license covers application code; it is not a grant of rights
+in TRREB's third-party source reports. Preserve the publisher attribution.
 
 `trreb-resale-2020-2025.json` contains exactly 1,950 observations: 25 municipal
 reporting contexts × (72 months + six actual year-end tables). It is exported
