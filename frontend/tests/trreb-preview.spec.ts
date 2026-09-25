@@ -4,8 +4,9 @@ import { request as httpsRequest } from "node:https";
 
 // Synthetic contract fixtures, deliberately not copied from licensed reports.
 const selected = "/?level=municipality&metric=population&geoid=3520005";
-const publicResale = process.env.NEXT_PUBLIC_TRREB_ENABLED === "1";
-const resaleEndpoint = publicResale ? "/api/trreb/resale" : "/api/trreb-preview";
+const archiveResale = process.env.NEXT_PUBLIC_TRREB_ENABLED === "archive";
+const publicResale = archiveResale || process.env.NEXT_PUBLIC_TRREB_ENABLED === "1";
+const resaleEndpoint = archiveResale ? "/api/trreb-archive/resale" : publicResale ? "/api/trreb/resale" : "/api/trreb-preview";
 const section = (page: Page) => page.locator('details[data-topic="resale"]');
 
 if (publicResale) {

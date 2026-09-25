@@ -86,7 +86,8 @@ export function getTransitRoutes(): Promise<TransitFeatureCollection> {
 export async function fetchJson<T>(
   path: string,
   signal?: AbortSignal,
-  timeoutMs: number = API_TIMEOUT_MS
+  timeoutMs: number = API_TIMEOUT_MS,
+  origin: "api" | "same-origin" = "api"
 ): Promise<T> {
   const startedAt = Date.now();
   const effectiveTimeoutMs = normalizeApiTimeout(timeoutMs);
@@ -104,7 +105,7 @@ export async function fetchJson<T>(
   }, effectiveTimeoutMs);
   let response: Response | undefined;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${origin === "same-origin" ? "" : API_BASE}${path}`, {
       signal: requestController.signal,
       cache: /^\/api\/(?:map-data|summary|compare)(?:\?|$)/.test(path) ? "no-cache" : "default",
     });

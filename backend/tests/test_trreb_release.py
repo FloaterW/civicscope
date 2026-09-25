@@ -76,6 +76,20 @@ def test_prepare_is_deterministic_audited_and_read_only(archive):
     assert release['observations'][0]['geography_note'].endswith('No tract allocation.')
 
 
+def test_web_export_excludes_private_release_material_and_requires_approval(archive):
+    from etl.export_trreb_web import public_archive
+    release = prepare_release(archive, draft_manifest(archive))
+    exported = public_archive(release, release['release_id'])
+    assert set(exported) == {'schema_version', 'source_release', 'observations'}
+    assert exported['observations'] == release['observations']
+    with pytest.raises(ValueError, match='separately approved'):
+        public_archive(release, '0' * 64)
+    changed = copy.deepcopy(release)
+    changed['observations'][0]['sales'] += 1
+    with pytest.raises(ValueError, match='hash mismatch'):
+        public_archive(changed, release['release_id'])
+
+
 @pytest.mark.parametrize('mutation,match', [
     (lambda m: m['reports'].pop(), 'all 102'),
     (lambda m: m['reports'].__setitem__(0, m['reports'][1]), 'duplicate'),

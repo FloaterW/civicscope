@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { getTrrebMode } from "@/lib/trreb-mode";
 
 describe("TRREB display gates", () => {
-  it.each(["development", "production", "test", undefined])("defaults off in %s", runtime => {
-    expect(getTrrebMode({ runtime })).toBe("disabled");
+  it.each(["development", "production", "test", undefined])("defaults to the approved archive in %s", runtime => {
+    expect(getTrrebMode({ runtime })).toBe("archive");
+    expect(getTrrebMode({ runtime, publicEnabled: "0" })).toBe("disabled");
   });
   it.each(["production", "test", undefined])("never enables local preview in %s", runtime => {
-    expect(getTrrebMode({ runtime, previewEnabled: "1" })).toBe("disabled");
+    expect(getTrrebMode({ runtime, previewEnabled: "1" })).toBe("archive");
   });
   it("enables the local preview only in development", () => {
     expect(getTrrebMode({ runtime: "development", previewEnabled: "1" })).toBe("preview");

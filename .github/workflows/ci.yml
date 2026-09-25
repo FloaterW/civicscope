@@ -133,6 +133,12 @@ jobs:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: npm run test:e2e:trreb-public
 
+      - name: Verify bundled TRREB archive and production dashboard
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+        run: npx playwright test --config playwright.trreb-archive.config.ts
+
       - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v7

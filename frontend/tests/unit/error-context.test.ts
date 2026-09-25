@@ -10,6 +10,7 @@ describe("bounded diagnostic context", () => {
     expect(context).toMatchObject({ operation: "search", failure: "network", duration: "1_to_10s" });
     expect(JSON.stringify(context)).not.toContain("private");
     expect(apiErrorContext("/api/trreb/resale/3520005?year=2020", 500, "http", 503)).toMatchObject({ operation: "resale", status: 503 });
+    expect(apiErrorContext("/api/trreb-archive/resale/3520005?year=2020", 500, "http", 503)).toMatchObject({ operation: "resale", status: 503 });
     expect(sanitizeErrorContext({ operation: "private", failure: "TypeError: private", status: "503", online: "yes", message: "private" })).toEqual({});
     expect(sanitizeErrorContext(null)).toEqual({});
     expect(sanitizeErrorContext([])).toEqual({});
