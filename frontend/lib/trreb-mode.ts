@@ -1,8 +1,11 @@
 type TrrebEnvironment = { runtime?: string; publicEnabled?: string; previewEnabled?: string };
 
-export function getTrrebMode({ runtime, publicEnabled, previewEnabled }: TrrebEnvironment): "public" | "preview" | "disabled" {
+export function getTrrebMode({ runtime, publicEnabled, previewEnabled }: TrrebEnvironment): "archive" | "public" | "preview" | "disabled" {
   if (publicEnabled === "1") return "public";
   if (runtime === "development" && previewEnabled === "1") return "preview";
+  // Owner-approved, versioned Vercel archive is the default. Explicit 0 (or
+  // any unrecognized value) disables display; 1 retains the legacy DB mode.
+  if (publicEnabled === undefined || publicEnabled === "archive") return "archive";
   return "disabled";
 }
 

@@ -62,8 +62,8 @@ try {
       response.end(credentials.cert);
       return;
     }
-    // Client error reporting belongs to Next.js, all other API paths to FastAPI.
-    const apiRequest = requestPath.startsWith("/api/") && !requestPath.startsWith("/api/client-errors");
+    // Telemetry and the bundled resale archive are owned by Next.js.
+    const apiRequest = requestPath.startsWith("/api/") && !requestPath.startsWith("/api/client-errors") && !requestPath.startsWith("/api/trreb-archive/");
     const targetOrigin = apiRequest ? upstream.origin : `http://127.0.0.1:${frontendPort}`;
     let target;
     try {

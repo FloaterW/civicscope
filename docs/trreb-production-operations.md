@@ -1,5 +1,12 @@
 # TRREB public resale: controlled release operations
 
+> **September 25, 2026 update:** the owner authorized publishing the aggregate
+> figures in the public repository. The dashboard now defaults to the versioned
+> Vercel archive described in [Vercel archive operations](trreb-vercel-archive.md).
+> The PostgreSQL workflow below remains available as a separately gated option;
+> it is no longer a prerequisite for the public historical dashboard. Original
+> PDFs, staging databases and private release manifests remain unpublished.
+
 ## Scope and invariants
 
 The owner authorized aggregate-statistics display; no further permission

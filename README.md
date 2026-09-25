@@ -26,6 +26,14 @@ CivicScope is a full-stack project for public-sector analytics. The backend is F
 
 Municipal geometries use Statistics Canada 2021 cartographic census subdivision boundaries. Metric values use official Statistics Canada 2021 Census Profile characteristics for the selected GTA municipalities.
 
+The municipality detail panel also includes **Resale market — TRREB**: archived
+2020–2025 median sale prices, sales and property days on market for 25 municipal
+reporting contexts. Choose a full-year or monthly report independently of the
+Census/CMHC dates. The approved aggregate archive is served directly by Vercel;
+no database import is needed. These are historical figures, not current quotes,
+and are not allocated to census tracts. See [archive operations](docs/trreb-vercel-archive.md)
+for attribution, coverage, updates and rollback.
+
 Census tract geometries use Statistics Canada 2021 cartographic census tract boundaries filtered to the selected GTA municipalities. Tract-level metrics are official Statistics Canada 2021 Census Profile values fetched via the SDMX DF_CT dataflow.
 
 ### Data provenance

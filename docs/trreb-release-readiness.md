@@ -1,5 +1,9 @@
 # TRREB release readiness — September 24, 2026
 
+> Superseded for the public dashboard by the owner-approved September 25
+> [Vercel archive release](trreb-vercel-archive.md). The readiness notes below
+> describe the earlier PostgreSQL pathway, not the current default delivery.
+
 ## Release scope
 
 The repository now includes a separately gated public resale pathway, backed

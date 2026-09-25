@@ -12,7 +12,7 @@ type Resale = {
   warnings: Array<{ area: string; field: string }>;
 };
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const RESALE_ENDPOINT = TRREB_MODE === "public" ? "/api/trreb/resale" : "/api/trreb-preview";
+const RESALE_ENDPOINT = TRREB_MODE === "archive" ? "/api/trreb-archive/resale" : TRREB_MODE === "public" ? "/api/trreb/resale" : "/api/trreb-preview";
 const format = (value: number | null, currency = false) => value == null ? "Not reported" :
   new Intl.NumberFormat("en-CA", currency ? { style: "currency", currency: "CAD", maximumFractionDigits: 0 } : {}).format(value);
 
@@ -25,7 +25,7 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
   useEffect(() => {
     if (!expanded) return;
     const controller = new AbortController();
-    fetchJson<Resale>(`${RESALE_ENDPOINT}/${encodeURIComponent(geoid)}?year=${year}${month ? `&month=${month}` : ""}`, controller.signal, 15000)
+    fetchJson<Resale>(`${RESALE_ENDPOINT}/${encodeURIComponent(geoid)}?year=${year}${month ? `&month=${month}` : ""}`, controller.signal, 15000, TRREB_MODE === "archive" ? "same-origin" : "api")
       .then(data => { if (!controller.signal.aborted) setResult({ key, data }); })
       .catch(() => { if (!controller.signal.aborted) setResult({ key, error: true }); });
     return () => controller.abort();
@@ -40,7 +40,7 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
       event.preventDefault();
       onViewChange({ ...view, expanded: !expanded });
     }} className="cursor-pointer text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
-      Resale market — TRREB <span className="ml-2 text-xs font-normal text-civic-muted">{TRREB_MODE === "public" ? "Archive · 2020–2025" : "Local preview"}</span>
+      Resale market — TRREB <span className="ml-2 text-xs font-normal text-civic-muted">{TRREB_MODE !== "preview" ? "Archive · 2020–2025" : "Local preview"}</span>
     </summary>
     {expanded && <div className="mt-3 space-y-3">
       <p className="text-xs leading-5 text-civic-muted">MLS® resale transactions · All home types. Separate from Census and CMHC rental statistics.</p>
@@ -72,7 +72,7 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
           <details className="text-xs text-civic-muted"><summary className="cursor-pointer">Source and interpretation</summary>
             <p className="mt-2 leading-5">{data.geography_note} {data.vintage_note}</p>
           </details>
-          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board, <a className="underline" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a>. {TRREB_MODE === "public" ? "Archived 2020–2025 reports; not current market quotes." : "Local preview; public display disabled."} TRREB statistics are not included in CSV downloads.</p>
+          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board, <a className="underline" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a>. {TRREB_MODE !== "preview" ? "Archived 2020–2025 reports; not current market quotes." : "Local preview; public display disabled."} TRREB statistics are not included in CSV downloads.</p>
         </>}
     </div>}
   </details>;

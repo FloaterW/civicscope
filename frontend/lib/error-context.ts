@@ -32,7 +32,7 @@ export function apiErrorContext(path: string, startedAt: number, failure: ErrorC
     "/api/geographies": "search", "/api/transit-routes": "transit", "/api/data-status": "status",
   };
   const pathname = path.split("?")[0];
-  const operation = routes[pathname] ?? (/^\/api\/(?:trreb\/resale|trreb-preview)\/[^/]+$/.test(pathname) ? "resale" : "other");
+  const operation = routes[pathname] ?? (/^\/api\/(?:trreb\/resale|trreb-archive\/resale|trreb-preview)\/[^/]+$/.test(pathname) ? "resale" : "other");
   const elapsed = Math.max(0, Date.now() - startedAt);
   return sanitizeErrorContext({
     operation, failure, status,
