@@ -382,18 +382,18 @@ make frontend-e2e  # Playwright browser tests (needs backend running)
 Or individually:
 
 ```bash
-cd backend && pytest                   # 158 passing tests; 3 PostGIS tests skip without a test database
-cd frontend && npm run test:unit       # 50 Vitest unit tests
-cd frontend && npm run test:e2e        # 68 Playwright executions across Chromium, Firefox, and WebKit
+cd backend && pytest                   # 355 passing tests; 5 PostGIS tests skip without a test database
+cd frontend && npm run test:unit       # 104 Vitest unit tests
+cd frontend && npm run test:e2e        # 96 Playwright executions across Chromium, Firefox, and WebKit
 cd frontend && npm run typecheck       # TypeScript strict mode
 cd frontend && npm run lint            # ESLint
 ```
 
 **Test coverage highlights:**
 
-- **158 backend tests** plus 3 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
-- **68 Playwright executions** covering 62 user journeys and checks, including map rendering, shareable URL/history state, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, accessibility, and critical journeys repeated in Chromium, Firefox, and WebKit
-- **50 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, dashboard URL state, transit-map helpers, reduced-motion behavior, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
+- **355 backend tests** plus 5 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
+- **96 Playwright executions** covering 86 user journeys and checks, including map rendering, shareable URL/history state, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, accessibility, and critical journeys repeated in Chromium, Firefox, and WebKit
+- **104 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, dashboard URL state, transit-map helpers, reduced-motion behavior, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
 - **axe-core WCAG 2.0 AA audit** runs in CI — zero critical or serious violations
 - **Rate limiting** at 60 req/min per IP via slowapi
 
