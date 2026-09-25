@@ -23,7 +23,7 @@ import type {
 } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
-import { MetricTooltip } from "./MetricTooltip";
+import { StatisticCard } from "./StatisticCard";
 import { TrrebResaleSection } from "./TrrebResaleSection";
 import { TRREB_MODE } from "@/lib/trreb-mode";
 
@@ -456,13 +456,7 @@ function MetricLine({
 }) {
   const selected = useContext(SelectedMetric) === metricKey;
   return (
-    <div data-metric={metricKey} data-selected-metric={selected || undefined} className={`flex min-h-24 min-w-0 flex-col rounded-md border px-3 py-3 ${selected ? "border-civic-teal bg-[var(--civic-accent-subtle)]" : "border-civic-line bg-civic-panel"}`}>
-      <span className="flex items-center gap-1 text-xs text-civic-muted">
-        {label}
-        {metricKey && <MetricTooltip metricKey={metricKey} />}
-      </span>
-      {selected && <span className="sr-only">Selected map metric</span>}
-      <span className="mt-auto block pt-2 text-lg font-semibold tabular-nums text-civic-ink">
+    <StatisticCard label={label} metricKey={metricKey} selected={selected} sourceLabel={sourceLabel} value={<>
         {value}
         {status === "estimated" && (
           <span
@@ -518,9 +512,7 @@ function MetricLine({
             est.
           </span>
         )}
-      </span>
-      <span aria-hidden={sourceLabel ? undefined : true} className="block min-h-4 text-[11px] text-civic-muted">{sourceLabel}</span>
-    </div>
+    </>} />
   );
 }
 

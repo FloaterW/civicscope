@@ -40,11 +40,12 @@ if (publicResale) {
   });
 }
 
-async function mockResale(page: Page, fail: () => boolean = () => false) {
+async function mockResale(page: Page, fail: () => boolean = () => false, beforeResponse: (url: URL) => Promise<void> = async () => {}) {
   const requests: string[] = [];
   await page.route(`**${resaleEndpoint}/**`, async route => {
     const url = new URL(route.request().url());
     requests.push(url.pathname + url.search);
+    await beforeResponse(url);
     if (fail()) {
       await route.fulfill({ status: 503, json: { detail: "Synthetic outage" } });
       return;
@@ -135,7 +136,7 @@ test("historical context survives map changes, sharing, reload and history", asy
   });
   await mockResale(page);
   await openResale(page);
-  await expect(section(page).getByText(/equivalence to the selected Census boundary is not certified/)).toBeVisible();
+  await expect(section(page).getByText(/TRREB reporting areas, not Census boundaries/)).toBeVisible();
   await page.getByLabel("Report year", { exact: true }).selectOption("2020");
   await page.getByLabel("Reporting period", { exact: true }).selectOption("1");
   await expect(section(page)).toContainText("January 2020");
@@ -201,7 +202,7 @@ test("municipality selection updates context; census tracts have no resale fallb
   await expect(section(page)).toHaveCount(0);
 });
 
-for (const width of [390, 1440]) {
+for (const width of [320, 390, 1440]) {
   test(`keyboard, accessibility and stable map at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await mockResale(page);
@@ -223,4 +224,100 @@ for (const width of [390, 1440]) {
     await page.keyboard.press("Space");
     await expect(section(page)).not.toHaveAttribute("open", "");
   });
+
+  test(`resale cards, controls and tooltips match the dashboard at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockResale(page);
+    await openResale(page);
+    const census = page.locator('[data-topic="population"] [data-metric="population"]');
+    const resale = section(page).locator('[data-metric="trreb_sales"]');
+    const cardStyle = (node: Element) => {
+      const value = node.querySelector('.tabular-nums')!;
+      const style = getComputedStyle(value);
+      return { height: node.getBoundingClientRect().height, font: style.fontSize, weight: style.fontWeight, numbers: style.fontVariantNumeric };
+    };
+    expect(await resale.evaluate(cardStyle)).toEqual(await census.evaluate(cardStyle));
+    const year = page.getByLabel("Report year", { exact: true });
+    expect(await year.evaluate(node => node.parentElement!.getBoundingClientRect().height)).toBe(44);
+    expect(await year.evaluate(node => getComputedStyle(node).backgroundColor)).toBe(await page.getByLabel("Map metric", { exact: true }).evaluate(node => getComputedStyle(node).backgroundColor));
+    for (const term of ["Median sale price", "Resale sales", "Property days on market"]) {
+      const button = section(page).getByRole("button", { name: `What is ${term}?`, exact: true });
+      await button.focus();
+      const tooltip = page.getByRole("tooltip");
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("Toronto Regional Real Estate Board");
+      const box = (await tooltip.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      await page.keyboard.press("Escape");
+      await expect(tooltip).toBeHidden();
+    }
+    await page.getByRole("button", { name: "Dark theme", exact: true }).click();
+    expect(await year.evaluate(node => getComputedStyle(node).backgroundColor)).toBe(await page.getByLabel("Map metric", { exact: true }).evaluate(node => getComputedStyle(node).backgroundColor));
+    expect((await new AxeBuilder({ page }).include('details[data-topic="resale"]').analyze()).violations).toEqual([]);
+  });
+
+  test(`report loading, errors and retry preserve the scrolled panel at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    let failing = false;
+    let hold = true;
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    await mockResale(page, () => failing, async url => {
+      if (hold && url.searchParams.get("year") === "2024") await pending;
+    });
+    await openResale(page);
+    await section(page).getByText("Source and interpretation", { exact: true }).click();
+    await section(page).getByText("$123,456", { exact: true }).click();
+    const year = page.getByLabel("Report year", { exact: true });
+    await year.focus();
+    // Allow ResizeObserver to record the expanded source content before loading.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const layout = () => page.evaluate(() => ({
+      scroll: document.querySelector('[data-testid="detail-panel-scroll"]')!.scrollTop,
+      yearY: document.querySelector<HTMLSelectElement>('select[aria-label="Report year"]')!.getBoundingClientRect().y,
+      map: document.querySelector('[data-testid="map-panel"]')!.getBoundingClientRect().height,
+    }));
+    const before = await layout();
+    try {
+      await year.selectOption("2024");
+      await expect(section(page).getByRole("status")).toContainText("Loading resale statistics");
+      await expect(section(page)).not.toContainText("$123,456");
+      await expect(section(page).getByRole("link", { name: /Market Watch/ })).toHaveCount(0);
+      const loading = await layout();
+      expect(loading.scroll).toBeCloseTo(before.scroll, 0);
+      expect(loading.yearY).toBeCloseTo(before.yearY, 0);
+      expect(loading.map).toBeCloseTo(before.map, 0);
+      failing = true;
+      release();
+      await expect(section(page).getByRole("status")).toContainText("unavailable");
+      const error = await layout();
+      expect(error.scroll).toBeCloseTo(before.scroll, 0);
+      expect(error.yearY).toBeCloseTo(before.yearY, 0);
+      failing = false;
+      hold = false;
+      await section(page).getByRole("button", { name: "Retry resale statistics" }).click();
+      await expect(section(page)).toContainText("January–December 2024");
+      await expect(section(page)).toContainText("$123,456");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    } finally { release(); }
+  });
 }
+
+test("a slower superseded report cannot replace the latest selected year", async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await mockResale(page, () => false, async url => {
+    if (url.searchParams.get("year") === "2024") await pending;
+  });
+  await openResale(page);
+  try {
+    await page.getByLabel("Report year", { exact: true }).selectOption("2024");
+    await expect(section(page).getByRole("status")).toContainText("Loading");
+    await page.getByLabel("Report year", { exact: true }).selectOption("2023");
+    await expect(section(page)).toContainText("January–December 2023");
+    release();
+    await expect(section(page)).not.toContainText("January–December 2024");
+    await expect(page.getByLabel("Report year", { exact: true })).toHaveValue("2023");
+  } finally { release(); }
+});

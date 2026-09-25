@@ -12,6 +12,21 @@ import {
 import { createPortal } from "react-dom";
 
 const metricDefinitions: Record<string, { term: string; definition: string; source: string }> = {
+  trreb_median_price: {
+    term: "Median sale price",
+    definition: "The middle sale price of MLS® resale transactions for all home types in the selected TRREB reporting area and period. Annual medians come directly from year-end tables, not averages of monthly medians. This is not a rent measure or a current asking price.",
+    source: "Toronto Regional Real Estate Board, archived Market Watch reports (2020–2025)"
+  },
+  trreb_sales: {
+    term: "Resale sales",
+    definition: "The number of MLS® resale transactions reported for all home types in the selected TRREB area and month or full year. It is not the number of active listings or rental leases.",
+    source: "Toronto Regional Real Estate Board, archived Market Watch reports (2020–2025)"
+  },
+  trreb_property_days: {
+    term: "Property days on market",
+    definition: "Average property days on market for the selected TRREB area and period. Includes qualifying re-listings of the same property; it differs from listing days on market, which tracks an individual listing.",
+    source: "Toronto Regional Real Estate Board, archived Market Watch reports (2020–2025)"
+  },
   rent_burden_pct: {
     term: "Rent burden",
     definition:

@@ -1,8 +1,10 @@
 "use client";
 
 import { Calendar } from "lucide-react";
+import { SelectControl } from "./SelectControl";
 
 type Props = {
+  id?: string;
   value: number;
   availableYears: number[];
   disabled: boolean;
@@ -11,6 +13,7 @@ type Props = {
 };
 
 export function YearSelector({
+  id,
   value,
   availableYears,
   disabled,
@@ -18,21 +21,13 @@ export function YearSelector({
   onChange
 }: Props) {
   return (
-    <div className="flex h-11 items-center gap-2 rounded-md border border-civic-line bg-civic-panel p-1 shadow-panel transition focus-within:border-civic-teal">
-      <Calendar className="ml-2 h-4 w-4 shrink-0 text-civic-muted" aria-hidden="true" />
-      <select
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        disabled={disabled}
-        className="h-full min-w-0 flex-1 rounded border-0 bg-civic-panel px-1 text-sm font-medium text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-not-allowed disabled:text-civic-muted disabled:opacity-50"
-        aria-label={label}
-      >
+    <SelectControl id={id} label={label} value={value} onChange={value => onChange(Number(value))} disabled={disabled}
+      icon={<Calendar className="ml-2 h-4 w-4 shrink-0 text-civic-muted" aria-hidden="true" />}>
         {availableYears.map((year) => (
           <option key={year} value={year}>
             {year}
           </option>
         ))}
-      </select>
-    </div>
+    </SelectControl>
   );
 }
