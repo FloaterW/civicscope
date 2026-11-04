@@ -17,6 +17,24 @@
         "file": "cmhc_bedroom_corrections_20261104.json",
         "sha256": "25cb2242f7c6e236c87e266c89895e0d553ffaa526d7e034f89fd6d77f482543"
       }
+    },
+    "census": {
+      "last_checked_at": "2026-11-02T17:15:56.758296+00:00",
+      "artifacts": {
+        "demo_seed.json": {
+          "sha256": "0ce30bc45105eb8a83631943ea87d4f79a1a1cdb75290a2482217d9f08b68c9d",
+          "candidate_sha256": "b6260f0e8ae0d68a6c9983089709d9d47f96098648774c379331362b512e2462"
+        },
+        "statcan_ct_metrics.csv": {
+          "sha256": "e444dc58fe929bdf147dd64972944eb070e3e572be0172d8c5a2ad8d6b651a7b",
+          "candidate_sha256": "e444dc58fe929bdf147dd64972944eb070e3e572be0172d8c5a2ad8d6b651a7b"
+        }
+      },
+      "review": {
+        "workflow_run": "https://github.com/FloaterW/civicscope/actions/runs/41488920149",
+        "reviewed_at": "2026-11-04",
+        "method": "All 1359 geography/boundary/metric records and the tract CSV match the official SDMX refresh. Only source/notes metadata differs from the original bulk-CSV retrieval. Original published data and provenance are retained."
+      }
     }
   }
 }
