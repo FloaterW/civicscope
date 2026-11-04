@@ -49,6 +49,70 @@ test.describe("critical cross-browser journeys", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
   });
 
+  test("search selection survives a held pointer and cancels a dragged release", async ({ page }) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
+    const search = page.getByTestId("geography-search");
+    await search.fill("Oakville");
+    const option = page.getByRole("option").filter({ hasText: "3524001" });
+    await expect(option).toBeVisible();
+    const box = (await option.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    let remainsOpen: boolean;
+    try {
+      // A press can span frames; a blur callback must not remove the click target.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      remainsOpen = await option.isVisible();
+    } finally {
+      await page.mouse.up();
+    }
+    expect(remainsOpen).toBe(true);
+    await expect(search).toBeFocused();
+    await expect(page.getByTestId("detail-panel")).toContainText("Oakville");
+
+    await search.fill("Toronto");
+    const other = page.getByRole("option").filter({ hasText: "3520005" });
+    await expect(other).toBeVisible();
+    const otherBox = (await other.boundingBox())!;
+    await page.mouse.move(otherBox.x + otherBox.width / 2, otherBox.y + otherBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+    await expect(page.getByTestId("detail-panel")).toContainText("Oakville");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+  });
+
+  test("search result keyboard selection and Tab dismissal remain usable", async ({ page }) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
+    const search = page.getByTestId("geography-search");
+    await search.fill("Oakville");
+    const oakville = page.getByRole("option").filter({ hasText: "3524001" });
+    await expect(oakville).toBeVisible();
+    await search.press("Tab");
+    await expect(oakville).toBeFocused();
+    await oakville.press("Enter");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+    await expect(search).toBeFocused();
+
+    await search.fill("Toronto");
+    const toronto = page.getByRole("option").filter({ hasText: "3520005" });
+    await expect(toronto).toBeVisible();
+    await search.press("Tab");
+    await expect(toronto).toBeFocused();
+    await toronto.press("Tab");
+    await expect(page.getByRole("listbox")).toBeHidden();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+
+    await search.focus();
+    await expect(toronto).toBeVisible();
+    await search.press("ArrowDown");
+    await expect(search).toHaveAttribute("aria-activedescendant", "search-option-3520005");
+    await search.press("Enter");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+  });
+
   test("keeps the mobile layout usable without horizontal overflow", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
@@ -199,6 +263,56 @@ test.describe("critical cross-browser journeys", () => {
       }
     });
   }
+});
+
+test.describe("touch search", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  test.beforeEach(async ({ page }) => {
+    await blockExternalMapAssets(page);
+  });
+
+  test("selects a result on tap and dismisses outside", async ({ page }) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+    const search = page.getByTestId("geography-search");
+    await search.fill("Oakville");
+    await page.getByRole("option").filter({ hasText: "3524001" }).tap();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+    await search.fill("Toronto");
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await page.getByRole("heading", { name: "Greater Toronto Housing Affordability Explorer" }).tap();
+    await expect(page.getByRole("listbox")).toBeHidden();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+  });
+
+  test("scrolling the results does not select the pressed option", async ({ page, browserName }) => {
+    // Playwright's cross-browser touchscreen API supports taps only. Chromium's
+    // protocol supplies a native touch sequence to verify scroll cancellation.
+    test.skip(browserName !== "chromium", "Native touch drag requires Chromium's protocol");
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+    await page.getByTestId("geography-search").fill("a");
+    const results = page.getByRole("listbox");
+    await expect(results.getByRole("option")).toHaveCount(8);
+    const box = (await results.boundingBox())!;
+    const client = await page.context().newCDPSession(page);
+    const x = box.x + box.width / 2;
+    const startY = box.y + box.height - 30;
+    try {
+      await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: startY }] });
+      for (let step = 1; step <= 8; step++) {
+        await client.send("Input.dispatchTouchEvent", {
+          type: "touchMove", touchPoints: [{ x, y: startY - step * 20 }]
+        });
+      }
+      await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect.poll(() => results.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+      await expect(results).toBeVisible();
+    } finally {
+      await client.detach();
+    }
+  });
 });
 
 async function blockExternalMapAssets(page: Page) {

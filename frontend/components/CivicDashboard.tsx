@@ -726,9 +726,8 @@ export function CivicDashboard() {
               ref={searchContainerRef}
               className="relative w-full"
               onBlurCapture={() => {
-                // Safari can report a null relatedTarget while focus is moving
-                // from the input to a result button. Defer the containment
-                // check so the click is not unmounted before it can fire.
+                // Wait for keyboard focus to settle before checking whether
+                // it left the search input and results.
                 window.requestAnimationFrame(() => {
                   const container = searchContainerRef.current;
                   if (container && !container.contains(document.activeElement)) {
@@ -791,6 +790,12 @@ export function CivicDashboard() {
                       type="button"
                       role="option"
                       aria-selected={index === searchHighlight}
+                      onMouseDown={(event) => {
+                        // Safari does not focus buttons on mouse press. Keep
+                        // input focus so blur cannot remove the pending click
+                        // target. Select on click, so dragging stays cancellable.
+                        if (event.button === 0) event.preventDefault();
+                      }}
                       onClick={() => selectSearchResult(geography)}
                       onMouseEnter={() => setSearchHighlight(index)}
                       className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal ${
