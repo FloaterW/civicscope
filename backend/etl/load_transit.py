@@ -273,7 +273,8 @@ def write_csv(scores: dict[str, tuple[int, float]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(f"{path.suffix}.tmp")
     with temporary.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
+        # Git checks packaged text out as LF. Hash those same bytes on every OS.
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["geoid", "transit_route_count", "transit_score"])
         for geoid in sorted(scores):
             count, score = scores[geoid]
@@ -337,7 +338,7 @@ def write_manifest(
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(f"{path.suffix}.tmp")
-    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
     temporary.replace(path)
 
 
@@ -468,7 +469,7 @@ def main() -> None:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["artifacts"][args.routes_output.name] = {"sha256": _sha256(args.routes_output), "feature_count": feature_count}
             manifest["notes"].append("Overlay shows the most frequently scheduled shape per route; scores use all stop-route relationships from the same feeds.")
-            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(f"Wrote transit provenance manifest to {manifest_path}")
     else:
         print("\n4. Updating metrics table...")
