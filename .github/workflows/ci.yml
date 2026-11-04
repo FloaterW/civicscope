@@ -204,6 +204,17 @@ jobs:
     name: Build production containers
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: civicscope_smoke
+          POSTGRES_USER: smoke
+          POSTGRES_PASSWORD: local-smoke-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U smoke -d civicscope_smoke"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -213,9 +224,9 @@ jobs:
 
       - name: Smoke-test backend startup with production proxy arguments
         run: |
-          docker run -d --name backend-smoke -p 127.0.0.1:8014:8000 \
-            -e DATABASE_URL=sqlite:////tmp/civicscope-smoke.db \
-            -e SEED_ON_STARTUP=false -e FORWARDED_ALLOW_IPS='*' civicscope-backend
+          docker run -d --name backend-smoke --network host \
+            -e DATABASE_URL=postgresql+psycopg://smoke:local-smoke-only@127.0.0.1:5432/civicscope_smoke \
+            -e PORT=8014 -e SEED_ON_STARTUP=false -e FORWARDED_ALLOW_IPS='*' civicscope-backend
           python - <<'PY'
           import json
           import time
