@@ -5,7 +5,7 @@ A geospatial analytics dashboard for exploring housing affordability, income, an
 [![CI](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml/badge.svg)](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![API Docs](https://img.shields.io/badge/API-OpenAPI%20Docs-009688)](https://civicscope.onrender.com/docs)
-![Next.js](https://img.shields.io/badge/Next.js-16.3-black)
+![Next.js](https://img.shields.io/badge/Next.js-16.4.5-black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688)
 ![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-316192)
 
@@ -435,7 +435,7 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 ## Performance & Security
 
 - **Next.js standalone output** with tree-shaking; heavy components (`ComparisonPanel`, `DetailPanel`) are code-split via `next/dynamic`
-- **Tailwind CSS** (zero-runtime CSS-in-JS); no client-side style injection overhead
+- **Tailwind CSS** compiles utility styles without client-side style injection
 - **GZip compression** on all API responses via Starlette middleware
 - **HTTP caching** — `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` on census data endpoints (2021 data is immutable)
 - **Geometry simplification** — production PostGIS uses `ST_SimplifyPreserveTopology`; SQLite/demo environments use compact rounded GeoJSON

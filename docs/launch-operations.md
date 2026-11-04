@@ -56,9 +56,10 @@ the packaged data. All values matched; its original check timestamp was retained
 No statistics were replaced in that September review. The November 4 [source review](source-refresh-review-2026-11-04.md) subsequently confirmed that all Census observations match the official November 2 SDMX candidate and recorded that check without replacing the original bulk-source provenance. The changed transit candidate remains unpublished pending reconciliation.
 
 Frontend dependency groups now include only minor/patch upgrades. Major upgrades remain separate
-review items, not silently bundled migrations. The September 20 repair retains the existing major
-versions of Tailwind, Recharts, ESLint, TypeScript, Vitest, Node types and icons. Recharts 2 and
-ESLint 9 report maintenance deprecations; their migrations remain follow-up work, not completed upgrades.
+review items, not silently bundled migrations. The September 20 repair retained the existing major
+versions. The November 4 integration adds independently tested Tailwind 4, Recharts 3 and Vitest 4
+upgrades. ESLint and runtime-major migrations remain separate compatibility reviews; see the
+[audit remediation](audit-remediation-2026-11-04.md) and [backend lock workflow](backend-dependency-locks.md).
 
 ## User-testing results
 
