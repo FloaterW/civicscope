@@ -17,10 +17,12 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # Five endpoints, two attempts each, at most75s +5s retry delay per endpoint.
+    # Leave time for setup and incident reporting during a persistent outage.
+    timeout-minutes: 16
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
       - name: Check frontend, database, API data and coverage
@@ -32,3 +34,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CHECK_RESULT: ${{ steps.monitor.outcome }}
         run: python scripts/workflow_alert.py --title 'Production monitoring incident' --result "$CHECK_RESULT"
+      - name: Open or resolve one source verification issue
+        if: always() && (steps.monitor.outputs.freshness_result == 'success' || steps.monitor.outputs.freshness_result == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_RESULT: ${{ steps.monitor.outputs.freshness_result }}
+        run: python scripts/workflow_alert.py --title 'Source verification overdue or unknown' --result "$CHECK_RESULT"

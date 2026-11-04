@@ -21,7 +21,7 @@ Required environment variables:
 | --- | --- |
 | `APP_ENV` | Set to `production`. |
 | `DATABASE_URL` | PostgreSQL connection string using the SQLAlchemy/psycopg format, for example `postgresql+psycopg://user:password@host:5432/dbname`. |
-| `SEED_ON_STARTUP` | Use `true` for a portfolio demo with packaged GTA seed data; use `false` when production data is loaded separately. |
+| `SEED_ON_STARTUP` | Use `true` only to initialize an empty demo database with packaged data, then set it to `false`. Normal production updates use reviewed migrations. |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins, for example `https://civicscope.vercel.app,http://localhost:3001`. |
 | `FORWARDED_ALLOW_IPS` | Proxy addresses trusted for client IP/rate-limit headers. Render uses `*` because traffic is terminated by its managed proxy; self-hosted deployments should list only their proxy addresses. |
 | `RATE_LIMIT` | SlowAPI limit string. Defaults to `60/minute`; automated test environments can raise it without weakening production. |
@@ -41,13 +41,13 @@ alembic upgrade head
 Start command:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 ```
 
 The production Dockerfile already runs migrations before startup:
 
 ```bash
-alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 ```
 
 Health check:

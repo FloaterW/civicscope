@@ -605,7 +605,16 @@ test.describe("CivicScope dashboard regressions", () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
       await map.screenshot({ path: testInfo.outputPath(`map-attribution-${width}.png`) });
     }
-    expect((await new AxeBuilder({ page }).include('[data-testid="civic-map"]').analyze()).violations).toEqual([]);
+    // MapLibre controls sit inside the canvas host excluded by broader page
+    // scans. Verify their text and links against both actual theme backgrounds.
+    for (const dark of [false, true]) {
+      if (dark) {
+        await page.getByRole("button", { name: "Dark theme" }).click();
+        await expect(page.locator("html")).toHaveClass(/dark/);
+      }
+      await expect(attribution.locator("a").first()).toHaveCSS("text-decoration-line", "underline");
+      expect((await new AxeBuilder({ page }).include('[data-testid="civic-map"]').analyze()).violations).toEqual([]);
+    }
   });
 
   test("basemap attribution remains visible", async ({ page }) => {

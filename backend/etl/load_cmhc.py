@@ -196,6 +196,10 @@ class ZoneData:
     average_rent_1br: float | None = None
     average_rent_2br: float | None = None
     average_rent_3br_plus: float | None = None
+    rental_universe_bachelor: int | None = None
+    rental_universe_1br: int | None = None
+    rental_universe_2br: int | None = None
+    rental_universe_3br_plus: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -378,9 +382,10 @@ def fetch_rms_bedroom_csv(year: int, bedroom_type: str) -> str:
 
 
 def fetch_bedroom_rents_for_year(year: int) -> dict[str, dict[str, float | None]]:
-    """Fetch average rent by bedroom type for all zones in a given year.
+    """Fetch rents and their matching bedroom-specific unit counts.
 
-    Returns: {zone_name: {average_rent_bachelor: ..., average_rent_1br: ..., ...}}
+    All-bedroom rental stock is not a valid weight for a bedroom-specific rent.
+    Unit counts are preserved alongside rents for municipality aggregation.
     """
     result: dict[str, dict[str, float | None]] = {}
 
@@ -389,8 +394,12 @@ def fetch_bedroom_rents_for_year(year: int) -> dict[str, dict[str, float | None]
         if not csv_text:
             continue
         zones = parse_rms_summary_csv(csv_text)
+        if len({zone.zone_name for zone in zones}) != len(zones):
+            raise ValueError(f"Duplicate RMS zones for {bedroom_label} in {year}")
         for zone in zones:
-            result.setdefault(zone.zone_name, {})[field_name] = zone.average_rent
+            values = result.setdefault(zone.zone_name, {})
+            values[field_name] = zone.average_rent
+            values[field_name.replace("average_rent_", "rental_universe_")] = zone.rental_universe
         time.sleep(REQUEST_DELAY)
 
     return result
@@ -402,10 +411,10 @@ def merge_bedroom_rents(
     """Merge bedroom-specific rents into ZoneData objects in-place."""
     for zone in zones:
         rents = bedroom_rents.get(zone.zone_name, {})
-        zone.average_rent_bachelor = rents.get("average_rent_bachelor")
-        zone.average_rent_1br = rents.get("average_rent_1br")
-        zone.average_rent_2br = rents.get("average_rent_2br")
-        zone.average_rent_3br_plus = rents.get("average_rent_3br_plus")
+        for field in BEDROOM_TYPES.values():
+            units_field = field.replace("average_rent_", "rental_universe_")
+            setattr(zone, field, rents.get(field))
+            setattr(zone, units_field, rents.get(units_field))
 
 
 # ---------------------------------------------------------------------------
@@ -571,9 +580,17 @@ def parse_scss_historical_csv(csv_text: str) -> list[ScssMonthlyRow]:
 
 
 def _sum_completions_for_year(monthly_rows: list[ScssMonthlyRow], year: int) -> int | None:
-    """Sum monthly completions for a calendar year. Returns None if no data."""
-    yearly = [r.total for r in monthly_rows if r.year == year and r.total is not None]
-    return sum(yearly) if yearly else None
+    """Return an annual total only for twelve unique, valid calendar months.
+
+    Missing/suppressed or duplicate months are not a smaller annual total.
+    Preserve None so the refresh coverage gate can reject incomplete sources.
+    """
+    yearly = [row for row in monthly_rows if row.year == year]
+    if len(yearly) != 12 or {row.month for row in yearly} != set(range(1, 13)):
+        return None
+    if any(type(row.total) is not int or row.total < 0 for row in yearly):
+        return None
+    return sum(row.total for row in yearly)
 
 
 def _dec_snapshot_for_year(monthly_rows: list[ScssMonthlyRow], year: int) -> int | None:
@@ -678,7 +695,7 @@ def aggregate_zones_to_municipalities(
 
     For municipalities that span multiple zones (Toronto, Mississauga, Brampton):
     - Rates (vacancy, availability): weighted average by rental universe
-    - Dollar amounts (rent): weighted average by rental universe
+    - Dollar amounts (rent): weighted average by the corresponding rental universe
     - Counts (rental universe): simple sum
 
     For combined zones (Richmond Hill/Vaughan/King):
@@ -704,7 +721,17 @@ def aggregate_zones_to_municipalities(
 
     rows: list[CmhcRow] = []
     for geoid, zone_list in sorted(geoid_zones.items()):
-        if geoid in AGGREGATED_GEOIDS and len(zone_list) > 1:
+        expected_zones = {name for name, ids in ZONE_TO_GEOIDS.items() if geoid in ids}
+        actual_zones = {zone.zone_name for zone in zone_list}
+        if len(actual_zones) != len(zone_list) or actual_zones != expected_zones:
+            missing = sorted(expected_zones - actual_zones)
+            duplicates = sorted(name for name in actual_zones if sum(z.zone_name == name for z in zone_list) > 1)
+            raise ValueError(
+                f"Incomplete or duplicate RMS zones for {geoid}/{year}: "
+                f"missing={missing}, duplicates={duplicates}. "
+                "Review the source geography definitions before updating the zone mapping."
+            )
+        if geoid in AGGREGATED_GEOIDS:
             row = _aggregate_zones(geoid, year, zone_list)
         else:
             # Single zone or combined-zone: use the zone data directly
@@ -729,6 +756,7 @@ def aggregate_zones_to_municipalities(
 def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
     """Compute weighted averages across multiple zones for a single municipality."""
     total_units = 0
+    complete_universe = all(z.rental_universe is not None and z.rental_universe >= 0 for z in zones)
     weighted_vacancy = 0.0
     weighted_availability = 0.0
     weighted_rent = 0.0
@@ -736,13 +764,6 @@ def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
     vacancy_units = 0
     availability_units = 0
     rent_units = 0
-
-    bedroom_accum: dict[str, tuple[float, int]] = {
-        "average_rent_bachelor": (0.0, 0),
-        "average_rent_1br": (0.0, 0),
-        "average_rent_2br": (0.0, 0),
-        "average_rent_3br_plus": (0.0, 0),
-    }
 
     for z in zones:
         units = z.rental_universe or 0
@@ -756,15 +777,22 @@ def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
         if z.average_rent is not None and units > 0:
             weighted_rent += z.average_rent * units
             rent_units += units
-        for field in bedroom_accum:
-            val = getattr(z, field, None)
-            if val is not None and units > 0:
-                w, u = bedroom_accum[field]
-                bedroom_accum[field] = (w + val * units, u + units)
 
     def _weighted_rent(field: str) -> float | None:
-        w, u = bedroom_accum[field]
-        return round(w / u) if u > 0 else None
+        units_field = field.replace("average_rent_", "rental_universe_")
+        weighted = 0.0
+        total = 0
+        for zone in zones:
+            units = getattr(zone, units_field)
+            rent = getattr(zone, field)
+            # Never substitute all-bedroom units or quietly drop an unknown
+            # zone. A published zero-unit zone contributes no weight.
+            if units is None or units < 0 or (units > 0 and rent is None):
+                return None
+            if units > 0:
+                weighted += rent * units
+                total += units
+        return round(weighted / total) if total > 0 else None
 
     return CmhcRow(
         geoid=geoid,
@@ -780,7 +808,7 @@ def _aggregate_zones(geoid: str, year: int, zones: list[ZoneData]) -> CmhcRow:
             if availability_units > 0
             else None
         ),
-        rental_universe=total_units if total_units > 0 else None,
+        rental_universe=total_units if complete_universe else None,
     )
 
 
@@ -892,7 +920,8 @@ def write_seed(
                 "RMS: Table 2.1.31.3 at survey-zone level, aggregated to municipalities.",
                 "Scss: Tables 1.1.1, 1.2.2, 1.2.3, 1.2.4 queried per CSD (municipality).",
                 "Housing starts are annual totals (Jan-Dec YTD).",
-                "Completions are annual sums of monthly completions.",
+                "Completions require twelve unique, valid monthly totals; incomplete years remain missing.",
+                "Bedroom-specific rents use matching bedroom-specific rental-unit weights; incomplete weights remain missing.",
                 "Under construction is December point-in-time inventory.",
                 "Unabsorbed units is December point-in-time count of completed but unsold/unrented units.",
                 "Municipalities without RMS zone coverage still get Scss data.",
@@ -902,7 +931,8 @@ def write_seed(
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
-    temporary_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    # Match the repository's LF contract before provenance hashes are computed.
+    temporary_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8", newline="\n")
     temporary_path.replace(output_path)
     return len(metrics)
 

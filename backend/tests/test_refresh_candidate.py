@@ -233,7 +233,7 @@ def monitor():
 
 
 def test_monitor_recovers_cold_start_without_masking_retry(monitor, monkeypatch):
-    responses = iter([TimeoutError("sleeping"), (b'{"status":"ok"}', 0.2), (b'CivicScope', 0.1), (b'{"population":100}', 0.1), (b'{"geography_count":1359}', 0.1)])
+    responses = iter([TimeoutError("sleeping"), (b'{"status":"ok"}', 0.2), (b'CivicScope', 0.1), (b'{"population":100}', 0.1), (b'{"geography_count":1359}', 0.1), (json.dumps(archive_response()).encode(), 0.1)])
     def read(url):
         result = next(responses)
         if isinstance(result, Exception):
@@ -242,7 +242,7 @@ def test_monitor_recovers_cold_start_without_masking_retry(monitor, monkeypatch)
     monkeypatch.setattr(monitor, "read", read)
     monkeypatch.setattr(monitor.time, "sleep", MagicMock())
     results = monitor.check("https://api.example", "https://frontend.example")
-    assert len(results) == 4
+    assert len(results) == 5
     assert results[0]["retried"] is True
     assert not any("error" in result for result in results)
 
@@ -255,10 +255,66 @@ def test_monitor_reports_persistent_invalid_content_and_continues(monitor, monke
             return b'{"population":100}', 0.1
         if "data-status" in url:
             return b'{"geography_count":1359}', 0.1
+        if "trreb-archive" in url:
+            return json.dumps(archive_response()).encode(), 0.1
         return b'CivicScope', 0.1
     monkeypatch.setattr(monitor, "read", read)
     monkeypatch.setattr(monitor.time, "sleep", MagicMock())
     results = monitor.check("https://api.example", "https://frontend.example")
-    assert results[0] == {"check": "api_health", "error": "ValueError"}
-    assert len(results) == 4
+    assert results[0]["check"] == "api_health"
+    assert results[0]["error"] == "ValueError"
+    assert results[0]["attempts"] == 2
+    assert len(results) == 5
     assert all("error" not in result for result in results[1:])
+
+
+def archive_response():
+    return {"geoid": "3520005", "period": "2025", "preview_only": False,
+            "source_sha256": "a" * 64, "archive_sha256": "b" * 64,
+            "median_price": 855000, "sales": 23196, "property_days": 44}
+
+
+def test_monitor_preserves_http_status_without_sensitive_response(monitor, monkeypatch):
+    from urllib.error import HTTPError
+    def fail(url):
+        raise HTTPError(url, 503, "do not log sensitive response", {}, None)
+    monkeypatch.setattr(monitor, "read", fail)
+    monkeypatch.setattr(monitor.time, "sleep", MagicMock())
+    results = monitor.check("https://api.example", "https://frontend.example")
+    assert all(result["http_status"] == 503 for result in results)
+    assert "sensitive" not in json.dumps(results)
+
+
+@pytest.mark.parametrize("status,expected", [("checked", "success"), ("overdue", "failure"), ("unknown", "failure")])
+def test_monitor_reports_freshness_separately_from_availability(monitor, monkeypatch, tmp_path, status, expected):
+    def read(url):
+        payload = archive_response() if "trreb-archive" in url else {"status": "ok", "population": 100, "geography_count": 1359,
+            "sources": [{"source": name, "check_status": status} for name in ("census", "cmhc", "transit")]}
+        return (b"CivicScope" if url == "https://frontend.example" else json.dumps(payload).encode()), 0.1
+    monkeypatch.setattr(monitor, "read", read)
+    output = tmp_path / "outputs"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    assert monitor.report(monitor.check("https://api.example", "https://frontend.example")) == 0
+    assert output.read_text() == f"freshness_result={expected}\n"
+
+
+def test_unavailable_freshness_cannot_close_existing_incident(monitor, monkeypatch, tmp_path):
+    output = tmp_path / "outputs"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    assert monitor.report([{"check": "freshness", "error": "TimeoutError"}]) == 1
+    assert output.read_text() == "freshness_result=unknown\n"
+
+
+@pytest.mark.parametrize("field,value", [("median_price", True), ("median_price", float("nan")), ("property_days", float("inf")), ("sales", True), ("preview_only", True)])
+def test_archive_monitor_rejects_invalid_values(monitor, monkeypatch, field, value):
+    payload = {**archive_response(), field: value}
+    def read(url):
+        data = payload if "trreb-archive" in url else {"status": "ok", "population": 100, "geography_count": 1359}
+        return (b"CivicScope" if url == "https://frontend.example" else json.dumps(data).encode()), 0.1
+    monkeypatch.setattr(monitor, "read", read)
+    monkeypatch.setattr(monitor.time, "sleep", MagicMock())
+    results = monitor.check("https://api.example", "https://frontend.example")
+    assert results[-1]["check"] == "trreb_archive"
+    assert results[-1]["error"] == "ValueError"

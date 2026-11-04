@@ -1,5 +1,14 @@
 import type { ExpressionSpecification, FilterSpecification, StyleSpecification } from "maplibre-gl";
 
+/** No network resources: civic geography layers must work without the basemap service. */
+export function fallbackBasemapStyle(dark: boolean): StyleSpecification {
+  return {
+    version: 8,
+    sources: {},
+    layers: [{ id: "fallback-background", type: "background", paint: { "background-color": dark ? "#17212d" : "#eef2ed" } }],
+  };
+}
+
 /** Guard the observed OpenFreeMap range filter without altering other layers. */
 export function normalizeBasemapStyle(style: StyleSpecification): StyleSpecification {
   return {

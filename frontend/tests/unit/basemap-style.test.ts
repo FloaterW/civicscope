@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { featureFilter } from "@maplibre/maplibre-gl-style-spec";
 import type { LineLayerSpecification, StyleSpecification } from "maplibre-gl";
-import { normalizeBasemapStyle } from "@/lib/basemap-style";
+import { fallbackBasemapStyle, normalizeBasemapStyle } from "@/lib/basemap-style";
 
 const boundary: LineLayerSpecification = {
   id: "boundary_3", type: "line", source: "openmaptiles", "source-layer": "boundary",
@@ -11,6 +11,18 @@ const boundary: LineLayerSpecification = {
 const style: StyleSpecification = { version: 8, sources: {}, layers: [boundary, { id: "background", type: "background" }] };
 
 describe("basemap boundary filter", () => {
+  it("provides a network-independent fallback for both themes", () => {
+    for (const dark of [false, true]) {
+      const fallback = fallbackBasemapStyle(dark);
+      expect(fallback.version).toBe(8);
+      expect(fallback.sources).toEqual({});
+      expect(fallback.glyphs).toBeUndefined();
+      expect(fallback.sprite).toBeUndefined();
+      expect(fallback.layers).toHaveLength(1);
+      expect(fallback.layers[0].type).toBe("background");
+    }
+    expect(fallbackBasemapStyle(true)).not.toEqual(fallbackBasemapStyle(false));
+  });
   it("excludes invalid levels without warnings, preserving valid range and exclusions", () => {
     const normalized = normalizeBasemapStyle(style);
     const compiled = featureFilter((normalized.layers[0] as LineLayerSpecification).filter, "test");

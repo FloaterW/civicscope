@@ -14,6 +14,7 @@ import {
 } from "recharts";
 
 import { formatMetric, getMetricLabel } from "@/lib/api";
+import { formatChartLabel } from "@/lib/chart-format";
 import { COMPARISON_BAR_COLOR } from "@/lib/colors";
 import { buildGeographyExportRows, rowsToCsv } from "@/lib/csv-export";
 import { isTransitMetric, transitAgencyNames, transitSnapshotDate } from "@/lib/transit";
@@ -53,7 +54,11 @@ const defaultComparisonNouns: Record<GeographyLevel, string> = {
 };
 
 export function ComparisonPanel({ comparison, metric, geographyLevel, loading, displayYear, isUserSelection = false, transitSnapshot, hasInspectedSelection = false, selectedGeography, pinnedIds = [], onPinnedIdsChange }: Props) {
-  const [chartTooltipActive, setChartTooltipActive] = useState(false);
+  // Let Recharts manage pointer and keyboard activation. Only override it when
+  // dismissing a tooltip; Recharts 3 no longer sends keyboard input to onMouseMove.
+  const [chartTooltipDismissed, setChartTooltipDismissed] = useState(false);
+  const [chartTooltipKeyboard, setChartTooltipKeyboard] = useState(false);
+  const [compactChartLabels, setCompactChartLabels] = useState(true);
   const [shareMessage, setShareMessage] = useState("");
   const isTransit = isTransitMetric(metric);
   const showsRentRatio = ["rent_burden_pct", "affordability_index", "median_income", "median_rent"].includes(metric);
@@ -179,7 +184,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             <button
               type="button"
               onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
+              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
               aria-label="Export comparison data as CSV"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -214,7 +219,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div
           className="relative h-72 overflow-hidden rounded-md border border-civic-line bg-civic-subtle p-3"
-          role={hasChartData ? "img" : undefined}
+          role={hasChartData ? "group" : undefined}
           aria-label={
             hasChartData
               ? `${getMetricLabel(metric)} bar chart for ${cohortDescription}. ${
@@ -226,6 +231,26 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                 } Exact values are available in the adjacent table.`
               : undefined
           }
+          onFocusCapture={(event) => {
+            setChartTooltipDismissed(false);
+            setChartTooltipKeyboard(event.target.matches(":focus-visible"));
+          }}
+          onBlurCapture={() => setChartTooltipDismissed(true)}
+          onMouseMoveCapture={() => {
+            setChartTooltipDismissed(false);
+            setChartTooltipKeyboard(false);
+          }}
+          onTouchStartCapture={() => {
+            setChartTooltipDismissed(false);
+            setChartTooltipKeyboard(false);
+          }}
+          onKeyDownCapture={(event) => {
+            if (event.key === "Escape") setChartTooltipDismissed(true);
+            if (["ArrowLeft", "ArrowRight", "Enter"].includes(event.key)) {
+              setChartTooltipDismissed(false);
+              setChartTooltipKeyboard(true);
+            }
+          }}
         >
           {loading && !hasChartData ? (
             <div className="flex h-full flex-col items-center justify-center gap-2">
@@ -246,17 +271,27 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             <ResponsiveContainer
               width="100%"
               height="100%"
-              onResize={() => setChartTooltipActive(false)}
+              onResize={(width) => {
+                setChartTooltipDismissed(true);
+                setCompactChartLabels(width < 480);
+              }}
             >
               <BarChart
                 data={chartData}
+                accessibilityLayer
+                aria-label={`${getMetricLabel(metric)} comparison chart. Use left and right arrow keys to explore values, Enter to toggle the tooltip, and Escape to dismiss it.`}
                 // Leave room for the value label above the tallest bar.
                 margin={{ top: 24, right: 8, bottom: 8, left: 12 }}
-                onMouseMove={() => setChartTooltipActive(true)}
-                onMouseLeave={() => setChartTooltipActive(false)}
               >
                 <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickLine={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 12, fill: "var(--chart-label)" }}
+                  tickLine={false}
+                  // Negative bar labels sit below the bar. Keep area names clear.
+                  height={40}
+                  tickMargin={16}
+                />
                 <YAxis
                   tick={{ fontSize: 12, fill: "var(--chart-label)" }}
                   tickFormatter={(value: number) => formatAxisMetric(metric, value)}
@@ -264,12 +299,13 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                   width={62}
                 />
                 <Tooltip
-                  active={chartTooltipActive}
+                  active={chartTooltipDismissed ? false : undefined}
                   content={(tooltipProps) => (
                     <ComparisonChartTooltip
                       active={tooltipProps.active}
                       payload={tooltipProps.payload}
                       metric={metric}
+                      announce={chartTooltipKeyboard}
                     />
                   )}
                   isAnimationActive={false}
@@ -288,8 +324,8 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                   <LabelList
                     dataKey="value"
                     position="top"
-                    formatter={(v: number) => formatMetric(metric, v)}
-                    style={{ fontSize: 11, fill: "var(--chart-label)" }}
+                    formatter={(value) => formatChartLabel(metric, value, compactChartLabels)}
+                    style={{ fontSize: compactChartLabels ? 10 : 11, fill: "var(--chart-label)" }}
                   />
                 </Bar>
               </BarChart>
@@ -331,7 +367,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                       {formatMetric(metric, item.rawValue)}
                       {!item.lowConfidence && <span className="block text-xs font-normal text-civic-muted">{item.rawValue == null ? "Unavailable" : item.provenance}</span>}
                       {item.lowConfidence && (
-                        <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                        <span className="ml-2 inline-block rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                           Low confidence — very small 2016 base
                         </span>
                       )}
@@ -368,19 +404,24 @@ function formatAxisMetric(metric: MetricKey, value: number): string {
 function ComparisonChartTooltip({
   active,
   payload,
-  metric
+  metric,
+  announce
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{
     payload?: { fullName?: string; rawValue?: number };
   }>;
   metric: MetricKey;
+  announce: boolean;
 }) {
   const datum = payload?.[0]?.payload;
   if (!active || !datum || typeof datum.rawValue !== "number") return null;
 
   return (
     <div
+      role={announce ? "status" : undefined}
+      aria-live={announce ? "polite" : undefined}
+      aria-atomic={announce ? true : undefined}
       className="w-max whitespace-normal rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs text-civic-ink shadow-panel"
       style={{ maxWidth: "min(16rem, calc(100vw - 4rem))" }}
     >

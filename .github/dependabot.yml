@@ -4,6 +4,11 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    # Revisit when the active Next/ESLint integration officially supports TS7.
+    # Do not disable lint or override peer compatibility to merge this migration.
+    ignore:
+      - dependency-name: typescript
+        versions: [">=7.0.0 <8.0.0"]
     groups:
       frontend-dependencies:
         patterns: ["*"]
@@ -16,6 +21,7 @@ updates:
     groups:
       backend-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: docker
     directory: /backend

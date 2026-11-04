@@ -709,7 +709,7 @@ export function CivicDashboard() {
                 CivicScope
               </span>
             </div>
-            <h1 className="text-xl font-semibold leading-tight text-civic-ink lg:text-2xl">
+            <h1 className="text-xl font-semibold leading-tight text-civic-ink lg:text-2xl lg:leading-8">
               Greater Toronto Housing Affordability Explorer
             </h1>
             <p className="text-xs text-civic-muted lg:text-sm">
@@ -726,9 +726,8 @@ export function CivicDashboard() {
               ref={searchContainerRef}
               className="relative w-full"
               onBlurCapture={() => {
-                // Safari can report a null relatedTarget while focus is moving
-                // from the input to a result button. Defer the containment
-                // check so the click is not unmounted before it can fire.
+                // Wait for keyboard focus to settle before checking whether
+                // it left the search input and results.
                 window.requestAnimationFrame(() => {
                   const container = searchContainerRef.current;
                   if (container && !container.contains(document.activeElement)) {
@@ -780,7 +779,7 @@ export function CivicDashboard() {
                     ? `search-option-${visibleResults[searchHighlight]?.geoid}`
                     : undefined
                 }
-                className="h-11 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-none ring-civic-teal focus:ring-2 disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
+                className="h-11 w-full rounded-md border border-civic-line bg-civic-panel pl-9 pr-3 text-sm text-civic-ink outline-hidden ring-civic-teal focus:ring-2 disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
               />
               {searchOpen && (
                 <div id="geography-search-results" role="listbox" className="absolute right-0 z-20 mt-2 max-h-72 w-full overflow-auto rounded-md border border-civic-line bg-civic-panel shadow-panel">
@@ -791,9 +790,15 @@ export function CivicDashboard() {
                       type="button"
                       role="option"
                       aria-selected={index === searchHighlight}
+                      onMouseDown={(event) => {
+                        // Safari does not focus buttons on mouse press. Keep
+                        // input focus so blur cannot remove the pending click
+                        // target. Select on click, so dragging stays cancellable.
+                        if (event.button === 0) event.preventDefault();
+                      }}
                       onClick={() => selectSearchResult(geography)}
                       onMouseEnter={() => setSearchHighlight(index)}
-                      className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal ${
+                      className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal ${
                         index === searchHighlight
                           ? "bg-civic-teal/10 dark:bg-civic-teal/20"
                           : "hover:bg-civic-subtle"
@@ -911,7 +916,7 @@ export function CivicDashboard() {
           <button
             type="button"
             onClick={retryRequests}
-            className="shrink-0 rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2 focus-visible:ring-offset-red-50 dark:border-red-700 dark:hover:bg-red-900 dark:focus-visible:ring-red-300 dark:focus-visible:ring-offset-red-950"
+            className="shrink-0 rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2 focus-visible:ring-offset-red-50 dark:border-red-700 dark:hover:bg-red-900 dark:focus-visible:ring-red-300 dark:focus-visible:ring-offset-red-950"
           >
             Retry
           </button>
@@ -989,7 +994,7 @@ export function CivicDashboard() {
           type="button"
           data-testid="details-toggle"
           onClick={() => setDetailsPanelOpen(!detailsPanelOpen)}
-          className="order-3 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-civic-line bg-civic-panel px-4 py-3 text-sm font-medium text-civic-ink shadow-panel transition hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 xl:hidden"
+          className="order-3 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-civic-line bg-civic-panel px-4 py-3 text-sm font-medium text-civic-ink shadow-panel transition hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 xl:hidden"
           aria-expanded={detailsPanelOpen}
           aria-controls="selected-geography-details"
         >
@@ -1018,6 +1023,7 @@ export function CivicDashboard() {
             cmhcMetrics={selectedCmhcMetrics}
             cmhcLoading={mapLoading}
             cmhcError={Boolean(mapError)}
+            onRetryCmhc={retryRequests}
             cmhcYear={selectedCmhcYear ?? (isCmhc ? displayYear : undefined)}
             dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
             metricStatus={visibleMapData?.metadata.data_quality?.metric_status}
@@ -1097,7 +1103,7 @@ function ExternalFooterLink({ href, children }: { href: string; children: React.
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-medium text-civic-teal underline decoration-civic-teal/40 underline-offset-2 hover:decoration-civic-teal focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2"
+      className="font-medium text-civic-teal underline decoration-civic-teal/40 underline-offset-2 hover:decoration-civic-teal focus-visible:rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2"
     >
       {children}
       <span className="sr-only"> (opens in a new tab)</span>

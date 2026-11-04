@@ -1,5 +1,19 @@
 # Dependency review — September 15, 2026
 
+## November 4, 2026 audit remediation
+
+The hardening branch updates Next.js, its analyzer and ESLint configuration together to 16.4.5, Vitest to 4.1.12, and compatible transitive security fixes. A new Dependency security workflow audits the complete lockfile on PRs, main pushes and weekly schedules, enforcing high/critical severity for both production and tooling. It complements dependency-change review.
+
+Local checks after these updates: production npm audit reports zero vulnerabilities; the full audit reports 16 moderate affected package entries caused by the minimatch globparts-amplification advisory (GHSA-g3hv-75wg-m249) in development lint tooling. No high/critical entries remain. Do not apply npm's suggested forced ESLint 4 / Next ESLint 12 downgrades: these are incompatible with the application. Keep monitoring upstream compatible resolutions; do not feed untrusted glob patterns to this tooling. This is a documented residual finding, not an audit suppression or claim of zero tooling vulnerabilities.
+
+Major migrations remain separate from the security/reliability patch: Recharts 3 requires chart formatter changes, Tailwind 4 requires CSS/PostCSS migration and visual regression review, and TypeScript 7 must match the supported ESLint integration. Previously green PR checks are not a fresh security audit. No paid hosting or runtime-major change is part of this patch.
+
+November dependency triage: TypeScript 7 is deferred because the active typescript-eslint 8.70.0 supports versions below 6.1; its major Dependabot PR is closed. The obsolete Node 25 PR is also closed. Node 26 is now Active LTS and supported by Vercel; a migration must update Docker, package engines, CI, `.nvmrc` and typings together. Node 22 remains supported until April 2027, so retaining it during these fixes is supported. Python 3.14 has wheels for the locked native dependencies but still needs coordinated CI and migration testing before replacing 3.12. Backend dependency PR #46 changes inputs without regenerating locks; historical green CI did not exercise its proposed upgrades. Major backend updates are kept out of the routine minor/patch group.
+
+Current references: [Node release schedule](https://raw.githubusercontent.com/nodejs/Release/main/schedule.json), [Vercel Node versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions), [Python 3.14 schedule](https://peps.python.org/pep-0745/), [typescript-eslint compatibility](https://typescript-eslint.io/users/dependency-versions/).
+
+The September decisions below are historical context, not the current dependency inventory.
+
 None of these PRs was merged or closed. Historical green checks do not prove compatibility with current main.
 
 | PR | Evidence | Decision |

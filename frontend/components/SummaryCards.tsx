@@ -23,6 +23,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   const regionCount = new Intl.NumberFormat("en-CA").format(summary?.region_count ?? 0);
+  const isRegionalSummary = (summary?.region_count ?? 0) > 1;
   const primaryCards = [
     {
       label: "Rent burden",
@@ -39,13 +40,13 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
   ];
   const supportingCards = [
     {
-      label: "Median income",
+      label: isRegionalSummary ? "Income (local medians)" : "Median income",
       metricKey: "median_income",
       value: formatMetric("median_income", summary?.median_income),
       icon: WalletCards
     },
     {
-      label: "Median rent",
+      label: isRegionalSummary ? "Rent (local medians)" : "Median rent",
       metricKey: "median_rent",
       value: formatMetric("median_rent", summary?.median_rent),
       icon: Home
@@ -126,6 +127,17 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
           );
         })}
       </div>
+      {summary && !loading && isRegionalSummary && (
+        <div data-testid="summary-methodology" className="mt-3 border-t border-civic-line pt-3 text-xs leading-5 text-civic-muted">
+          <p>Income and rent are weighted averages of local medians, not official regional medians.</p>
+          <details className="mt-1">
+            <summary className="cursor-pointer rounded-xs font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">How this snapshot is calculated</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              {summary.notes.map(note => <li key={note}>{note}</li>)}
+            </ul>
+          </details>
+        </div>
+      )}
     </section>
   );
 }

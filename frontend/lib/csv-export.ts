@@ -85,7 +85,7 @@ export function buildGeographyExportRows(
   geographyLevel: GeographyLevel,
   metrics: MetricValues,
   cmhcMetrics?: CmhcMetricValues | null,
-  cmhcYear?: number,
+  cmhcYear?: number | null,
   transitSnapshot?: TransitSnapshot
 ): string[][] {
   const rows: Row[] = [];

@@ -1,0 +1,803 @@
+{
+  "schema_version": 1,
+  "source": "CMHC HMIP Rental Market Survey, October 2018–2025; table 2.1.31.3, Toronto CMA survey zones, Row / Apartment",
+  "audited_at": "2026-11-04",
+  "methodology": "Use matching bedroom-specific rental-unit weights. Missing/suppressed constituent inputs remain null. Only changed values in the reviewed baseline are eligible.",
+  "baseline_sha256": "ac94257f526580e97bcc96b2a58d8f889200cdb95a9ccc35d48947931e888e25",
+  "corrected_seed_sha256": "fe8d24d569b681d7962be3b66e812139a9faf4b351c7e757168bcbc56e362a58",
+  "source_endpoint": "https://www03.cmhc-schl.gc.ca/hmip-pimh/en/TableMapChart/ExportTable",
+  "source_files": [
+    {
+      "file": "2018/Total.csv",
+      "sha256": "bf14ca284ae0abdbcf3df1ffc54d0461ad2c0d1afef293bab2b502bc16df371a"
+    },
+    {
+      "file": "2018/Studio.csv",
+      "sha256": "d6cd1a6fb0175404304cc2dec181e3b2e0a272f8ab0553ebc539859dfc661471"
+    },
+    {
+      "file": "2018/1_Bedroom.csv",
+      "sha256": "9c4184a6e59fd752a2b9c914abe23f086f7e5a4700aef062e199585e1c2d6317"
+    },
+    {
+      "file": "2018/2_Bedroom.csv",
+      "sha256": "e0252f18e65bb8a28c8371205aa41eb22caddb7bffa85ded2b64ac97352f316e"
+    },
+    {
+      "file": "2018/3_Bedroom_plus.csv",
+      "sha256": "14e784dcf9b3afe11254b1f072335f6564df69ddb55db6f82ca3ac8626501a7a"
+    },
+    {
+      "file": "2019/Total.csv",
+      "sha256": "8a77131d25668b76a8dfa2b298a4e49e259b8cc71743981587d7c72e46c28d98"
+    },
+    {
+      "file": "2019/Studio.csv",
+      "sha256": "42a1e1db6692e5af0a74879f9580227048f746fb931df0b7554cb78e8dc9a67b"
+    },
+    {
+      "file": "2019/1_Bedroom.csv",
+      "sha256": "c52b7cc4ac4c889831499725f8c5bb22f0cdf55e1eba3b948a942983f13d225e"
+    },
+    {
+      "file": "2019/2_Bedroom.csv",
+      "sha256": "bf4de1856d87eb884dbd6a240e55cefb2c5c52551d9a3fbcaa044887e9985a5a"
+    },
+    {
+      "file": "2019/3_Bedroom_plus.csv",
+      "sha256": "b6075335d072dea7ad5bcd39bcc9aa29aa0294c7750a027c72d0677fc70a9dbf"
+    },
+    {
+      "file": "2020/Total.csv",
+      "sha256": "00a0db92e56abf85f39b5d49e32516b45f3f2a2ae2ffdb3e6e24aa2791856df5"
+    },
+    {
+      "file": "2020/Studio.csv",
+      "sha256": "14fe986b1359cd782446df6d215e8074746cb64d45309dee9d0f6f7c2ab223e4"
+    },
+    {
+      "file": "2020/1_Bedroom.csv",
+      "sha256": "691218a64af1429465f3ce0839063376c9dc0704eb66311d7edf640809588ddd"
+    },
+    {
+      "file": "2020/2_Bedroom.csv",
+      "sha256": "895b6c63566edaf608b760eaa6a3232932040c8ca9048d382ba71a07b257f3c2"
+    },
+    {
+      "file": "2020/3_Bedroom_plus.csv",
+      "sha256": "5815aa041803c6f6f582610c69d933dcfc3cc354dcb1265df1d0a090b3abdf6d"
+    },
+    {
+      "file": "2021/Total.csv",
+      "sha256": "8fccf8a50cc4c0b953f629351bd996236b4701e5734240f56254f3fac99f5f22"
+    },
+    {
+      "file": "2021/Studio.csv",
+      "sha256": "256770f2bf1c6b5418b19ca43b4b52c2e08eafd3846e490c82d7bc2610ba57c2"
+    },
+    {
+      "file": "2021/1_Bedroom.csv",
+      "sha256": "f05d4db8b877496da961350f266401681da75e81313213a613b0c5f6c1cc970a"
+    },
+    {
+      "file": "2021/2_Bedroom.csv",
+      "sha256": "c0042015351a0a25846b2c12ef7c5663553ea475f7b582aaf46b5396f82e0a83"
+    },
+    {
+      "file": "2021/3_Bedroom_plus.csv",
+      "sha256": "200e37ffac8316db8a8a9ce0ea70549d759f0232da5cedc7884f68cdecc4d57a"
+    },
+    {
+      "file": "2022/Total.csv",
+      "sha256": "4560024bb2a31170825581fdee5b7fd34c893668407f1f14e8e0c4a2ee2dfdab"
+    },
+    {
+      "file": "2022/Studio.csv",
+      "sha256": "3e3fa3891c2cea77609c3716f5223c3e03ad37742e497590a5012ef0ee9e6806"
+    },
+    {
+      "file": "2022/1_Bedroom.csv",
+      "sha256": "65c223191994af053ea2828647620dad4605eb85305660f203c9ed0c438946ab"
+    },
+    {
+      "file": "2022/2_Bedroom.csv",
+      "sha256": "a2cbe25963ebb40cc68c36a66aad164c8bd02076ec967e117be8b481893c31fd"
+    },
+    {
+      "file": "2022/3_Bedroom_plus.csv",
+      "sha256": "7cfbfc81d5cf7d331e98edeec2f47489112391f64105467f8f45e1d4dcb53f01"
+    },
+    {
+      "file": "2023/Total.csv",
+      "sha256": "f417e19e10710e5cfce2b063349ce22eb0d3bee8ade39241a68845c3c5c08e60"
+    },
+    {
+      "file": "2023/Studio.csv",
+      "sha256": "63470e0d2bb6faf593b63c77b30d9e46377c434965ac199a6d6978deab2442d5"
+    },
+    {
+      "file": "2023/1_Bedroom.csv",
+      "sha256": "eded67fde72e9805c27ff0d2cda87a1ec12d964867d97da407d4099f310b1167"
+    },
+    {
+      "file": "2023/2_Bedroom.csv",
+      "sha256": "2c7b05ed510244a2bf54b8556031c778a290e241f9ad01ace0af127dacca5e38"
+    },
+    {
+      "file": "2023/3_Bedroom_plus.csv",
+      "sha256": "df76e8f54dfff89c4dd217cb9196d883c577331f08020713b21df4e3daef6c87"
+    },
+    {
+      "file": "2024/Total.csv",
+      "sha256": "c340c799b85c00e926860a4d66e4eb95cbef9462ee74074710fc8f664d4313a4"
+    },
+    {
+      "file": "2024/Studio.csv",
+      "sha256": "e53d38c5901a6a3fc2a1ede8ffe9957d98ae9b2b6cca9067c869c253d2856e11"
+    },
+    {
+      "file": "2024/1_Bedroom.csv",
+      "sha256": "66fadada892e9071a767260cf102613cd87dad8c889370ccfcfcea4073300d27"
+    },
+    {
+      "file": "2024/2_Bedroom.csv",
+      "sha256": "12692f0d224a7b811cc04aee06e3e0699a9443012da9142ce10340319b50badb"
+    },
+    {
+      "file": "2024/3_Bedroom_plus.csv",
+      "sha256": "d6d507cfbfd7e6a1fc5ac46613c9126bd13c33eac11e54ce7bda7512e63005ae"
+    },
+    {
+      "file": "2025/Total.csv",
+      "sha256": "e341204bafbdfa755c3b5b26fe234f5e8ae95fa9be451f33105c281548643077"
+    },
+    {
+      "file": "2025/Studio.csv",
+      "sha256": "81c52539185342e472bd655bc10d0be21a3c640dca3b825e910680e7f7fc76ce"
+    },
+    {
+      "file": "2025/1_Bedroom.csv",
+      "sha256": "6201b182efbc1696e86a0f82413470af7e35e8d3d62289cda899e3ce3d5f7001"
+    },
+    {
+      "file": "2025/2_Bedroom.csv",
+      "sha256": "7994e4be3f8857108cfa1f0b8a5c912ca1164a7eac7f0daf50c6433525afd2d9"
+    },
+    {
+      "file": "2025/3_Bedroom_plus.csv",
+      "sha256": "dc15b2a4e6554b6e636b2488393ac0f361d8e96246135c39fcac583175734772"
+    }
+  ],
+  "corrections": [
+    {
+      "geoid": "3520005",
+      "year": 2018,
+      "field": "average_rent_bachelor",
+      "before": 1035,
+      "after": 1085
+    },
+    {
+      "geoid": "3520005",
+      "year": 2018,
+      "field": "average_rent_1br",
+      "before": 1253,
+      "after": 1271
+    },
+    {
+      "geoid": "3520005",
+      "year": 2018,
+      "field": "average_rent_2br",
+      "before": 1548,
+      "after": 1491
+    },
+    {
+      "geoid": "3520005",
+      "year": 2018,
+      "field": "average_rent_3br_plus",
+      "before": 1783,
+      "after": null
+    },
+    {
+      "geoid": "3520005",
+      "year": 2019,
+      "field": "average_rent_bachelor",
+      "before": 1107,
+      "after": 1149
+    },
+    {
+      "geoid": "3520005",
+      "year": 2019,
+      "field": "average_rent_1br",
+      "before": 1356,
+      "after": 1372
+    },
+    {
+      "geoid": "3520005",
+      "year": 2019,
+      "field": "average_rent_2br",
+      "before": 1651,
+      "after": 1589
+    },
+    {
+      "geoid": "3520005",
+      "year": 2019,
+      "field": "average_rent_3br_plus",
+      "before": 1976,
+      "after": 1775
+    },
+    {
+      "geoid": "3520005",
+      "year": 2020,
+      "field": "average_rent_bachelor",
+      "before": 1152,
+      "after": 1215
+    },
+    {
+      "geoid": "3520005",
+      "year": 2020,
+      "field": "average_rent_1br",
+      "before": 1419,
+      "after": 1433
+    },
+    {
+      "geoid": "3520005",
+      "year": 2020,
+      "field": "average_rent_2br",
+      "before": 1716,
+      "after": 1659
+    },
+    {
+      "geoid": "3520005",
+      "year": 2020,
+      "field": "average_rent_3br_plus",
+      "before": 2192,
+      "after": null
+    },
+    {
+      "geoid": "3520005",
+      "year": 2021,
+      "field": "average_rent_bachelor",
+      "before": 1168,
+      "after": 1226
+    },
+    {
+      "geoid": "3520005",
+      "year": 2021,
+      "field": "average_rent_1br",
+      "before": 1434,
+      "after": 1446
+    },
+    {
+      "geoid": "3520005",
+      "year": 2021,
+      "field": "average_rent_2br",
+      "before": 1766,
+      "after": 1707
+    },
+    {
+      "geoid": "3520005",
+      "year": 2021,
+      "field": "average_rent_3br_plus",
+      "before": 2270,
+      "after": null
+    },
+    {
+      "geoid": "3520005",
+      "year": 2022,
+      "field": "average_rent_bachelor",
+      "before": 1246,
+      "after": 1310
+    },
+    {
+      "geoid": "3520005",
+      "year": 2022,
+      "field": "average_rent_1br",
+      "before": 1522,
+      "after": 1536
+    },
+    {
+      "geoid": "3520005",
+      "year": 2022,
+      "field": "average_rent_2br",
+      "before": 1867,
+      "after": 1812
+    },
+    {
+      "geoid": "3520005",
+      "year": 2022,
+      "field": "average_rent_3br_plus",
+      "before": 2294,
+      "after": 2075
+    },
+    {
+      "geoid": "3520005",
+      "year": 2023,
+      "field": "average_rent_bachelor",
+      "before": 1371,
+      "after": 1428
+    },
+    {
+      "geoid": "3520005",
+      "year": 2023,
+      "field": "average_rent_1br",
+      "before": 1689,
+      "after": 1708
+    },
+    {
+      "geoid": "3520005",
+      "year": 2023,
+      "field": "average_rent_2br",
+      "before": 2042,
+      "after": 1990
+    },
+    {
+      "geoid": "3520005",
+      "year": 2023,
+      "field": "average_rent_3br_plus",
+      "before": 2512,
+      "after": 2224
+    },
+    {
+      "geoid": "3520005",
+      "year": 2024,
+      "field": "average_rent_bachelor",
+      "before": 1394,
+      "after": 1454
+    },
+    {
+      "geoid": "3520005",
+      "year": 2024,
+      "field": "average_rent_1br",
+      "before": 1706,
+      "after": 1716
+    },
+    {
+      "geoid": "3520005",
+      "year": 2024,
+      "field": "average_rent_2br",
+      "before": 2040,
+      "after": 1996
+    },
+    {
+      "geoid": "3520005",
+      "year": 2024,
+      "field": "average_rent_3br_plus",
+      "before": 2495,
+      "after": 2221
+    },
+    {
+      "geoid": "3520005",
+      "year": 2025,
+      "field": "average_rent_bachelor",
+      "before": 1443,
+      "after": 1495
+    },
+    {
+      "geoid": "3520005",
+      "year": 2025,
+      "field": "average_rent_1br",
+      "before": 1746,
+      "after": 1761
+    },
+    {
+      "geoid": "3520005",
+      "year": 2025,
+      "field": "average_rent_2br",
+      "before": 2127,
+      "after": 2061
+    },
+    {
+      "geoid": "3520005",
+      "year": 2025,
+      "field": "average_rent_3br_plus",
+      "before": 2582,
+      "after": null
+    },
+    {
+      "geoid": "3521005",
+      "year": 2018,
+      "field": "average_rent_bachelor",
+      "before": 921,
+      "after": 924
+    },
+    {
+      "geoid": "3521005",
+      "year": 2018,
+      "field": "average_rent_1br",
+      "before": 1239,
+      "after": 1232
+    },
+    {
+      "geoid": "3521005",
+      "year": 2018,
+      "field": "average_rent_2br",
+      "before": 1396,
+      "after": 1397
+    },
+    {
+      "geoid": "3521005",
+      "year": 2018,
+      "field": "average_rent_3br_plus",
+      "before": 1546,
+      "after": 1582
+    },
+    {
+      "geoid": "3521005",
+      "year": 2019,
+      "field": "average_rent_bachelor",
+      "before": 1028,
+      "after": 1012
+    },
+    {
+      "geoid": "3521005",
+      "year": 2019,
+      "field": "average_rent_1br",
+      "before": 1303,
+      "after": 1296
+    },
+    {
+      "geoid": "3521005",
+      "year": 2019,
+      "field": "average_rent_3br_plus",
+      "before": 1617,
+      "after": 1650
+    },
+    {
+      "geoid": "3521005",
+      "year": 2020,
+      "field": "average_rent_bachelor",
+      "before": 1078,
+      "after": 1052
+    },
+    {
+      "geoid": "3521005",
+      "year": 2020,
+      "field": "average_rent_1br",
+      "before": 1390,
+      "after": 1384
+    },
+    {
+      "geoid": "3521005",
+      "year": 2020,
+      "field": "average_rent_3br_plus",
+      "before": 1720,
+      "after": 1749
+    },
+    {
+      "geoid": "3521005",
+      "year": 2021,
+      "field": "average_rent_bachelor",
+      "before": 1109,
+      "after": 1095
+    },
+    {
+      "geoid": "3521005",
+      "year": 2021,
+      "field": "average_rent_1br",
+      "before": 1436,
+      "after": 1434
+    },
+    {
+      "geoid": "3521005",
+      "year": 2021,
+      "field": "average_rent_2br",
+      "before": 1609,
+      "after": 1610
+    },
+    {
+      "geoid": "3521005",
+      "year": 2021,
+      "field": "average_rent_3br_plus",
+      "before": 1760,
+      "after": 1798
+    },
+    {
+      "geoid": "3521005",
+      "year": 2022,
+      "field": "average_rent_bachelor",
+      "before": 1146,
+      "after": 1130
+    },
+    {
+      "geoid": "3521005",
+      "year": 2022,
+      "field": "average_rent_1br",
+      "before": 1480,
+      "after": 1473
+    },
+    {
+      "geoid": "3521005",
+      "year": 2022,
+      "field": "average_rent_3br_plus",
+      "before": 1874,
+      "after": 1896
+    },
+    {
+      "geoid": "3521005",
+      "year": 2023,
+      "field": "average_rent_bachelor",
+      "before": 1247,
+      "after": null
+    },
+    {
+      "geoid": "3521005",
+      "year": 2023,
+      "field": "average_rent_1br",
+      "before": 1632,
+      "after": 1624
+    },
+    {
+      "geoid": "3521005",
+      "year": 2023,
+      "field": "average_rent_3br_plus",
+      "before": 1993,
+      "after": 2010
+    },
+    {
+      "geoid": "3521005",
+      "year": 2024,
+      "field": "average_rent_bachelor",
+      "before": 1307,
+      "after": 1283
+    },
+    {
+      "geoid": "3521005",
+      "year": 2024,
+      "field": "average_rent_1br",
+      "before": 1740,
+      "after": 1748
+    },
+    {
+      "geoid": "3521005",
+      "year": 2024,
+      "field": "average_rent_2br",
+      "before": 1935,
+      "after": 1933
+    },
+    {
+      "geoid": "3521005",
+      "year": 2024,
+      "field": "average_rent_3br_plus",
+      "before": 2058,
+      "after": 2070
+    },
+    {
+      "geoid": "3521005",
+      "year": 2025,
+      "field": "average_rent_bachelor",
+      "before": 1401,
+      "after": null
+    },
+    {
+      "geoid": "3521005",
+      "year": 2025,
+      "field": "average_rent_1br",
+      "before": 1744,
+      "after": 1739
+    },
+    {
+      "geoid": "3521005",
+      "year": 2025,
+      "field": "average_rent_2br",
+      "before": 1996,
+      "after": 1995
+    },
+    {
+      "geoid": "3521005",
+      "year": 2025,
+      "field": "average_rent_3br_plus",
+      "before": 2134,
+      "after": 2180
+    },
+    {
+      "geoid": "3521010",
+      "year": 2018,
+      "field": "average_rent_bachelor",
+      "before": 851,
+      "after": 840
+    },
+    {
+      "geoid": "3521010",
+      "year": 2018,
+      "field": "average_rent_1br",
+      "before": 1168,
+      "after": 1158
+    },
+    {
+      "geoid": "3521010",
+      "year": 2018,
+      "field": "average_rent_2br",
+      "before": 1332,
+      "after": 1335
+    },
+    {
+      "geoid": "3521010",
+      "year": 2018,
+      "field": "average_rent_3br_plus",
+      "before": 1542,
+      "after": 1533
+    },
+    {
+      "geoid": "3521010",
+      "year": 2019,
+      "field": "average_rent_bachelor",
+      "before": 902,
+      "after": null
+    },
+    {
+      "geoid": "3521010",
+      "year": 2019,
+      "field": "average_rent_1br",
+      "before": 1298,
+      "after": 1284
+    },
+    {
+      "geoid": "3521010",
+      "year": 2019,
+      "field": "average_rent_2br",
+      "before": 1444,
+      "after": 1447
+    },
+    {
+      "geoid": "3521010",
+      "year": 2020,
+      "field": "average_rent_bachelor",
+      "before": 966,
+      "after": null
+    },
+    {
+      "geoid": "3521010",
+      "year": 2020,
+      "field": "average_rent_1br",
+      "before": 1350,
+      "after": 1340
+    },
+    {
+      "geoid": "3521010",
+      "year": 2020,
+      "field": "average_rent_2br",
+      "before": 1512,
+      "after": 1514
+    },
+    {
+      "geoid": "3521010",
+      "year": 2020,
+      "field": "average_rent_3br_plus",
+      "before": 1648,
+      "after": 1650
+    },
+    {
+      "geoid": "3521010",
+      "year": 2021,
+      "field": "average_rent_bachelor",
+      "before": 1036,
+      "after": 980
+    },
+    {
+      "geoid": "3521010",
+      "year": 2021,
+      "field": "average_rent_1br",
+      "before": 1395,
+      "after": 1385
+    },
+    {
+      "geoid": "3521010",
+      "year": 2021,
+      "field": "average_rent_2br",
+      "before": 1566,
+      "after": 1568
+    },
+    {
+      "geoid": "3521010",
+      "year": 2021,
+      "field": "average_rent_3br_plus",
+      "before": 1730,
+      "after": 1732
+    },
+    {
+      "geoid": "3521010",
+      "year": 2022,
+      "field": "average_rent_bachelor",
+      "before": 1244,
+      "after": 1218
+    },
+    {
+      "geoid": "3521010",
+      "year": 2022,
+      "field": "average_rent_1br",
+      "before": 1527,
+      "after": 1516
+    },
+    {
+      "geoid": "3521010",
+      "year": 2022,
+      "field": "average_rent_2br",
+      "before": 1690,
+      "after": 1691
+    },
+    {
+      "geoid": "3521010",
+      "year": 2022,
+      "field": "average_rent_3br_plus",
+      "before": 1841,
+      "after": 1869
+    },
+    {
+      "geoid": "3521010",
+      "year": 2023,
+      "field": "average_rent_bachelor",
+      "before": 1334,
+      "after": 1373
+    },
+    {
+      "geoid": "3521010",
+      "year": 2023,
+      "field": "average_rent_1br",
+      "before": 1624,
+      "after": 1621
+    },
+    {
+      "geoid": "3521010",
+      "year": 2023,
+      "field": "average_rent_2br",
+      "before": 1865,
+      "after": 1864
+    },
+    {
+      "geoid": "3521010",
+      "year": 2023,
+      "field": "average_rent_3br_plus",
+      "before": 2046,
+      "after": 2028
+    },
+    {
+      "geoid": "3521010",
+      "year": 2024,
+      "field": "average_rent_bachelor",
+      "before": 1343,
+      "after": 1366
+    },
+    {
+      "geoid": "3521010",
+      "year": 2024,
+      "field": "average_rent_1br",
+      "before": 1693,
+      "after": 1692
+    },
+    {
+      "geoid": "3521010",
+      "year": 2024,
+      "field": "average_rent_2br",
+      "before": 1921,
+      "after": 1922
+    },
+    {
+      "geoid": "3521010",
+      "year": 2024,
+      "field": "average_rent_3br_plus",
+      "before": 2063,
+      "after": 2030
+    },
+    {
+      "geoid": "3521010",
+      "year": 2025,
+      "field": "average_rent_bachelor",
+      "before": 1435,
+      "after": 1458
+    },
+    {
+      "geoid": "3521010",
+      "year": 2025,
+      "field": "average_rent_1br",
+      "before": 1777,
+      "after": 1778
+    },
+    {
+      "geoid": "3521010",
+      "year": 2025,
+      "field": "average_rent_3br_plus",
+      "before": 2083,
+      "after": 2063
+    }
+  ]
+}

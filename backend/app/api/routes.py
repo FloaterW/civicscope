@@ -215,12 +215,14 @@ def serialize_geography(
     return payload
 
 
-def resolve_cmhc_year(db: Session, year: int | None) -> int:
+def resolve_cmhc_year(db: Session, year: int | None, *, required: bool = True) -> int | None:
     if year is not None:
         return year
     latest_year = db.query(func.max(CmhcMetric.year)).scalar()
     if latest_year is None:
-        raise HTTPException(status_code=404, detail="No CMHC metrics have been loaded.")
+        if required:
+            raise HTTPException(status_code=404, detail="No CMHC metrics have been loaded.")
+        return None
     return int(latest_year)
 
 
@@ -431,7 +433,15 @@ def get_geography(
 ):
     metric_year = resolve_year(db, year)
     geography = db.query(Geography).filter(Geography.geoid == geography_id).first()
-    if geography_id.isdigit():
+    # The legacy database-ID fallback is a PostgreSQL INTEGER, not an arbitrary
+    # Unicode or unbounded integer. GEOIDs (including tract decimals) win first.
+    if (
+        geography is None
+        and geography_id.isascii()
+        and geography_id.isdecimal()
+        and len(geography_id) <= 10
+        and 0 < int(geography_id) <= 2_147_483_647
+    ):
         geography = geography or db.query(Geography).filter(Geography.id == int(geography_id)).first()
     if geography is None:
         raise HTTPException(status_code=404, detail="Geography not found.")
@@ -492,7 +502,7 @@ def get_summary(
     if id_list and not records:
         raise HTTPException(status_code=404, detail="No selected geographies were found.")
 
-    cmhc_year = resolve_cmhc_year(db, year)
+    cmhc_year = resolve_cmhc_year(db, year, required=False)
     # CMHC data is stored at municipality level only.  For census tract mode
     # we aggregate the municipality-level rows so the summary still reports
     # meaningful GTA-wide CMHC stats.
@@ -549,7 +559,7 @@ def compare_geographies(
     else:
         ordered_records = sorted(records, key=lambda item: item[1].population or 0, reverse=True)[:6]
 
-    cmhc_year = resolve_cmhc_year(db, year)
+    cmhc_year = resolve_cmhc_year(db, year, required=False)
     cmhc_by_geoid = {
         row.geoid: row
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
@@ -574,7 +584,8 @@ def compare_geographies(
         )
         # Real published CMHC tract values for this year (same as the map uses)
         # so compare and map agree per tract instead of diverging.
-        real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
+        if cmhc_year is not None:
+            real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
         tract_count_allocations = build_tract_count_allocations(
             all_tract_records,
             municipality_name_to_geoid,
@@ -666,7 +677,9 @@ def get_map_data(
     # Always load CMHC data so the detail panel can display it regardless
     # of which metric the map is colored by.  When viewing a CMHC metric the
     # user-selected year is used; otherwise the latest available CMHC year.
-    cmhc_year = resolve_cmhc_year(db, year if cmhc else None)
+    # CMHC is supplemental on Census/transit maps: its absence must not hide
+    # otherwise available geography data. CMHC maps still require that source.
+    cmhc_year = resolve_cmhc_year(db, year if cmhc else None, required=cmhc)
     cmhc_by_geoid: dict[str, CmhcMetric] = {
         row.geoid: row
         for row in db.query(CmhcMetric).filter(CmhcMetric.year == cmhc_year).all()
@@ -686,7 +699,8 @@ def get_map_data(
         # full cmhc_metrics for every feature, so starts/completions must keep
         # their real "official" provenance regardless of which metric colours
         # the map.
-        real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
+        if cmhc_year is not None:
+            real_tract_cmhc = load_real_tract_cmhc(db, cmhc_year)
         tract_count_allocations = build_tract_count_allocations(
             records,
             municipality_name_to_geoid,

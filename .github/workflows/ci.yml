@@ -18,10 +18,10 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Review dependency changes
-        uses: actions/dependency-review-action@v5
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5
         with:
           fail-on-severity: high
 
@@ -32,10 +32,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
 
@@ -45,14 +45,17 @@ jobs:
 
       - name: Audit backend dependencies
         working-directory: backend
-        run: pip-audit --require-hashes -r requirements.lock
+        run: |
+          python scripts/check_dependency_locks.py
+          pip-audit --require-hashes -r requirements.lock
+          pip-audit --require-hashes -r requirements-dev.lock
 
       - name: Run backend tests
         working-directory: backend
         run: pytest
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
           cache: npm
@@ -141,7 +144,7 @@ jobs:
 
       - name: Upload browser failure evidence
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
           path: |
@@ -176,10 +179,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
 
@@ -198,18 +201,54 @@ jobs:
         working-directory: backend
         run: |
           python etl/seed_demo_data.py
-          pytest -q tests/test_postgis_integration.py tests/test_trreb_postgres.py
+          pytest -q tests/test_postgis_integration.py tests/test_trreb_postgres.py tests/test_cmhc_corrections_postgres.py
 
   containers:
     name: Build production containers
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: civicscope_smoke
+          POSTGRES_USER: smoke
+          POSTGRES_PASSWORD: local-smoke-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U smoke -d civicscope_smoke"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build backend image
         run: docker build -t civicscope-backend ./backend
+
+      - name: Smoke-test backend startup with production proxy arguments
+        run: |
+          docker run -d --name backend-smoke --network host \
+            -e DATABASE_URL=postgresql+psycopg://smoke:local-smoke-only@127.0.0.1:5432/civicscope_smoke \
+            -e PORT=8014 -e SEED_ON_STARTUP=false -e FORWARDED_ALLOW_IPS='*' civicscope-backend
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+          for attempt in range(45):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8014/health', timeout=2) as response:
+                      if json.load(response).get('status') == 'ok':
+                          raise SystemExit(0)
+              except Exception:
+                  time.sleep(1)
+          raise SystemExit('Backend container did not become healthy')
+          PY
+
+      - name: Report and remove backend smoke container
+        if: always()
+        run: |
+          docker logs backend-smoke || true
+          docker rm -f backend-smoke || true
 
       - name: Build frontend image
         run: docker build -t civicscope-frontend ./frontend

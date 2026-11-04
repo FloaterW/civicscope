@@ -5,7 +5,7 @@ A geospatial analytics dashboard for exploring housing affordability, income, an
 [![CI](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml/badge.svg)](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![API Docs](https://img.shields.io/badge/API-OpenAPI%20Docs-009688)](https://civicscope.onrender.com/docs)
-![Next.js](https://img.shields.io/badge/Next.js-16.3-black)
+![Next.js](https://img.shields.io/badge/Next.js-16.4.5-black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688)
 ![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-316192)
 
@@ -382,24 +382,24 @@ make frontend-e2e  # Playwright browser tests (needs backend running)
 Or individually:
 
 ```bash
-cd backend && pytest                   # 158 passing tests; 3 PostGIS tests skip without a test database
-cd frontend && npm run test:unit       # 50 Vitest unit tests
-cd frontend && npm run test:e2e        # 68 Playwright executions across Chromium, Firefox, and WebKit
+cd backend && pytest                   # PostgreSQL checks need POSTGIS_TEST_DATABASE_URL
+cd frontend && npm run test:unit       # Vitest unit tests
+cd frontend && npm run test:e2e        # Dashboard journeys and browser smoke checks
 cd frontend && npm run typecheck       # TypeScript strict mode
 cd frontend && npm run lint            # ESLint
 ```
 
 **Test coverage highlights:**
 
-- **158 backend tests** plus 3 opt-in PostGIS integration checks covering API endpoints, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and data validation
-- **68 Playwright executions** covering 62 user journeys and checks, including map rendering, shareable URL/history state, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, accessibility, and critical journeys repeated in Chromium, Firefox, and WebKit
-- **50 Vitest unit tests** for formatting, request cancellation/timeouts, cache keys, dashboard URL state, transit-map helpers, reduced-motion behavior, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
-- **axe-core WCAG 2.0 AA audit** runs in CI — zero critical or serious violations
+- **Backend and opt-in PostgreSQL integration tests** cover API endpoints, data migrations, provenance, refresh safety, conservation rules, ETL coverage gates, metric calculations, and validation
+- **Playwright browser tests** cover map rendering, shareable URL/history state, theme/layer persistence, metric selection, search, retry states, responsive controls, comparison, provenance, accessibility, and critical journeys repeated in Chromium, Firefox, and WebKit; separate production-build suites verify the TRREB archive
+- **Vitest unit tests** cover formatting, request cancellation/timeouts, cache keys, dashboard URL state, transit-map helpers, reduced-motion behavior, spreadsheet-safe CSV exports, color semantics, labeling, and CMHC classification
+- **axe-core WCAG accessibility checks** run in CI; automated checks supplement manual visual and keyboard review
 - **Rate limiting** at 60 req/min per IP via slowapi
 
 The Playwright suite expects the backend API running at `NEXT_PUBLIC_API_URL` or `http://127.0.0.1:8000`. It starts its own Next.js server on port `3101`. To run against Docker, pass `PLAYWRIGHT_PORT=3102`.
 
-CI (`.github/workflows/ci.yml`) runs dependency audits, backend pytest, frontend typecheck/lint/build, Vitest, Playwright across Chromium plus critical Firefox and WebKit journeys against a freshly seeded API, reversible migrations against real PostGIS, and production Docker image builds. CodeQL and Dependabot add scheduled static analysis and update checks.
+[CivicScope CI](https://github.com/FloaterW/civicscope/actions/workflows/ci.yml) reports current test counts and results for each commit. It runs dependency audits, backend pytest, frontend typecheck/lint/build, Vitest, Playwright across Chromium plus critical Firefox and WebKit journeys against a freshly seeded API, schema migration round trips and guarded data corrections against real PostGIS, and production Docker builds/startup checks. CodeQL and Dependabot add scheduled static analysis and update checks.
 
 Screenshot generation:
 
@@ -435,7 +435,7 @@ SQLite test databases still use SQLAlchemy metadata creation for fast isolated t
 ## Performance & Security
 
 - **Next.js standalone output** with tree-shaking; heavy components (`ComparisonPanel`, `DetailPanel`) are code-split via `next/dynamic`
-- **Tailwind CSS** (zero-runtime CSS-in-JS); no client-side style injection overhead
+- **Tailwind CSS** compiles utility styles without client-side style injection
 - **GZip compression** on all API responses via Starlette middleware
 - **HTTP caching** — `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` on census data endpoints (2021 data is immutable)
 - **Geometry simplification** — production PostGIS uses `ST_SimplifyPreserveTopology`; SQLite/demo environments use compact rounded GeoJSON

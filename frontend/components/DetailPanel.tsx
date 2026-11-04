@@ -23,7 +23,7 @@ import type {
 } from "@/types";
 
 import { DataQualityBadge } from "./DataQualityBadge";
-import { MetricTooltip } from "./MetricTooltip";
+import { StatisticCard } from "./StatisticCard";
 import { TrrebResaleSection } from "./TrrebResaleSection";
 import { TRREB_MODE } from "@/lib/trreb-mode";
 
@@ -36,6 +36,7 @@ type Props = {
   cmhcMetrics?: CmhcMetricValues | null;
   cmhcLoading?: boolean;
   cmhcError?: boolean;
+  onRetryCmhc?: () => void;
   cmhcYear?: number;
   dataQualityLabel?: string;
   metricStatus?: "official" | "derived" | "estimated" | "mixed" | "zone";
@@ -90,7 +91,7 @@ function TopicSection({ topic, title, period, children }: { topic: string; title
   const active = metricTopic(useContext(SelectedMetric)) === topic;
   return (
     <details open={active} data-topic={topic} data-active-topic={active || undefined} className="group border-t border-civic-line pt-3">
-      <summary className="cursor-pointer rounded-sm text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+      <summary className="cursor-pointer rounded-xs text-sm font-semibold text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">
         {title}
         {period && <span className="ml-2 text-xs font-normal text-civic-muted"> {period}</span>}
       </summary>
@@ -99,12 +100,13 @@ function TopicSection({ topic, title, period, children }: { topic: string; title
   );
 }
 
-export function DetailPanel({ resaleView, onResaleViewChange, geography, metric, geographyLevel, cmhcMetrics, cmhcLoading = false, cmhcError = false, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
+export function DetailPanel({ resaleView, onResaleViewChange, geography, metric, geographyLevel, cmhcMetrics, cmhcLoading = false, cmhcError = false, onRetryCmhc, cmhcYear, dataQualityLabel, metricStatus, transitSnapshot, onClear }: Props) {
   const metrics = geography?.metrics;
   const quality = metrics?.data_quality;
+  const exportUnavailable = cmhcLoading || cmhcError || !metrics;
 
   const handleExportCsv = useCallback(() => {
-    if (!geography || !metrics) return;
+    if (!geography || !metrics || exportUnavailable) return;
     const csv = rowsToCsv(
       buildGeographyExportRows(geographyLevel, metrics, cmhcMetrics, cmhcYear, transitSnapshot)
     );
@@ -117,7 +119,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [geography, geographyLevel, metrics, cmhcMetrics, cmhcYear, transitSnapshot]);
+  }, [geography, geographyLevel, metrics, cmhcMetrics, cmhcYear, transitSnapshot, exportUnavailable]);
   return (
     <SelectedMetric.Provider value={metric}>
     <section
@@ -145,7 +147,9 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
             <button
               type="button"
               onClick={handleExportCsv}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-civic-line px-2.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink"
+              disabled={exportUnavailable}
+              aria-describedby={cmhcLoading || cmhcError ? "geography-export-status" : undefined}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-civic-line px-2.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal"
               aria-label="Export geography data as CSV"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -162,6 +166,18 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
           </div>
         )}
       </div>
+      {geography && (cmhcLoading || cmhcError) && (
+        <div className="mt-2 shrink-0 text-xs leading-5 text-civic-muted">
+          <p id="geography-export-status" role="status">
+            {cmhcLoading ? "CSV export will be available when the selected year's data finishes loading." : "CSV export is unavailable because rental and construction data could not be loaded."}
+          </p>
+          {cmhcError && !cmhcLoading && onRetryCmhc && (
+            <button type="button" onClick={onRetryCmhc} className="mt-1 min-h-9 rounded-md border border-civic-line px-2.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">
+              Retry rental and construction data
+            </button>
+          )}
+        </div>
+      )}
 
       {geography ? (
         <div
@@ -170,7 +186,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
           role="region"
           aria-label="Selected geography statistics"
           tabIndex={0}
-          className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-gutter:stable]"
+          className="rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-gutter:stable]"
         >
         <TopicSections key={`${geography.geoid}:${metric}`}>
           {/* Census Profile */}
@@ -211,7 +227,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
           )}
           <TopicSection topic="rental" title="Rental market" period={cmhcYear ? `Oct ${cmhcYear} · CMHC` : "CMHC"}>
               {cmhcLoading || cmhcError ? (
-                <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading rental data…" : "Rental data could not be loaded. Use Retry above."}</p>
+                <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading rental data…" : "Rental data could not be loaded."}</p>
               ) : cmhcMetrics ? (
                 <CmhcRentalSection cmhcMetrics={cmhcMetrics} cmhcYear={cmhcYear} geographyLevel={geographyLevel} />
               ) : metricTopic(metric) === "rental" ? (
@@ -224,7 +240,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
           </TopicSection>
           <TopicSection topic="construction" title="Housing construction" period={cmhcYear ? String(cmhcYear) : "CMHC"}>
               {cmhcLoading || cmhcError ? (
-                <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading construction data…" : "Construction data could not be loaded. Use Retry above."}</p>
+                <p role="status" className="text-sm text-civic-muted">{cmhcLoading ? "Loading construction data…" : "Construction data could not be loaded."}</p>
               ) : cmhcMetrics ? (
                 <div>
                   <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
@@ -456,13 +472,7 @@ function MetricLine({
 }) {
   const selected = useContext(SelectedMetric) === metricKey;
   return (
-    <div data-metric={metricKey} data-selected-metric={selected || undefined} className={`flex min-h-24 min-w-0 flex-col rounded-md border px-3 py-3 ${selected ? "border-civic-teal bg-[var(--civic-accent-subtle)]" : "border-civic-line bg-civic-panel"}`}>
-      <span className="flex items-center gap-1 text-xs text-civic-muted">
-        {label}
-        {metricKey && <MetricTooltip metricKey={metricKey} />}
-      </span>
-      {selected && <span className="sr-only">Selected map metric</span>}
-      <span className="mt-auto block pt-2 text-lg font-semibold tabular-nums text-civic-ink">
+    <StatisticCard label={label} metricKey={metricKey} selected={selected} sourceLabel={sourceLabel} value={<>
         {value}
         {status === "estimated" && (
           <span
@@ -518,9 +528,7 @@ function MetricLine({
             est.
           </span>
         )}
-      </span>
-      <span aria-hidden={sourceLabel ? undefined : true} className="block min-h-4 text-[11px] text-civic-muted">{sourceLabel}</span>
-    </div>
+    </>} />
   );
 }
 
