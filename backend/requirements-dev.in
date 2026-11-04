@@ -4,4 +4,6 @@
 
 httpx2>=2.13.0,<3.0
 pip-audit>=2.10.1,<3.0
-pytest>=8.3,<9.0
+# Pytest 9.0.3 fixes CVE-2025-71176; no pytest 8 release contains that fix.
+# https://docs.pytest.org/en/9.0.x/changelog.html#pytest-9-0-3-2026-04-07
+pytest>=9.0.3,<10.0
