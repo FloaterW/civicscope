@@ -764,36 +764,8 @@ def get_map_data(
         resolve_rent_burden(row.median_rent, row.median_income, row.rent_burden_pct)[1] == "estimated"
         for _, row in records
     )
-    metadata: dict[str, Any] = {
-        "metric": metric_key,
-        "year": cmhc_year if cmhc else metric_year,
-        "cmhc_year": cmhc_year,
-        "domain": domain,
-        "geography_type": normalized_type,
-        "data_quality": data_quality(normalized_type, cmhc=cmhc, metric_key=metric_key, year=cmhc_year, has_estimated_rent_burden=has_estimated_rent_burden),
-        "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
-        "available_years": available_cmhc_years(db),
-        # All non-CMHC metrics share one client-side map payload. Keep the small
-        # transit manifest on every response so local metric repainting never
-        # loses the coverage disclosure.
-        "transit_snapshot": load_transit_manifest(),
-        "metric_catalog": {
-            candidate: {
-                "data_quality": data_quality(
-                    normalized_type,
-                    cmhc=is_cmhc_metric(candidate),
-                    metric_key=candidate,
-                    year=cmhc_year,
-                    has_estimated_rent_burden=has_estimated_rent_burden,
-                ),
-                "source": map_data_source(
-                    normalized_type,
-                    cmhc=is_cmhc_metric(candidate),
-                    metric_key=candidate,
-                ),
-            }
-            for candidate in sorted(VALID_METRICS)
-        },
+    tract_metric_sources: dict[str, set[str]] = {
+        candidate: set() for candidate in CMHC_REAL_TRACT_METRICS
     }
     features = []
     for geography, row in records:
@@ -844,6 +816,18 @@ def get_map_data(
                 real_tract=real_row,
                 zone_name=zone,
             )
+            if normalized_type == "census_tract":
+                # Classify the values actually served for this year, not the
+                # presence of a source row (whose selected field may be null).
+                # Published zero counts are observations and retain provenance.
+                for candidate, source_field in (
+                    ("housing_starts_total", "starts_source"),
+                    ("housing_completions", "completions_source"),
+                ):
+                    if props["cmhc_metrics"][candidate] is not None:
+                        tract_metric_sources[candidate].add(
+                            props["cmhc_metrics"][source_field]
+                        )
         props["cmhc_year"] = cmhc_year
         geometry = postgis_geometries.get(geography.geoid)
         if geometry is None:
@@ -856,6 +840,43 @@ def get_map_data(
                 "properties": props,
             }
         )
+
+    metadata: dict[str, Any] = {
+        "metric": metric_key,
+        "year": cmhc_year if cmhc else metric_year,
+        "cmhc_year": cmhc_year,
+        "domain": domain,
+        "geography_type": normalized_type,
+        "data_quality": data_quality(
+            normalized_type, cmhc=cmhc, metric_key=metric_key, year=cmhc_year,
+            has_estimated_rent_burden=has_estimated_rent_burden,
+            tract_metric_sources=tract_metric_sources.get(metric_key),
+        ),
+        "source": map_data_source(normalized_type, cmhc=cmhc, metric_key=metric_key),
+        "available_years": available_cmhc_years(db),
+        # All non-CMHC metrics share one client-side map payload. Keep the small
+        # transit manifest on every response so local metric repainting never
+        # loses the coverage disclosure.
+        "transit_snapshot": load_transit_manifest(),
+        "metric_catalog": {
+            candidate: {
+                "data_quality": data_quality(
+                    normalized_type,
+                    cmhc=is_cmhc_metric(candidate),
+                    metric_key=candidate,
+                    year=cmhc_year,
+                    has_estimated_rent_burden=has_estimated_rent_burden,
+                    tract_metric_sources=tract_metric_sources.get(candidate),
+                ),
+                "source": map_data_source(
+                    normalized_type,
+                    cmhc=is_cmhc_metric(candidate),
+                    metric_key=candidate,
+                ),
+            }
+            for candidate in sorted(VALID_METRICS)
+        },
+    }
 
     return {
         "type": "FeatureCollection",
@@ -875,12 +896,22 @@ def is_transit_metric(metric_key: str) -> bool:
     return metric_key in TRANSIT_METRICS
 
 
+def cmhc_survey_name(metric_key: str | None) -> str:
+    # The portal groups unabsorbed inventory with construction tables, but
+    # CMHC attributes completed/unsold inventory to its Market Absorption Survey.
+    if metric_key == "unabsorbed_units":
+        return "CMHC Market Absorption Survey"
+    if metric_key in CMHC_COUNT_METRICS and metric_key != "rental_universe":
+        return "CMHC Starts & Completions Survey"
+    return "CMHC Rental Market Survey"
+
+
 def map_data_source(geography_type: str | None, cmhc: bool = False, metric_key: str | None = None) -> str:
     if metric_key and is_transit_metric(metric_key):
         return transit_data_source()
     if cmhc:
         return (
-            "CMHC Rental Market Survey and Starts & Completions Survey data "
+            f"{cmhc_survey_name(metric_key)} data "
             "from the Housing Market Information Portal."
         )
     if geography_type == "census_tract":
@@ -900,16 +931,45 @@ def data_quality(
     metric_key: str | None = None,
     year: int | None = None,
     has_estimated_rent_burden: bool = False,
+    tract_metric_sources: set[str] | None = None,
 ) -> dict[str, str]:
     if cmhc and geography_type == "census_tract":
         if metric_key is not None and metric_key in CMHC_REAL_TRACT_METRICS:
+            if not tract_metric_sources:
+                return {
+                    "metric_status": "unavailable",
+                    "label": "No CMHC tract values",
+                    "description": (
+                        "No published tract counts or allocation estimates are available "
+                        "in the loaded data for this metric and year."
+                    ),
+                }
+            if tract_metric_sources == {"official"}:
+                return {
+                    "metric_status": "official",
+                    "label": "Official CMHC tract values",
+                    "description": (
+                        "Available values for the selected year are published CMHC "
+                        "census-tract counts. Tracts without a value show no data."
+                    ),
+                }
+            if "official" not in tract_metric_sources:
+                return {
+                    "metric_status": "estimated",
+                    "label": "CMHC (estimated tract allocation)",
+                    "description": (
+                        "Available values for the selected year are estimated allocations "
+                        "from CMHC parent-tract or municipal counts, not published counts "
+                        "for each mapped tract. Tracts without a value show no data."
+                    ),
+                }
             return {
                 "metric_status": "mixed",
                 "label": "CMHC tract values (official + estimated)",
                 "description": (
-                    "Real CMHC census-tract values are shown where CMHC publishes them "
-                    "(official); tracts outside CMHC's survey coverage fall back to the parent "
-                    "municipality's total allocated by renter-household share (estimated)."
+                    "Available values combine official CMHC tract counts with labeled "
+                    "estimates allocated from CMHC parent-tract or municipal totals. "
+                    "Tracts without either source show no data."
                 ),
             }
         if metric_key is not None and metric_key in CMHC_COUNT_METRICS:
@@ -917,8 +977,8 @@ def data_quality(
                 "metric_status": "estimated",
                 "label": "CMHC (estimated tract allocation)",
                 "description": (
-                    "CMHC does not publish this count at the census-tract level. The parent "
-                    "municipality's total is allocated to each tract by its share of municipal "
+                    "The loaded tract data uses allocation estimates for this count. The "
+                    "parent municipality's total is allocated by each tract's share of municipal "
                     "renter households, so values vary per tract."
                 ),
             }
@@ -941,11 +1001,12 @@ def data_quality(
             ),
         }
     if cmhc:
+        survey = cmhc_survey_name(metric_key)
         return {
             "metric_status": "official",
-            "label": "CMHC Rental Market Survey",
+            "label": survey,
             "description": (
-                "CMHC Rental Market Survey data "
+                f"{survey} data "
                 "from the Housing Market Information Portal."
             ),
         }

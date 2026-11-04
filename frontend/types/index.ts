@@ -1,5 +1,8 @@
 export type GeographyLevel = "municipality" | "census_tract";
 
+/** Dataset-level provenance for the selected map metric. */
+export type MapMetricStatus = "official" | "derived" | "estimated" | "mixed" | "zone" | "unavailable";
+
 export type MetricKey =
   | "median_income"
   | "median_rent"
@@ -158,7 +161,7 @@ export type MapData = {
     geography_type: GeographyLevel;
     available_years?: number[];
     data_quality: {
-      metric_status: "official" | "derived" | "estimated" | "mixed" | "zone";
+      metric_status: MapMetricStatus;
       label: string;
       description: string;
     };

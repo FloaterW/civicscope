@@ -7,6 +7,7 @@ import {
   isTransitFeatureCollection,
   TRANSIT_FILTERS_OFF,
   TRANSIT_FILTERS_ON,
+  transitFiltersForRoutes,
   transitRouteLabels
 } from "@/lib/transit-map";
 
@@ -78,5 +79,21 @@ describe("transit route payloads", () => {
     expect(transitRouteLabels(validRoutes)).toEqual([
       "TTC — Route 1 — Yonge–University"
     ]);
+  });
+
+  it("enables only categories represented by loaded routes", () => {
+    if (!isTransitFeatureCollection(validRoutes)) throw new Error("Fixture should be valid");
+    const available = transitFiltersForRoutes(validRoutes);
+    expect(available).toEqual({ ...TRANSIT_FILTERS_OFF, ttc_subway: true });
+    expect(allTransitFiltersEnabled(available, available)).toBe(true);
+    expect(allTransitFiltersEnabled(TRANSIT_FILTERS_OFF, available)).toBe(false);
+    expect(allTransitFiltersEnabled(TRANSIT_FILTERS_ON, TRANSIT_FILTERS_OFF)).toBe(false);
+  });
+
+  it("preserves disabled choices when routes finish loading", () => {
+    if (!isTransitFeatureCollection(validRoutes)) throw new Error("Fixture should be valid");
+    expect(transitFiltersForRoutes(validRoutes, { ...TRANSIT_FILTERS_ON, ttc_subway: false }))
+      .toEqual(TRANSIT_FILTERS_OFF);
+    expect(transitFiltersForRoutes(validRoutes, TRANSIT_FILTERS_OFF)).toEqual(TRANSIT_FILTERS_OFF);
   });
 });

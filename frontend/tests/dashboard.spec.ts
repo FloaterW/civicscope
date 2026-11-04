@@ -508,7 +508,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(comparisonPanel.getByRole("columnheader", { name: "Ratio" })).toHaveCount(0);
   });
 
-  test("transit overlay is lazy, reports failure, and retries successfully", async ({ page }) => {
+  test("transit overlay is lazy, retries failures, and enables only published route categories", async ({ page }, testInfo) => {
     await blockExternalMapAssets(page);
     let transitRequests = 0;
     let failTransit = true;
@@ -559,12 +559,21 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(
       page.getByRole("alert").filter({ hasText: "Transit lines could not be loaded" }),
     ).toBeVisible();
+    await expect(page.getByText("Not in snapshot", { exact: true })).toHaveCount(0);
     expect(transitRequests).toBe(1);
 
     failTransit = false;
     await page.getByRole("button", { name: "Retry transit lines" }).click();
-    await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: "GO Transit" })).toBeChecked();
+    const subway = page.getByRole("checkbox", { name: "Subway", exact: true });
+    const brampton = page.getByRole("checkbox", { name: /Brampton Transit/ });
+    await expect(subway).toBeChecked();
+    await expect(subway).toBeEnabled();
+    for (const name of [/GO Transit/, /Brampton Transit/]) {
+      const unavailable = page.getByRole("checkbox", { name });
+      await expect(unavailable).toBeDisabled();
+      await expect(unavailable).not.toBeChecked();
+      await expect(unavailable.locator("..")).toContainText("Not in snapshot");
+    }
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-status", "loaded");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-feature-count", "1");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "true");
@@ -574,9 +583,34 @@ test.describe("CivicScope dashboard regressions", () => {
     );
     expect(transitRequests).toBe(2);
 
+    await page.getByRole("button", { name: "Clear all", exact: true }).click();
+    await expect(subway).not.toBeChecked();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "false");
+    await page.getByRole("button", { name: "Select all", exact: true }).click();
+    await expect(subway).toBeChecked();
+    await expect(brampton).not.toBeChecked();
+    // A deliberate individual choice must survive style and data-year changes.
+    await subway.focus();
+    await subway.press("Space");
     await page.getByRole("button", { name: "Dark theme" }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
-    await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
+    await expect(page.getByTestId("map-canvas-host")).toHaveAttribute("data-map-theme", "dark");
+    await expect(subway).not.toBeChecked();
+    await page.getByLabel("Map metric", { exact: true }).selectOption("average_rent_total");
+    await page.getByLabel("CMHC data year", { exact: true }).selectOption("2018");
+    await expect(page.getByTestId("map-panel")).toContainText("CMHC 2018");
+    await expect(subway).not.toBeChecked();
+    await expect(brampton).toBeDisabled();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "false");
+    // Closing and reopening uses the cached snapshot, without enabling absent routes.
+    await transitButton.click();
+    await transitButton.click();
+    await expect(subway).toBeChecked();
+    await expect(brampton).not.toBeChecked();
+    await expect(brampton).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Clear all", exact: true })).toBeVisible();
+    expect(transitRequests).toBe(2);
+    await page.locator("#transit-layer-panel").screenshot({ path: testInfo.outputPath("published-transit-categories.png") });
   });
 
   test("expanded mobile attribution never overlaps the legend or transit control", async ({ page }, testInfo) => {

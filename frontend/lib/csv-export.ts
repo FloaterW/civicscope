@@ -59,23 +59,27 @@ function rmsMethod(source: CmhcRmsSource | undefined): string {
 
 function countProvenance(
   source: CmhcCountSource | undefined,
-  geographyLevel: GeographyLevel
+  geographyLevel: GeographyLevel,
+  metric: keyof CmhcMetricValues
 ): [string, string, string] {
+  const survey = metric === "unabsorbed_units"
+    ? "CMHC Market Absorption Survey"
+    : "CMHC Starts & Completions Survey";
   if (geographyLevel === "municipality") {
-    return ["CMHC Starts & Completions Survey — municipality", "Published value", "official"];
+    return [`${survey} — municipality`, "Published value", "official"];
   }
   if (source === "official") {
-    return ["CMHC Starts & Completions Survey — census tract", "Published tract value", "official"];
+    return [`${survey} — census tract`, "Published tract value", "official"];
   }
   if (source === "estimated_parent") {
     return [
-      "CMHC Starts & Completions Survey — parent census tract",
+      `${survey} — parent census tract`,
       "Allocated from a published parent tract after a boundary split",
       "estimated_parent"
     ];
   }
   return [
-    "CMHC Starts & Completions Survey — parent municipality",
+    `${survey} — parent municipality`,
     "Allocated by renter-household share",
     "estimated"
   ];
@@ -172,7 +176,7 @@ export function buildGeographyExportRows(
       ["Unabsorbed units", "unabsorbed_units", "december", undefined]
     ];
     for (const [label, key, periodType, countSource] of supplyFields) {
-      const provenance = countProvenance(countSource, geographyLevel);
+      const provenance = countProvenance(countSource, geographyLevel, key);
       add(
         label,
         cmhcMetrics[key] as number | null,

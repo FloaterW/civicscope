@@ -105,6 +105,12 @@ const metricDefinitions: Record<string, { term: string; definition: string; sour
       "The number of new dwelling units that reached completion (ready for occupancy) during the reference period. A trailing indicator of new supply entering the market.",
     source: "CMHC Starts and Completions Survey (SCSS)"
   },
+  unabsorbed_units: {
+    term: "Unabsorbed units",
+    definition:
+      "Completed new homes intended for ownership or condominium sale that have not yet been sold. CivicScope shows the December inventory for the selected year, not an annual total. Census-tract figures are allocated estimates from the parent municipality.",
+    source: "CMHC Market Absorption Survey (MAS)"
+  },
   rental_universe: {
     term: "Rental universe",
     definition:

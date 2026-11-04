@@ -107,8 +107,24 @@ export function anyTransitFilterEnabled(filters: TransitFilters): boolean {
   return Object.values(filters).some(Boolean);
 }
 
-export function allTransitFiltersEnabled(filters: TransitFilters): boolean {
-  return Object.values(filters).every(Boolean);
+export function allTransitFiltersEnabled(
+  filters: TransitFilters,
+  available: TransitFilters = TRANSIT_FILTERS_ON
+): boolean {
+  return anyTransitFilterEnabled(available) &&
+    TRANSIT_LAYERS.every(({ key }) => !available[key] || filters[key]);
+}
+
+/** Keep only requested categories that have routes in this published snapshot. */
+export function transitFiltersForRoutes(
+  routes: TransitFeatureCollection,
+  requested: TransitFilters = TRANSIT_FILTERS_ON
+): TransitFilters {
+  const filters = { ...TRANSIT_FILTERS_OFF };
+  for (const { properties } of routes.features) {
+    filters[properties.transit_category] = requested[properties.transit_category];
+  }
+  return filters;
 }
 
 export function buildTransitFilter(filters: TransitFilters): FilterSpecification | undefined {

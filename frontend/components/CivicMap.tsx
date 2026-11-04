@@ -20,6 +20,7 @@ import {
   TRANSIT_FILTERS_OFF,
   TRANSIT_FILTERS_ON,
   TRANSIT_LAYERS,
+  transitFiltersForRoutes,
   transitRouteLabels,
   type TransitFeatureCollection,
   type TransitFilters
@@ -278,6 +279,9 @@ export function CivicMap({
   const [transitFilters, setTransitFilters] = useState<TransitFilters>({
     ...TRANSIT_FILTERS_OFF
   });
+  const [availableTransitFilters, setAvailableTransitFilters] = useState<TransitFilters>({
+    ...TRANSIT_FILTERS_OFF
+  });
   const [transitLoadState, setTransitLoadState] = useState<TransitLoadState>({
     status: "idle"
   });
@@ -351,6 +355,8 @@ export function CivicMap({
       if (requestId !== transitRequestRef.current) return;
 
       transitRoutesRef.current = geojson;
+      setAvailableTransitFilters(transitFiltersForRoutes(geojson));
+      setTransitFilters((previous) => transitFiltersForRoutes(geojson, previous));
       setTransitRouteList(transitRouteLabels(geojson));
       setTransitFeatureCount(geojson.features.length);
       const map = mapRef.current;
@@ -365,6 +371,7 @@ export function CivicMap({
     } catch (transitError) {
       if (requestId !== transitRequestRef.current) return;
       transitRoutesRef.current = null;
+      setAvailableTransitFilters({ ...TRANSIT_FILTERS_OFF });
       setTransitRouteList([]);
       setTransitFeatureCount(0);
       setRouteDetailsOpen(false);
@@ -800,13 +807,13 @@ export function CivicMap({
                     type="button"
                     className="min-h-8 rounded-sm px-2 py-1 text-[11px] text-civic-ink hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal"
                     onClick={() => {
-                      const allOn = allTransitFiltersEnabled(transitFilters);
+                      const allOn = allTransitFiltersEnabled(transitFilters, availableTransitFilters);
                       setTransitFilters({
-                        ...(allOn ? TRANSIT_FILTERS_OFF : TRANSIT_FILTERS_ON)
+                        ...(allOn ? TRANSIT_FILTERS_OFF : availableTransitFilters)
                       });
                     }}
                   >
-                    {allTransitFiltersEnabled(transitFilters) ? "Clear all" : "Select all"}
+                    {allTransitFiltersEnabled(transitFilters, availableTransitFilters) ? "Clear all" : "Select all"}
                   </button>
                 )}
               </div>
@@ -841,6 +848,7 @@ export function CivicMap({
                         key={layer.key}
                         layer={layer}
                         checked={transitFilters[layer.key]}
+                        available={availableTransitFilters[layer.key]}
                         label={layer.label.replace("TTC ", "")}
                         onToggle={() =>
                           setTransitFilters((previous) => ({
@@ -856,6 +864,7 @@ export function CivicMap({
                         key={layer.key}
                         layer={layer}
                         checked={transitFilters[layer.key]}
+                        available={availableTransitFilters[layer.key]}
                         label={layer.label}
                         onToggle={() =>
                           setTransitFilters((previous) => ({
@@ -894,7 +903,11 @@ export function CivicMap({
             onClick={() => {
               if (!transitOpen) {
                 setTransitOpen(true);
-                if (!anyTransitOn) setTransitFilters({ ...TRANSIT_FILTERS_ON });
+                if (!anyTransitOn) {
+                  setTransitFilters({
+                    ...(transitLoadState.status === "loaded" ? availableTransitFilters : TRANSIT_FILTERS_ON)
+                  });
+                }
                 if (
                   transitLoadState.status === "idle" ||
                   transitLoadState.status === "error"
@@ -944,20 +957,23 @@ export function CivicMap({
 function TransitFilterOption({
   layer,
   checked,
+  available,
   label,
   onToggle
 }: {
   layer: (typeof TRANSIT_LAYERS)[number];
   checked: boolean;
+  available: boolean;
   label: string;
   onToggle: () => void;
 }) {
   return (
-    <label className="flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-0.5 text-civic-muted hover:text-civic-ink">
+    <label className={`flex min-h-8 items-center gap-2 rounded-sm px-0.5 text-civic-muted ${available ? "cursor-pointer hover:text-civic-ink" : "cursor-default"}`}>
       <input
         type="checkbox"
         className="peer sr-only"
         checked={checked}
+        disabled={!available}
         onChange={onToggle}
       />
       <span
@@ -982,7 +998,10 @@ function TransitFilterOption({
         className="h-0.5 w-3 shrink-0 rounded-full"
         style={{ backgroundColor: layer.color }}
       />
-      {label}
+      <span>
+        {label}
+        {!available && <span className="block text-[11px]">Not in snapshot</span>}
+      </span>
     </label>
   );
 }
