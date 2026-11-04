@@ -53,7 +53,7 @@ CMHC verification covers the municipality and tract artifacts, not the separate 
 On September 20, the successful September 15 CMHC candidate from workflow
 https://github.com/FloaterW/civicscope/actions/runs/34987098673 was compared against
 the packaged data. All values matched; its original check timestamp was retained.
-No statistics were replaced. Census and the partial transit snapshot remain unverified.
+No statistics were replaced in that September review. The November 4 [source review](source-refresh-review-2026-11-04.md) subsequently confirmed that all Census observations match the official November 2 SDMX candidate and recorded that check without replacing the original bulk-source provenance. The changed transit candidate remains unpublished pending reconciliation.
 
 Frontend dependency groups now include only minor/patch upgrades. Major upgrades remain separate
 review items, not silently bundled migrations. The September 20 repair retains the existing major
