@@ -73,7 +73,53 @@ test.describe("critical cross-browser journeys", () => {
     await expect(page.locator("#selected-geography-details")).toBeVisible();
   });
 
-  for (const metric of ["population", "population_growth_pct"]) {
+  test("comparison values support keyboard navigation, dismissal, and pointer recovery", async ({ page }) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    const panel = page.getByTestId("comparison-panel");
+    await expect(panel).toContainText("2,794,356");
+    const chart = panel.getByRole("application", { name: /Population comparison chart/ });
+    const tooltip = panel.locator(".recharts-tooltip-wrapper");
+    const rows = panel.locator("tbody tr");
+    const firstName = await rows.nth(0).locator("td").first().innerText();
+    const secondName = await rows.nth(1).locator("td").first().innerText();
+
+    await chart.scrollIntoViewIfNeeded();
+    await chart.focus();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(firstName);
+    await chart.press("ArrowRight");
+    await expect(tooltip).toContainText(secondName);
+    await expect(tooltip.getByRole("status")).toHaveAttribute("aria-live", "polite");
+    await chart.press("Enter");
+    await expect(tooltip).toBeHidden();
+    await chart.press("Enter");
+    await expect(tooltip).toBeVisible();
+    await chart.press("Escape");
+    await expect(tooltip).toBeHidden();
+    await chart.press("ArrowLeft");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(firstName);
+    await expect(tooltip).toContainText("2,794,356");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(tooltip).toBeHidden();
+    await chart.press("ArrowRight");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(secondName);
+    await chart.press("Tab");
+    await expect(chart).not.toBeFocused();
+    await expect(tooltip).toBeHidden();
+
+    await panel.locator(".recharts-bar-rectangle").first().hover();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(firstName);
+    await expect(tooltip).toContainText("2,794,356");
+    await expect(tooltip.getByRole("status")).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await expect(tooltip).toBeHidden();
+  });
+
+  for (const metric of ["population", "population_growth_pct", "median_income"]) {
     test(`comparison bar values fit inside the chart at desktop and mobile widths: ${metric}`, async ({ page }, testInfo) => {
       if (metric === "population_growth_pct") {
         // Exercise both signs, including a negative bar at the lower axis bound.
@@ -88,9 +134,20 @@ test.describe("critical cross-browser journeys", () => {
           await route.fulfill({ response, json: payload });
         });
       }
+      if (metric === "median_income") {
+        // Identical heights expose label-to-label collisions that varied bars hide.
+        await page.route("**/api/compare?**", async (route) => {
+          const response = await route.fetch();
+          const payload = await response.json();
+          payload.items.forEach((item: { metrics: { median_income: number } }) => {
+            item.metrics.median_income = 107_000;
+          });
+          await route.fulfill({ response, json: payload });
+        });
+      }
       await page.goto(`/?level=municipality&metric=${metric}&geoid=3520005`);
       const panel = page.getByTestId("comparison-panel");
-      await expect(panel).toContainText(metric === "population" ? "2,794,356" : "-20.0%");
+      await expect(panel).toContainText(metric === "population" ? "2,794,356" : metric === "median_income" ? "$107,000" : "-20.0%");
 
       for (const width of [1440, 390, 320]) {
         await page.setViewportSize({ width, height: 1000 });
@@ -101,22 +158,41 @@ test.describe("critical cross-browser journeys", () => {
         if (metric === "population_growth_pct") {
           await expect(panel.locator(".recharts-label-list")).toContainText("-20.0%");
         }
+        if (metric === "population") {
+          await expect(panel.locator(".recharts-label-list")).toContainText(width === 1440 ? "2,794,356" : "2.8M");
+          await expect(panel.locator("tbody")).toContainText("2,794,356");
+        }
+        if (metric === "median_income") {
+          await expect(panel.locator(".recharts-label-list")).toContainText(width === 1440 ? "$107,000" : "107K");
+          await expect(panel.locator('.recharts-cartesian-axis-tick-value[orientation="left"]').first()).toContainText("$");
+          await expect(panel.locator("tbody")).toContainText("$107,000");
+        }
         await expect.poll(async () => panel.evaluate((element) => {
           const svg = element.querySelector("svg.recharts-surface")!;
           const bounds = svg.getBoundingClientRect();
           const container = element.querySelector(".recharts-responsive-container")!.getBoundingClientRect();
           const bars = [...svg.querySelectorAll("path.recharts-rectangle")];
           const labels = [...svg.querySelectorAll(".recharts-label-list .recharts-label")];
+          // Recharts 3 portals tick labels outside their axis <g> for z-index ordering.
+          const axisLabels = [...svg.querySelectorAll('.recharts-cartesian-axis-tick-value[orientation="bottom"]')];
           // Do not accept old-width SVG geometry before ResizeObserver catches up.
           const resized = Math.abs(bounds.width - container.width) <= 1 &&
             bounds.left >= container.left - 1 && bounds.right <= container.right + 1;
-          return resized && bars.length === 5 && labels.length === 5 && bars.every((bar) => {
+          return resized && bars.length === 5 && labels.length === 5 && axisLabels.length > 0 && bars.every((bar) => {
             const box = bar.getBoundingClientRect();
             return box.width > 0 && box.height > 0;
-          }) && labels.every((label) => {
+          }) && labels.every((label, index) => {
             const box = label.getBoundingClientRect();
             return box.width > 0 && box.height > 0 && box.top >= bounds.top &&
-              box.bottom <= bounds.bottom && box.left >= bounds.left && box.right <= bounds.right;
+              box.bottom <= bounds.bottom && box.left >= bounds.left && box.right <= bounds.right &&
+              axisLabels.every((axisLabel) => {
+                const axisBox = axisLabel.getBoundingClientRect();
+                return box.right <= axisBox.left || box.left >= axisBox.right || box.bottom <= axisBox.top;
+              }) && labels.slice(index + 1).every((otherLabel) => {
+                const otherBox = otherLabel.getBoundingClientRect();
+                return box.right <= otherBox.left || box.left >= otherBox.right ||
+                  box.bottom <= otherBox.top || box.top >= otherBox.bottom;
+              });
           });
         })).toBe(true);
         await panel.screenshot({ path: testInfo.outputPath(`comparison-labels-${width}.png`) });
