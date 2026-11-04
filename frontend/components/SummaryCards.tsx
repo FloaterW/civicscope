@@ -131,7 +131,7 @@ export function SummaryCards({ summary, geographyLevel, loading }: Props) {
         <div data-testid="summary-methodology" className="mt-3 border-t border-civic-line pt-3 text-xs leading-5 text-civic-muted">
           <p>Income and rent are weighted averages of local medians, not official regional medians.</p>
           <details className="mt-1">
-            <summary className="cursor-pointer rounded-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">How this snapshot is calculated</summary>
+            <summary className="cursor-pointer rounded-xs font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">How this snapshot is calculated</summary>
             <ul className="mt-2 list-disc space-y-1 pl-4">
               {summary.notes.map(note => <li key={note}>{note}</li>)}
             </ul>

@@ -45,7 +45,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-civic-line text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-surface"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-civic-line text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-surface"
       aria-label="Dark theme"
       aria-pressed={isDark}
       title={actionLabel}

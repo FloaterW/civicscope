@@ -687,7 +687,7 @@ export function CivicMap({
         <div role="status" className="absolute left-3 right-14 top-3 z-10 max-w-sm rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs leading-5 text-civic-muted shadow-panel">
           <p>Background map unavailable. Geography boundaries and statistics still work.</p>
           <button type="button" onClick={() => { if (mapRef.current) void loadBasemap(mapRef.current, themeRef.current); }}
-            className="mt-1 min-h-9 rounded-md border border-civic-line px-2.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+            className="mt-1 min-h-9 rounded-md border border-civic-line px-2.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">
             Retry background map
           </button>
         </div>
@@ -709,7 +709,7 @@ export function CivicMap({
               <button
                 type="button"
                 onClick={onRetry}
-                className="mt-3 rounded-md border border-civic-line px-3 py-1.5 text-xs font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
+                className="mt-3 rounded-md border border-civic-line px-3 py-1.5 text-xs font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
               >
                 Retry map
               </button>
@@ -718,7 +718,7 @@ export function CivicMap({
         </div>
       )}
       {data && loading && loadedMetric !== metric && (
-        <div role="status" className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs font-medium text-civic-ink shadow-panel backdrop-blur-sm">
+        <div role="status" className="absolute right-3 top-3 z-10 animate-fade-in rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs font-medium text-civic-ink shadow-panel backdrop-blur-xs">
           Updating map...
         </div>
       )}
@@ -726,7 +726,7 @@ export function CivicMap({
         <div
           data-testid="map-empty-state"
           role="status"
-          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-center text-xs text-civic-muted shadow-panel backdrop-blur-sm"
+          className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit max-w-[90%] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-center text-xs text-civic-muted shadow-panel backdrop-blur-xs"
         >
           No data available for {getMetricLabel(metric)} in this dataset.
         </div>
@@ -741,7 +741,7 @@ export function CivicMap({
         <div
           data-testid="map-legend"
           aria-label={`${getMetricLabel(metric)} map legend`}
-          className="absolute left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+          className="absolute left-3 max-w-[230px] rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-xs"
           style={{ bottom: "calc(var(--civic-map-attribution-height, 24px) + 12px)", maxWidth: "min(230px, calc(100% - 120px))" }}
         >
           <div className="mb-1.5 font-semibold text-civic-ink">{getMetricLabel(metric)}</div>
@@ -749,7 +749,7 @@ export function CivicMap({
             <p className="text-civic-muted">No values available</p>
           ) : legend.flat ? (
             <div data-legend-class className="flex items-center gap-2 text-civic-muted">
-              <span className="h-3 w-3 shrink-0 rounded-sm border border-slate-500 dark:border-slate-400" style={{ backgroundColor: FLAT_COLOR }} />
+              <span className="h-3 w-3 shrink-0 rounded-xs border border-slate-500 dark:border-slate-400" style={{ backgroundColor: FLAT_COLOR }} />
               <span className="tabular-nums">{formatMetric(metric, legend.classes[0].lower)}</span>
             </div>
           ) : (
@@ -763,7 +763,7 @@ export function CivicMap({
                     className="flex items-center gap-2 text-civic-muted"
                   >
                     <span
-                      className="h-3 w-3 shrink-0 rounded-sm border border-slate-500 dark:border-slate-400"
+                      className="h-3 w-3 shrink-0 rounded-xs border border-slate-500 dark:border-slate-400"
                       style={{ backgroundColor: colorClass.color }}
                     />
                     <span className="tabular-nums">
@@ -778,7 +778,7 @@ export function CivicMap({
             data-legend-no-data
             className="mt-1.5 flex items-center gap-2 border-t border-civic-line pt-1.5 text-civic-muted"
           >
-            <span className="h-3 w-3 shrink-0 rounded-sm border border-slate-500 dark:border-slate-400" style={{ backgroundColor: NULL_COLOR }} />
+            <span className="h-3 w-3 shrink-0 rounded-xs border border-slate-500 dark:border-slate-400" style={{ backgroundColor: NULL_COLOR }} />
             <span>
               No data{legend.noDataCount > 0 ? ` (${legend.noDataCount.toLocaleString("en-CA")})` : ""}
             </span>
@@ -791,14 +791,14 @@ export function CivicMap({
           {transitOpen && (
             <div
               id="transit-layer-panel"
-              className="pointer-events-auto min-h-0 min-w-56 max-w-[calc(100vw-3rem)] overflow-y-auto overscroll-contain rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-sm"
+              className="pointer-events-auto min-h-0 min-w-56 max-w-[calc(100vw-3rem)] overflow-y-auto overscroll-contain rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs shadow-panel backdrop-blur-xs"
             >
               <div className="mb-2 flex items-center justify-between gap-4">
                 <span className="font-semibold text-civic-ink">Transit Lines</span>
                 {transitLoadState.status === "loaded" && (
                   <button
                     type="button"
-                    className="min-h-8 rounded px-2 py-1 text-[11px] text-civic-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                    className="min-h-8 rounded-sm px-2 py-1 text-[11px] text-civic-ink hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal"
                     onClick={() => {
                       const allOn = allTransitFiltersEnabled(transitFilters);
                       setTransitFilters({
@@ -825,7 +825,7 @@ export function CivicMap({
                   <button
                     type="button"
                     onClick={loadTransitRoutes}
-                    className="mt-2 min-h-9 rounded-md border border-civic-line px-2.5 py-1.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                    className="mt-2 min-h-9 rounded-md border border-civic-line px-2.5 py-1.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal"
                   >
                     Retry transit lines
                   </button>
@@ -871,7 +871,7 @@ export function CivicMap({
                     onClick={() => setRouteDetailsOpen((open) => !open)}
                     aria-expanded={routeDetailsOpen}
                     aria-controls="transit-route-details"
-                    className="mt-2 w-full rounded-md border border-civic-line px-2 py-1.5 text-left text-[11px] font-medium text-civic-muted hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+                    className="mt-2 w-full rounded-md border border-civic-line px-2 py-1.5 text-left text-[11px] font-medium text-civic-muted hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal"
                   >
                     Browse route details ({transitRouteList.length})
                   </button>
@@ -907,7 +907,7 @@ export function CivicMap({
                 setRouteDetailsOpen(false);
               }
             }}
-            className={`pointer-events-auto flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel ${
+            className={`pointer-events-auto flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-panel focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel ${
               transitOpen
                 ? "border-civic-teal bg-civic-teal text-white dark:text-slate-950"
                 : "border-civic-line bg-civic-panel text-civic-muted hover:text-civic-ink"
@@ -953,7 +953,7 @@ function TransitFilterOption({
   onToggle: () => void;
 }) {
   return (
-    <label className="flex min-h-8 cursor-pointer items-center gap-2 rounded px-0.5 text-civic-muted hover:text-civic-ink">
+    <label className="flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-0.5 text-civic-muted hover:text-civic-ink">
       <input
         type="checkbox"
         className="peer sr-only"
@@ -961,7 +961,7 @@ function TransitFilterOption({
         onChange={onToggle}
       />
       <span
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-civic-teal peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-civic-panel"
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-civic-line peer-checked:border-transparent peer-checked:text-white peer-focus-visible:outline-hidden peer-focus-visible:ring-2 peer-focus-visible:ring-civic-teal peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-civic-panel"
         style={checked ? { backgroundColor: layer.color } : undefined}
       >
         {checked && (

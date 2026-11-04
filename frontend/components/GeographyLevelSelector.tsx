@@ -42,7 +42,7 @@ export function GeographyLevelSelector({
               disabled={isDisabled}
               aria-describedby={isTransitDisabled ? "transit-geography-note" : undefined}
               title={isTransitDisabled ? "Transit metrics are available by census tract" : undefined}
-              className={`h-full min-w-0 flex-1 whitespace-nowrap rounded px-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`h-full min-w-0 flex-1 whitespace-nowrap rounded-sm px-2 text-sm font-medium transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-not-allowed disabled:opacity-50 ${
                 isActive
                   ? "bg-civic-teal text-white dark:text-slate-900"
                   : "text-civic-muted hover:bg-civic-subtle hover:text-civic-ink disabled:hover:bg-transparent disabled:hover:text-civic-muted"

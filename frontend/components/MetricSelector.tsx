@@ -23,7 +23,7 @@ export function MetricSelector({ value, onChange, disabled = false }: Props) {
         value={value}
         onChange={(event) => onChange(event.target.value as MetricKey)}
         disabled={disabled}
-        className="h-full min-w-0 flex-1 rounded border-0 bg-civic-panel px-1 text-sm font-medium text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
+        className="h-full min-w-0 flex-1 rounded-sm border-0 bg-civic-panel px-1 text-sm font-medium text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel disabled:cursor-wait disabled:text-civic-muted disabled:opacity-60"
         aria-label="Map metric"
       >
         {groups.map((group) => (
