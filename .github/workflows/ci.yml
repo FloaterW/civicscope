@@ -198,7 +198,7 @@ jobs:
         working-directory: backend
         run: |
           python etl/seed_demo_data.py
-          pytest -q tests/test_postgis_integration.py tests/test_trreb_postgres.py
+          pytest -q tests/test_postgis_integration.py tests/test_trreb_postgres.py tests/test_cmhc_corrections_postgres.py
 
   containers:
     name: Build production containers

@@ -931,7 +931,8 @@ def write_seed(
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = output_path.with_suffix(f"{output_path.suffix}.tmp")
-    temporary_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8")
+    # Match the repository's LF contract before provenance hashes are computed.
+    temporary_path.write_text(json.dumps(seed, indent=2) + "\n", encoding="utf-8", newline="\n")
     temporary_path.replace(output_path)
     return len(metrics)
 

@@ -6,7 +6,7 @@ Hosting remains on the existing free Render and Vercel plans. No paid upgrade is
 
 The Production health checks workflow checks frontend content, backend database health, population data, the expected 1,359 geographies, and a public TRREB archive response. It retries once for cold starts, records per-request and total latency, preserves HTTP status codes without response bodies, and opens one GitHub incident issue on persistent failure. Recovery closes the bot-created incident. GitHub notification delivery depends on repository notification preferences. Slow responses are reported, not treated as outages.
 
-Source verification has a separate deduplicated issue: overdue or unknown Census/CMHC/transit evidence opens it, verified checks close it, and an unavailable API cannot falsely close it. This is not an assertion that the observation year itself is stale. The monitor leaves16minutes for its five bounded endpoint checks and incident reporting. It does not replace the reviewed candidate-promotion process below.
+Source verification has a separate deduplicated issue: overdue or unknown Census/CMHC/transit evidence opens it, verified checks close it, and an unavailable API cannot falsely close it. This is not an assertion that the observation year itself is stale. The monitor leaves 16 minutes for its five bounded endpoint checks and incident reporting. It does not replace the reviewed candidate-promotion process below.
 
 Frontend error reporting sends only fixed error categories to a same-origin endpoint. It excludes search text, URLs, stack traces and user payloads. Logging is deduplicated per browser load and per server instance, not globally rate-limited. Vercel runtime logs and backend structured logs require manual investigation; they are not a full error-tracking service.
 
@@ -37,7 +37,13 @@ It only ignores CMHC fetch timestamps/coverage diagnostics and harmless row orde
 it never treats a missing or suppressed number as zero. Other JSON/geometry files must match exactly.
 Changed data still needs the full promotion review above. Do not copy a candidate's check date alone.
 
-Municipal CMHC imports now require all12 distinct months for annual completions and every expected unique survey-zone constituent for municipal RMS aggregation. Suppressed values remain null; genuine zero values remain zero. Bedroom averages use the corresponding bedroom unit counts, not all-bedroom stock. Missing bedroom weights or suppressed contributing rents do not become an apparently complete average. Any resulting corrections or newly suppressed cells need source reconciliation before promotion.
+Municipal CMHC imports now require all 12 distinct months for annual completions and every expected unique survey-zone constituent for municipal RMS aggregation. Suppressed values remain null; genuine zero values remain zero. Bedroom averages use the corresponding bedroom unit counts, not all-bedroom stock. Missing bedroom weights or suppressed contributing rents do not become an apparently complete average. Any resulting corrections or newly suppressed cells need source reconciliation before promotion.
+
+### November 4 CMHC correction
+
+The [audited correction](cmhc-bedroom-correction-2026-11-04.md) changes 90 bedroom-rent cells across Toronto, Mississauga and Brampton for 2018–2025. Migration `0012_cmhc_bedroom_weights` updates only the recorded old values on the expected municipal boundaries. It preserves missing rows and conflicting/custom values, logs skipped conflicts, and never deletes or inserts rows. A downgrade does not restore incorrect statistics.
+
+Production CMHC startup seeding now refuses unexplained drift before deleting anything, matching the existing Census safeguard. If startup reports a mismatch, inspect the migration log and compare the database with the audited snapshot; do not use `FORCE_RESEED` to bypass that review. Keep `SEED_ON_STARTUP=false` for normal production operation. New empty databases can still be initialized explicitly with the corrected seed.
 
 The API verifies all required packaged file hashes before accepting a source record.
 Text hashes normalize CRLF to LF for consistent Windows/Linux checkout behavior, and are cached

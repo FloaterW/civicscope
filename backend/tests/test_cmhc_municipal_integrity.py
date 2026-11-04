@@ -157,3 +157,10 @@ def test_update_seed_rejects_entirely_missing_surveyed_municipality(tmp_path, mo
     with pytest.raises(ValueError, match="surveyed rows missing RMS values"):
         cmhc.update_seed([2025], output_path=output)
     assert not output.exists()
+
+
+def test_seed_json_has_portable_lf_bytes_before_provenance_hashing(tmp_path):
+    output = tmp_path / "cmhc.json"
+    cmhc.write_seed([cmhc.CmhcRow("3520005", 2025)], [2025], output_path=output)
+    assert b"\r\n" not in output.read_bytes()
+    assert output.read_bytes().endswith(b"\n")

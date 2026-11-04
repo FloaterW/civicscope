@@ -152,9 +152,10 @@ def _seed_content_changed(db: Session, seed_metrics: list[dict[str, Any]]) -> bo
 
     Catches both null->value (a newly populated field) and value->value drift
     (e.g. a corrected vacancy rate) where the row count is unchanged, so a stale
-    Docker volume holding superseded CMHC values is re-seeded without a manual
-    FORCE_RESEED. All seed metrics and nullable fields are compared in one bulk
-    read so value-to-null suppression corrections are applied as well.
+    Docker volume holding superseded CMHC values is detected without a manual
+    FORCE_RESEED. Production drift requires an audited migration; development
+    can reseed. All seed metrics and nullable fields are compared in one bulk
+    read so value-to-null suppression corrections are detected as well.
     """
     if not seed_metrics:
         return False
@@ -207,6 +208,12 @@ def seed_cmhc_data(db: Session, force: bool = False) -> int:
 
     if existing_count and not force and not needs_reseed:
         return 0
+
+    if existing_count and not force and settings.app_env == "production":
+        raise RuntimeError(
+            "Production CMHC data differs from the packaged seed. Apply an audited "
+            "data migration; automatic destructive reseeding is disabled."
+        )
 
     if existing_count:
         db.query(CmhcMetric).delete()
