@@ -45,7 +45,10 @@ jobs:
 
       - name: Audit backend dependencies
         working-directory: backend
-        run: pip-audit --require-hashes -r requirements.lock
+        run: |
+          python scripts/check_dependency_locks.py
+          pip-audit --require-hashes -r requirements.lock
+          pip-audit --require-hashes -r requirements-dev.lock
 
       - name: Run backend tests
         working-directory: backend
