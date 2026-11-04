@@ -15,7 +15,9 @@ export function StatisticCard({ label, value, metricKey, selected = false, sourc
   const Value = definition ? "dd" : "div";
   return (
     <div data-metric={metricKey} data-selected-metric={selected || undefined} className={`flex min-h-24 min-w-0 flex-col rounded-md border px-3 py-3 ${selected ? "border-civic-teal bg-[var(--civic-accent-subtle)]" : "border-civic-line bg-civic-panel"} ${className}`}>
-      <Label className="flex items-center gap-1 text-xs text-civic-muted">
+      {/* Reserve two label lines so independent statistic grids share geometry.
+          Longer labels can still grow naturally at narrow widths or text zoom. */}
+      <Label className="flex min-h-8 items-center gap-1 text-xs text-civic-muted">
         {label}
         {metricKey && <MetricTooltip metricKey={metricKey} />}
         {selected && <span className="sr-only">Selected map metric</span>}
