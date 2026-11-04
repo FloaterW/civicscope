@@ -229,14 +229,25 @@ for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await mockResale(page);
     await openResale(page);
+    // Measure the final font metrics rather than a transient fallback-font layout.
+    await page.evaluate(async () => { await document.fonts.ready; });
     const census = page.locator('[data-topic="population"] [data-metric="population"]');
     const resale = section(page).locator('[data-metric="trreb_sales"]');
     const cardStyle = (node: Element) => {
       const value = node.querySelector('.tabular-nums')!;
       const style = getComputedStyle(value);
-      return { height: node.getBoundingClientRect().height, font: style.fontSize, weight: style.fontWeight, numbers: style.fontVariantNumeric };
+      const label = node.firstElementChild!;
+      return {
+        height: node.getBoundingClientRect().height,
+        labelHeight: label.getBoundingClientRect().height,
+        labelLineHeight: Number.parseFloat(getComputedStyle(label).lineHeight),
+        valueTop: value.getBoundingClientRect().top - node.getBoundingClientRect().top,
+        font: style.fontSize, weight: style.fontWeight, numbers: style.fontVariantNumeric,
+      };
     };
-    expect(await resale.evaluate(cardStyle)).toEqual(await census.evaluate(cardStyle));
+    const censusStyle = await census.evaluate(cardStyle);
+    expect(await resale.evaluate(cardStyle)).toEqual(censusStyle);
+    expect(censusStyle.labelHeight).toBeGreaterThanOrEqual(censusStyle.labelLineHeight * 2);
     const year = page.getByLabel("Report year", { exact: true });
     expect(await year.evaluate(node => node.parentElement!.getBoundingClientRect().height)).toBe(44);
     expect(await year.evaluate(node => getComputedStyle(node).backgroundColor)).toBe(await page.getByLabel("Map metric", { exact: true }).evaluate(node => getComputedStyle(node).backgroundColor));
