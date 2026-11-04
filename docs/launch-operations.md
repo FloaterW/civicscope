@@ -4,7 +4,9 @@ Hosting remains on the existing free Render and Vercel plans. No paid upgrade is
 
 ## Monitoring
 
-The Production health checks workflow checks frontend content, backend database health, population data and the expected 1,359 geographies. It retries once for cold starts, records latency and source-check status, and opens one GitHub incident issue on persistent failure. Recovery closes the bot-created incident. GitHub notification delivery depends on repository notification preferences. Slow responses and unknown source dates are reported, not treated as outages.
+The Production health checks workflow checks frontend content, backend database health, population data, the expected 1,359 geographies, and a public TRREB archive response. It retries once for cold starts, records per-request and total latency, preserves HTTP status codes without response bodies, and opens one GitHub incident issue on persistent failure. Recovery closes the bot-created incident. GitHub notification delivery depends on repository notification preferences. Slow responses are reported, not treated as outages.
+
+Source verification has a separate deduplicated issue: overdue or unknown Census/CMHC/transit evidence opens it, verified checks close it, and an unavailable API cannot falsely close it. This is not an assertion that the observation year itself is stale. The monitor leaves16minutes for its five bounded endpoint checks and incident reporting. It does not replace the reviewed candidate-promotion process below.
 
 Frontend error reporting sends only fixed error categories to a same-origin endpoint. It excludes search text, URLs, stack traces and user payloads. Logging is deduplicated per browser load and per server instance, not globally rate-limited. Vercel runtime logs and backend structured logs require manual investigation; they are not a full error-tracking service.
 
@@ -34,6 +36,8 @@ The helper checks candidate hashes, rejects changed values, and preserves other 
 It only ignores CMHC fetch timestamps/coverage diagnostics and harmless row ordering or line endings;
 it never treats a missing or suppressed number as zero. Other JSON/geometry files must match exactly.
 Changed data still needs the full promotion review above. Do not copy a candidate's check date alone.
+
+Municipal CMHC imports now require all12 distinct months for annual completions and every expected unique survey-zone constituent for municipal RMS aggregation. Suppressed values remain null; genuine zero values remain zero. Bedroom averages use the corresponding bedroom unit counts, not all-bedroom stock. Missing bedroom weights or suppressed contributing rents do not become an apparently complete average. Any resulting corrections or newly suppressed cells need source reconciliation before promotion.
 
 The API verifies all required packaged file hashes before accepting a source record.
 Text hashes normalize CRLF to LF for consistent Windows/Linux checkout behavior, and are cached

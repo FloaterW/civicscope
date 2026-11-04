@@ -141,7 +141,7 @@ export type MapFeature = {
     value: number | null;
     metrics: MetricValues;
     cmhc_metrics?: CmhcMetricValues | null;
-    cmhc_year?: number;
+    cmhc_year?: number | null;
   };
 };
 
@@ -150,7 +150,7 @@ export type MapData = {
   metadata: {
     metric: MetricKey;
     year: number;
-    cmhc_year?: number;
+    cmhc_year?: number | null;
     domain: {
       min: number | null;
       max: number | null;
@@ -221,7 +221,7 @@ export type Summary = {
 
 export type CompareResponse = {
   year: number;
-  cmhc_year?: number;
+  cmhc_year?: number | null;
   items: Array<{
     geoid: string;
     name: string;

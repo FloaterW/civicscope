@@ -1,5 +1,15 @@
 # Dependency review — September 15, 2026
 
+## November 4, 2026 audit remediation
+
+The hardening branch updates Next.js, its analyzer and ESLint configuration together to16.4.5, Vitest to4.1.12, and compatible transitive security fixes. A new Dependency security workflow audits the complete lockfile on PRs, main pushes and weekly schedules, enforcing high/critical severity for both production and tooling. It complements, rather than replaces, dependency-change review.
+
+Local checks after these updates: production npm audit reports zero vulnerabilities; the full audit reports16moderate affected package entries caused by the minimatch globparts-amplification advisory (GHSA-g3hv-75wg-m249) in development lint tooling. No high/critical entries remain. Do not apply npm's suggested forced ESLint4/Next ESLint12 downgrades: these are incompatible with the application. Keep monitoring upstream compatible resolutions; do not feed untrusted glob patterns to this tooling. This is a documented residual finding, not an audit suppression or claim of zero tooling vulnerabilities.
+
+Major migrations remain separate from the security/reliability patch: Recharts3 requires chart formatter changes, Tailwind4 requires CSS/PostCSS migration and visual regression review, and TypeScript7 must match the supported ESLint integration. Previously green PR checks are not a fresh security audit. No paid hosting or runtime-major change is part of this patch.
+
+The September decisions below are historical context, not the current dependency inventory.
+
 None of these PRs was merged or closed. Historical green checks do not prove compatibility with current main.
 
 | PR | Evidence | Decision |

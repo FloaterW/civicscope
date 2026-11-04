@@ -1018,6 +1018,7 @@ export function CivicDashboard() {
             cmhcMetrics={selectedCmhcMetrics}
             cmhcLoading={mapLoading}
             cmhcError={Boolean(mapError)}
+            onRetryCmhc={retryRequests}
             cmhcYear={selectedCmhcYear ?? (isCmhc ? displayYear : undefined)}
             dataQualityLabel={visibleMapData?.metadata.data_quality?.label}
             metricStatus={visibleMapData?.metadata.data_quality?.metric_status}

@@ -211,5 +211,30 @@ jobs:
       - name: Build backend image
         run: docker build -t civicscope-backend ./backend
 
+      - name: Smoke-test backend startup with production proxy arguments
+        run: |
+          docker run -d --name backend-smoke -p 127.0.0.1:8014:8000 \
+            -e DATABASE_URL=sqlite:////tmp/civicscope-smoke.db \
+            -e SEED_ON_STARTUP=false -e FORWARDED_ALLOW_IPS='*' civicscope-backend
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+          for attempt in range(45):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8014/health', timeout=2) as response:
+                      if json.load(response).get('status') == 'ok':
+                          raise SystemExit(0)
+              except Exception:
+                  time.sleep(1)
+          raise SystemExit('Backend container did not become healthy')
+          PY
+
+      - name: Report and remove backend smoke container
+        if: always()
+        run: |
+          docker logs backend-smoke || true
+          docker rm -f backend-smoke || true
+
       - name: Build frontend image
         run: docker build -t civicscope-frontend ./frontend

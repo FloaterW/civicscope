@@ -1,6 +1,6 @@
 "use client";
 
-import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup } from "maplibre-gl";
+import type { FilterSpecification, LngLatBoundsLike, Map as MapLibreMap, Popup, StyleSpecification } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatMetric, getMetricLabel, getTransitRoutes } from "@/lib/api";
@@ -12,7 +12,7 @@ import {
   type ChoroplethClass
 } from "@/lib/colors";
 import { mapAnimationDuration } from "@/lib/map-motion";
-import { normalizeBasemapStyle } from "@/lib/basemap-style";
+import { fallbackBasemapStyle, normalizeBasemapStyle } from "@/lib/basemap-style";
 import {
   allTransitFiltersEnabled,
   anyTransitFilterEnabled,
@@ -273,6 +273,8 @@ export function CivicMap({
   const pendingViewportFitRef = useRef(true);
   const [transitOpen, setTransitOpen] = useState(false);
   const [mapInitializationError, setMapInitializationError] = useState<string | null>(null);
+  const [basemapStatus, setBasemapStatus] = useState<"loading" | "ready" | "fallback">("loading");
+  const basemapRequestRef = useRef<AbortController | null>(null);
   const [transitFilters, setTransitFilters] = useState<TransitFilters>({
     ...TRANSIT_FILTERS_OFF
   });
@@ -306,6 +308,38 @@ export function CivicMap({
   );
 
   const anyTransitOn = anyTransitFilterEnabled(transitFilters);
+
+  const loadBasemap = useCallback(async (map: MapLibreMap, theme: ThemeName) => {
+    basemapRequestRef.current?.abort();
+    const controller = new AbortController();
+    basemapRequestRef.current = controller;
+    setBasemapStatus("loading");
+    // A local style makes the map useful even while the external root style is
+    // slow/offline. Full style reloads reattach civic layers in style.load.
+    mapReadyRef.current = false;
+    containerRef.current?.setAttribute("data-civic-layer-order", "loading");
+    map.setStyle(fallbackBasemapStyle(theme === "dark"), { diff: false });
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const response = await fetch(BASEMAP_STYLES[theme], { signal: controller.signal });
+      if (!response.ok) throw new Error("Basemap style request failed");
+      const style = await response.json() as StyleSpecification;
+      if (style.version !== 8 || !Array.isArray(style.layers) || !style.sources) throw new Error("Invalid basemap style");
+      if (basemapRequestRef.current !== controller || mapRef.current !== map) return;
+      mapReadyRef.current = false;
+      containerRef.current?.setAttribute("data-civic-layer-order", "loading");
+      map.setStyle(normalizeBasemapStyle(style), { diff: false });
+      setBasemapStatus("ready");
+    } catch {
+      if (basemapRequestRef.current !== controller || mapRef.current !== map) return;
+      mapReadyRef.current = false;
+      map.setStyle(fallbackBasemapStyle(theme === "dark"), { diff: false });
+      setBasemapStatus("fallback");
+    } finally {
+      clearTimeout(timeout);
+      if (basemapRequestRef.current === controller) basemapRequestRef.current = null;
+    }
+  }, []);
 
   const loadTransitRoutes = useCallback(async () => {
     const requestId = transitRequestRef.current + 1;
@@ -541,7 +575,7 @@ export function CivicMap({
       });
 
       mapRef.current = map;
-      map.setStyle(BASEMAP_STYLES[theme], { transformStyle: (_previous, next) => normalizeBasemapStyle(next) });
+      void loadBasemap(map, theme);
     }
 
     void initializeMap().catch(() => {
@@ -550,6 +584,8 @@ export function CivicMap({
 
     return () => {
       cancelled = true;
+      basemapRequestRef.current?.abort();
+      basemapRequestRef.current = null;
       attributionObserver?.disconnect();
       mapReadyRef.current = false;
       initialViewportAppliedRef.current = false;
@@ -564,7 +600,7 @@ export function CivicMap({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map initializes once when data first arrives; subsequent data/selection updates are handled by separate effects below
-  }, [isReady]);
+  }, [isReady, loadBasemap]);
 
   useEffect(() => {
     latestDataRef.current = data;
@@ -608,19 +644,15 @@ export function CivicMap({
       const theme = currentTheme();
       if (themeRef.current === theme) return;
       themeRef.current = theme;
-      mapReadyRef.current = false;
-      containerRef.current?.setAttribute("data-civic-layer-order", "loading");
       popupRef.current?.remove();
-      // Force a full style lifecycle. URL-to-URL diffing can complete without a
-      // new map-level style.load event, leaving custom sources absent.
-      map.setStyle(BASEMAP_STYLES[theme], { diff: false, transformStyle: (_previous, next) => normalizeBasemapStyle(next) });
+      void loadBasemap(map, theme);
     });
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class"],
     });
     return () => observer.disconnect();
-  }, []);
+  }, [loadBasemap]);
 
   return (
     <div
@@ -635,6 +667,7 @@ export function CivicMap({
       data-scale-min={legend?.min ?? ""}
       data-scale-max={legend?.max ?? ""}
       data-transit-status={transitLoadState.status}
+      data-basemap-status={basemapStatus}
       data-transit-feature-count={transitFeatureCount}
       data-transit-visible={
         transitLoadState.status === "loaded" && anyTransitOn ? "true" : "false"
@@ -650,6 +683,15 @@ export function CivicMap({
       className="civic-map relative h-full w-full"
     >
       {mapInitializationError && <div role="alert" className="absolute inset-0 z-10 grid place-items-center bg-civic-panel p-6 text-center text-sm text-civic-ink">{mapInitializationError}</div>}
+      {!mapInitializationError && basemapStatus === "fallback" && (
+        <div role="status" className="absolute left-3 right-14 top-3 z-10 max-w-sm rounded-md border border-civic-line bg-civic-panel px-3 py-2 text-xs leading-5 text-civic-muted shadow-panel">
+          <p>Background map unavailable. Geography boundaries and statistics still work.</p>
+          <button type="button" onClick={() => { if (mapRef.current) void loadBasemap(mapRef.current, themeRef.current); }}
+            className="mt-1 min-h-9 rounded-md border border-civic-line px-2.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+            Retry background map
+          </button>
+        </div>
+      )}
       {!data && loading && (
         <div className="absolute inset-0 z-10 grid place-items-center bg-civic-panel text-sm text-civic-muted">
           <div className="flex flex-col items-center gap-3">
