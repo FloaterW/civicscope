@@ -57,7 +57,7 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
       // Summary's native Enter/Space activation also dispatches this click.
       event.preventDefault();
       onViewChange({ ...view, expanded: !expanded });
-    }} className="cursor-pointer rounded-sm text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+    }} className="cursor-pointer rounded-xs text-sm font-semibold text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">
       Resale market — TRREB <span className="ml-2 text-xs font-normal text-civic-muted">{TRREB_MODE !== "preview" ? "Archive · 2020–2025" : "Local preview"}</span>
     </summary>
     {expanded && <div className="mt-3 space-y-3">
@@ -86,10 +86,10 @@ export function TrrebResaleSection({ geoid, view, onViewChange }: { geoid: strin
             <StatisticCard definition label="Sales" metricKey="trreb_sales" value={data ? format(data.sales) : "—"} />
             <StatisticCard definition label="Days on market" metricKey="trreb_property_days" sourceLabel="Property-based" value={data ? format(data.property_days) : "—"} />
           </dl>
-          {current?.error && <button type="button" className="inline-flex min-h-11 items-center rounded-md border border-civic-line bg-civic-panel px-3 text-sm font-medium text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal" onClick={() => setRetry(value => value + 1)}>Retry resale statistics</button>}
+          {current?.error && <button type="button" className="inline-flex min-h-11 items-center rounded-md border border-civic-line bg-civic-panel px-3 text-sm font-medium text-civic-ink hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal" onClick={() => setRetry(value => value + 1)}>Retry resale statistics</button>}
           {data && data.warnings.length > 0 && <p role="note" className="text-xs leading-5 text-amber-700 dark:text-amber-400">This report’s regional totals do not fully reconcile with its municipal rows. Published values are preserved; totals have not been redistributed.</p>}
-          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board. {data ? <a className="rounded-sm underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a> : "Report link available when loaded."}</p>
-          <details className="text-xs text-civic-muted"><summary className="cursor-pointer rounded-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">Source and interpretation</summary>
+          <p className="text-xs leading-5 text-civic-muted">Source: Toronto Regional Real Estate Board. {data ? <a className="rounded-xs underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal" href={data.source_url} target="_blank" rel="noreferrer">Market Watch, page {data.source_page}<span className="sr-only"> (opens in a new tab)</span></a> : "Report link available when loaded."}</p>
+          <details className="text-xs text-civic-muted"><summary className="cursor-pointer rounded-xs font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">Source and interpretation</summary>
             <div className="mt-2 space-y-2 leading-5">
               {data && <p>{data.geography_note} {data.vintage_note}</p>}
               <p>{TRREB_MODE !== "preview" ? "Archived 2020–2025 reports; not current market quotes." : "Local preview; public display disabled."} TRREB statistics are not included in CSV downloads.</p>

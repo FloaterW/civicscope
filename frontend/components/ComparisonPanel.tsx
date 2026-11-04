@@ -179,7 +179,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
             <button
               type="button"
               onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
+              className="inline-flex items-center gap-1.5 rounded-md border border-civic-line px-2.5 py-1.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
               aria-label="Export comparison data as CSV"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -331,7 +331,7 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
                       {formatMetric(metric, item.rawValue)}
                       {!item.lowConfidence && <span className="block text-xs font-normal text-civic-muted">{item.rawValue == null ? "Unavailable" : item.provenance}</span>}
                       {item.lowConfidence && (
-                        <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                        <span className="ml-2 inline-block rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                           Low confidence — very small 2016 base
                         </span>
                       )}

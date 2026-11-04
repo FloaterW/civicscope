@@ -293,7 +293,7 @@ function InfoTooltip({ term, definition, source }: { term: string; definition: s
         onMouseLeave={schedulePreviewClose}
         onFocus={showPreview}
         onBlur={schedulePreviewClose}
-        className="-my-2 -ml-1 -mr-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-civic-muted transition hover:bg-civic-hover hover:text-civic-teal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
+        className="-my-2 -ml-1 -mr-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-civic-muted transition hover:bg-civic-hover hover:text-civic-teal focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal focus-visible:ring-offset-2 focus-visible:ring-offset-civic-panel"
         aria-label={`What is ${term}?`}
         aria-expanded={open}
         aria-controls={open ? tooltipId : undefined}

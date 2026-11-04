@@ -91,7 +91,7 @@ function TopicSection({ topic, title, period, children }: { topic: string; title
   const active = metricTopic(useContext(SelectedMetric)) === topic;
   return (
     <details open={active} data-topic={topic} data-active-topic={active || undefined} className="group border-t border-civic-line pt-3">
-      <summary className="cursor-pointer rounded-sm text-sm font-semibold text-civic-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+      <summary className="cursor-pointer rounded-xs text-sm font-semibold text-civic-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">
         {title}
         {period && <span className="ml-2 text-xs font-normal text-civic-muted"> {period}</span>}
       </summary>
@@ -149,7 +149,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
               onClick={handleExportCsv}
               disabled={exportUnavailable}
               aria-describedby={cmhcLoading || cmhcError ? "geography-export-status" : undefined}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-civic-line px-2.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-civic-line px-2.5 text-xs font-medium text-civic-muted transition hover:bg-civic-subtle hover:text-civic-ink disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal"
               aria-label="Export geography data as CSV"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -172,7 +172,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
             {cmhcLoading ? "CSV export will be available when the selected year's data finishes loading." : "CSV export is unavailable because rental and construction data could not be loaded."}
           </p>
           {cmhcError && !cmhcLoading && onRetryCmhc && (
-            <button type="button" onClick={onRetryCmhc} className="mt-1 min-h-9 rounded-md border border-civic-line px-2.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-teal">
+            <button type="button" onClick={onRetryCmhc} className="mt-1 min-h-9 rounded-md border border-civic-line px-2.5 font-semibold text-civic-ink hover:bg-civic-subtle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-civic-teal">
               Retry rental and construction data
             </button>
           )}
@@ -186,7 +186,7 @@ export function DetailPanel({ resaleView, onResaleViewChange, geography, metric,
           role="region"
           aria-label="Selected geography statistics"
           tabIndex={0}
-          className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-gutter:stable]"
+          className="rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic-teal xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-gutter:stable]"
         >
         <TopicSections key={`${geography.geoid}:${metric}`}>
           {/* Census Profile */}
