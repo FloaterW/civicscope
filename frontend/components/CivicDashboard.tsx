@@ -579,7 +579,9 @@ export function CivicDashboard() {
             return;
           }
           setSearchResults(payload.items);
-          setSearchHighlight(-1);
+          // Query edits already clear the highlight. Preserve keyboard focus
+          // when reopening refreshes the same query, while keeping it in range.
+          setSearchHighlight((index) => index < Math.min(payload.items.length, 8) ? index : -1);
           setSearchLoading(false);
           setSearchError(null);
         })
@@ -647,11 +649,11 @@ export function CivicDashboard() {
   }
 
   const visibleResults = searchResults.slice(0, 8);
-  const searchOpen =
-    searchExpanded &&
+  const hasSearchResults =
     visibleResults.length > 0 &&
     Boolean(search.trim()) &&
     search !== selected?.name;
+  const searchOpen = searchExpanded && hasSearchResults;
   const highlightedSearchGeoid =
     searchOpen && searchHighlight >= 0
       ? visibleResults[searchHighlight]?.geoid
@@ -673,17 +675,20 @@ export function CivicDashboard() {
       setSearchHighlight(-1);
       return;
     }
-    if (!searchOpen) return;
+    if (!hasSearchResults) return;
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
+        setSearchExpanded(true);
         setSearchHighlight((i) => (i < visibleResults.length - 1 ? i + 1 : 0));
         break;
       case "ArrowUp":
         event.preventDefault();
+        setSearchExpanded(true);
         setSearchHighlight((i) => (i > 0 ? i - 1 : visibleResults.length - 1));
         break;
       case "Enter":
+        if (!searchOpen) return;
         event.preventDefault();
         if (searchHighlight >= 0 && searchHighlight < visibleResults.length) {
           selectSearchResult(visibleResults[searchHighlight]);

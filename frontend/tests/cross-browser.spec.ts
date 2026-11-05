@@ -83,7 +83,7 @@ test.describe("critical cross-browser journeys", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
   });
 
-  test("search result keyboard selection and Tab dismissal remain usable", async ({ page }) => {
+  test("search result keyboard selection, Escape reopening, and Tab dismissal remain usable", async ({ page }) => {
     await page.goto("/?level=municipality&metric=population&geoid=3520005");
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
     const search = page.getByTestId("geography-search");
@@ -107,10 +107,63 @@ test.describe("critical cross-browser journeys", () => {
 
     await search.focus();
     await expect(toronto).toBeVisible();
+    await search.press("Escape");
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("Toronto");
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(search).not.toHaveAttribute("aria-activedescendant");
+    await search.press("Enter");
+    await expect(page.getByRole("listbox")).toBeHidden();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+
+    const refreshedResults = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/geographies" && url.searchParams.get("search") === "Toronto";
+    });
     await search.press("ArrowDown");
+    await expect(toronto).toBeVisible();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveAttribute("aria-activedescendant", "search-option-3520005");
+    await (await refreshedResults).finished();
+    // Reopening refreshes the same query. Its response must not erase the
+    // keyboard highlight before a user has time to press Enter.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await expect(search).toHaveAttribute("aria-activedescendant", "search-option-3520005");
     await search.press("Enter");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+  });
+
+  test("search arrows ignore empty results and reopen the last result with ArrowUp", async ({ page }) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    const search = page.getByTestId("geography-search");
+
+    for (const query of ["", "   ", "zzzznomatch"]) {
+      await search.fill(query);
+      if (query.trim()) await expect(page.getByTestId("search-empty")).toContainText("No municipalities match");
+      await search.press("Escape");
+      for (const key of ["ArrowDown", "ArrowUp", "Enter"]) await search.press(key);
+      await expect(search).toBeFocused();
+      await expect(search).toHaveAttribute("aria-expanded", "false");
+      await expect(search).not.toHaveAttribute("aria-activedescendant");
+      await expect(page.getByRole("listbox")).toBeHidden();
+      await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    }
+
+    await search.fill("a");
+    const options = page.getByRole("listbox").getByRole("option");
+    await expect.poll(() => options.count()).toBeGreaterThan(1);
+    const lastOptionId = (await options.last().getAttribute("id"))!;
+    await search.press("Enter");
+    await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    await search.press("Escape");
+    await search.press("ArrowUp");
+    await expect(search).toHaveAttribute("aria-expanded", "true");
+    await expect(search).toHaveAttribute("aria-activedescendant", lastOptionId);
+    await expect(options.last()).toHaveAttribute("aria-selected", "true");
+    await search.press("Enter");
+    await expect(map).toHaveAttribute("data-selected-geoid", lastOptionId.replace("search-option-", ""));
   });
 
   test("keeps the mobile layout usable without horizontal overflow", async ({ page }) => {
