@@ -33,7 +33,7 @@ type MapPayload = {
     };
     geography_type: "municipality" | "census_tract";
     data_quality: {
-      metric_status: "official" | "derived" | "estimated" | "mixed" | "zone";
+      metric_status: "official" | "derived" | "estimated" | "mixed" | "zone" | "unavailable";
       label: string;
     };
   };
@@ -508,7 +508,7 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(comparisonPanel.getByRole("columnheader", { name: "Ratio" })).toHaveCount(0);
   });
 
-  test("transit overlay is lazy, reports failure, and retries successfully", async ({ page }) => {
+  test("transit overlay is lazy, retries failures, and enables only published route categories", async ({ page }, testInfo) => {
     await blockExternalMapAssets(page);
     let transitRequests = 0;
     let failTransit = true;
@@ -559,12 +559,21 @@ test.describe("CivicScope dashboard regressions", () => {
     await expect(
       page.getByRole("alert").filter({ hasText: "Transit lines could not be loaded" }),
     ).toBeVisible();
+    await expect(page.getByText("Not in snapshot", { exact: true })).toHaveCount(0);
     expect(transitRequests).toBe(1);
 
     failTransit = false;
     await page.getByRole("button", { name: "Retry transit lines" }).click();
-    await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: "GO Transit" })).toBeChecked();
+    const subway = page.getByRole("checkbox", { name: "Subway", exact: true });
+    const brampton = page.getByRole("checkbox", { name: /Brampton Transit/ });
+    await expect(subway).toBeChecked();
+    await expect(subway).toBeEnabled();
+    for (const name of [/GO Transit/, /Brampton Transit/]) {
+      const unavailable = page.getByRole("checkbox", { name });
+      await expect(unavailable).toBeDisabled();
+      await expect(unavailable).not.toBeChecked();
+      await expect(unavailable.locator("..")).toContainText("Not in snapshot");
+    }
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-status", "loaded");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-feature-count", "1");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "true");
@@ -574,9 +583,34 @@ test.describe("CivicScope dashboard regressions", () => {
     );
     expect(transitRequests).toBe(2);
 
+    await page.getByRole("button", { name: "Clear all", exact: true }).click();
+    await expect(subway).not.toBeChecked();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "false");
+    await page.getByRole("button", { name: "Select all", exact: true }).click();
+    await expect(subway).toBeChecked();
+    await expect(brampton).not.toBeChecked();
+    // A deliberate individual choice must survive style and data-year changes.
+    await subway.focus();
+    await subway.press("Space");
     await page.getByRole("button", { name: "Dark theme" }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
-    await expect(page.getByRole("checkbox", { name: "Subway" })).toBeChecked();
+    await expect(page.getByTestId("map-canvas-host")).toHaveAttribute("data-map-theme", "dark");
+    await expect(subway).not.toBeChecked();
+    await page.getByLabel("Map metric", { exact: true }).selectOption("average_rent_total");
+    await page.getByLabel("CMHC data year", { exact: true }).selectOption("2018");
+    await expect(page.getByTestId("map-panel")).toContainText("CMHC 2018");
+    await expect(subway).not.toBeChecked();
+    await expect(brampton).toBeDisabled();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-transit-visible", "false");
+    // Closing and reopening uses the cached snapshot, without enabling absent routes.
+    await transitButton.click();
+    await transitButton.click();
+    await expect(subway).toBeChecked();
+    await expect(brampton).not.toBeChecked();
+    await expect(brampton).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Clear all", exact: true })).toBeVisible();
+    expect(transitRequests).toBe(2);
+    await page.locator("#transit-layer-panel").screenshot({ path: testInfo.outputPath("published-transit-categories.png") });
   });
 
   test("expanded mobile attribution never overlaps the legend or transit control", async ({ page }, testInfo) => {
@@ -1074,44 +1108,58 @@ test.describe("CivicScope dashboard regressions", () => {
     expect(scaleMax).toBe(domainMax);
   });
 
-  test("CMHC starts in census tract mode shows official+estimated provenance", async ({ page }) => {
+  test("CMHC tract starts provenance follows the selected year and clears stale official flags", async ({ page }, testInfo) => {
     await blockExternalMapAssets(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Census tracts" }).click();
-    await expect(page.getByTestId("civic-map")).toHaveAttribute(
-      "data-geography-type",
-      "census_tract",
-      { timeout: 30000 }
-    );
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-geography-type", "census_tract", { timeout: 30000 });
 
     await page.getByLabel("Map metric").selectOption("housing_starts_total");
-    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-metric", "housing_starts_total");
+    await expect(map).toHaveAttribute("data-metric", "housing_starts_total");
+    const year = page.getByLabel("CMHC data year", { exact: true });
+    await expect(year).toHaveValue("2025");
+    const badge = page.getByTestId("data-quality-badge").first();
+    await expect(badge).toHaveText("CMHC (estimated tract allocation)");
 
-    // housing_starts_total now has REAL CMHC census-tract values where published,
-    // with the allocation as a labeled estimate elsewhere -> mixed badge.
-    await expect(
-      page.getByTestId("data-quality-badge").filter({ hasText: /official \+ estimated/i }).first()
-    ).toBeVisible();
-
-    // 2023 has real published tract starts; select it so a covered tract shows
-    // the real value (the latest year has no tract data yet).
-    await page.getByLabel("CMHC data year", { exact: true }).selectOption("2023");
-
-    // A covered Toronto tract shows the real value flagged "CMHC tract data".
     await page.getByTestId("geography-search").fill("5350017.01");
     const result = page.getByRole("option").filter({ hasText: "5350017.01" });
     await expect(result).toHaveCount(1);
     await result.click();
 
     const panel = page.getByTestId("detail-panel");
-    await expect(panel).toContainText("census tract 0017.01");
-    // Real starts value carries the "CMHC tract data" badge...
-    await expect(panel.getByTestId("official-flag").first()).toBeVisible();
-    // ...but the badge belongs ONLY to the Housing Construction section. The
-    // census "Household & Housing Profile" fields are Statistics Canada values
-    // and must NOT be mislabeled "CMHC tract data" (regression).
-    const censusSection = panel.locator("[data-section='census']");
-    await expect(censusSection.getByTestId("official-flag")).toHaveCount(0);
+    const construction = panel.locator('[data-topic="construction"]');
+    const starts = construction.locator('[data-metric="housing_starts_total"]');
+    // Packaged 2025 starts are all municipal allocations. Published tract
+    // counts exist in 2023/2024; this covered tract reports 2,304 and 1,738.
+    // Returning to 2025 must replace both the value and the official flag.
+    for (const [index, state] of [
+      { year: "2025", value: "26", official: false },
+      { year: "2023", value: "2,304", official: true },
+      { year: "2024", value: "1,738", official: true },
+      { year: "2025", value: "26", official: false }
+    ].entries()) {
+      if (index > 0) await year.selectOption(state.year);
+      await expect(year).toHaveValue(state.year);
+      await expect(map).toHaveAttribute("aria-busy", "false");
+      await expect(map).toHaveAttribute("data-selected-geoid", "5350017.01");
+      await expect(panel).toContainText("census tract 0017.01");
+      await expect(construction.locator("summary")).toContainText(state.year);
+      const label = state.official
+        ? "CMHC tract values (official + estimated)"
+        : "CMHC (estimated tract allocation)";
+      await expect(badge).toHaveText(label);
+      await expect(panel.getByTestId("data-quality-badge")).toHaveText(label);
+      await expect(starts.locator(".tabular-nums")).toHaveText(
+        new RegExp(`^${state.value}\\s*${state.official ? "CMHC tract data" : "est\\."}$`)
+      );
+      await expect(starts.getByTestId("official-flag")).toHaveCount(state.official ? 1 : 0);
+      await expect(starts.getByTestId("cmhc-estimated-flag")).toHaveCount(state.official ? 0 : 1);
+      await expect(starts.getByTestId("parent-est-flag")).toHaveCount(0);
+      // Census fields must never inherit a CMHC construction provenance flag.
+      await expect(panel.locator("[data-section='census']").getByTestId("official-flag")).toHaveCount(0);
+      await construction.screenshot({ path: testInfo.outputPath(`cmhc-starts-${index}-${state.year}.png`) });
+    }
   });
 
   test("a parent-tract-allocated tract is flagged 'est. (CMHC parent tract)'", async ({ page }) => {

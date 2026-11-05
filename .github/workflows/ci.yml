@@ -28,7 +28,9 @@ jobs:
   test:
     name: Backend, frontend, and browser checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Four browser suites plus backend/build checks can exceed 45 minutes on a
+    # slower runner. Keep per-test timeouts and failure checks unchanged.
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository

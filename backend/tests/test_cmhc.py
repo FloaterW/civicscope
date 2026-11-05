@@ -319,8 +319,10 @@ def test_census_tract_cmhc_allocation(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["metadata"]["metric"] == "housing_starts_total"
-    # Real-tract metric -> mixed provenance badge.
-    assert payload["metadata"]["data_quality"]["metric_status"] == "mixed"
+    # The latest packaged year has municipal allocations but no official tract
+    # counts; having a real-tract metric name alone does not make it mixed.
+    assert payload["metadata"]["year"] == 2025
+    assert payload["metadata"]["data_quality"]["metric_status"] == "estimated"
     features_with_value = [f for f in payload["features"] if f["properties"]["value"] is not None]
     assert len(features_with_value) >= 1
     # At least one tract is served via the allocation estimate fallback.

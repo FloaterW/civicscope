@@ -279,6 +279,9 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               <BarChart
                 data={chartData}
                 accessibilityLayer
+                // A queued mousemove can otherwise reactivate the tooltip after
+                // mouseleave. Keep pointer hover updates in event order.
+                throttledEvents={["touchmove", "pointermove", "scroll", "wheel"]}
                 aria-label={`${getMetricLabel(metric)} comparison chart. Use left and right arrow keys to explore values, Enter to toggle the tooltip, and Escape to dismiss it.`}
                 // Leave room for the value label above the tallest bar.
                 margin={{ top: 24, right: 8, bottom: 8, left: 12 }}

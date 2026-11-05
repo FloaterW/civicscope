@@ -83,7 +83,7 @@ test.describe("critical cross-browser journeys", () => {
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
   });
 
-  test("search result keyboard selection and Tab dismissal remain usable", async ({ page }) => {
+  test("search result keyboard selection, Escape reopening, and Tab dismissal remain usable", async ({ page }) => {
     await page.goto("/?level=municipality&metric=population&geoid=3520005");
     await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
     const search = page.getByTestId("geography-search");
@@ -107,10 +107,63 @@ test.describe("critical cross-browser journeys", () => {
 
     await search.focus();
     await expect(toronto).toBeVisible();
+    await search.press("Escape");
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("Toronto");
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(search).not.toHaveAttribute("aria-activedescendant");
+    await search.press("Enter");
+    await expect(page.getByRole("listbox")).toBeHidden();
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3524001");
+
+    const refreshedResults = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/geographies" && url.searchParams.get("search") === "Toronto";
+    });
     await search.press("ArrowDown");
+    await expect(toronto).toBeVisible();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveAttribute("aria-activedescendant", "search-option-3520005");
+    await (await refreshedResults).finished();
+    // Reopening refreshes the same query. Its response must not erase the
+    // keyboard highlight before a user has time to press Enter.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await expect(search).toHaveAttribute("aria-activedescendant", "search-option-3520005");
     await search.press("Enter");
     await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+  });
+
+  test("search arrows ignore empty results and reopen the last result with ArrowUp", async ({ page }) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    const map = page.getByTestId("civic-map");
+    await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    const search = page.getByTestId("geography-search");
+
+    for (const query of ["", "   ", "zzzznomatch"]) {
+      await search.fill(query);
+      if (query.trim()) await expect(page.getByTestId("search-empty")).toContainText("No municipalities match");
+      await search.press("Escape");
+      for (const key of ["ArrowDown", "ArrowUp", "Enter"]) await search.press(key);
+      await expect(search).toBeFocused();
+      await expect(search).toHaveAttribute("aria-expanded", "false");
+      await expect(search).not.toHaveAttribute("aria-activedescendant");
+      await expect(page.getByRole("listbox")).toBeHidden();
+      await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    }
+
+    await search.fill("a");
+    const options = page.getByRole("listbox").getByRole("option");
+    await expect.poll(() => options.count()).toBeGreaterThan(1);
+    const lastOptionId = (await options.last().getAttribute("id"))!;
+    await search.press("Enter");
+    await expect(map).toHaveAttribute("data-selected-geoid", "3520005");
+    await search.press("Escape");
+    await search.press("ArrowUp");
+    await expect(search).toHaveAttribute("aria-expanded", "true");
+    await expect(search).toHaveAttribute("aria-activedescendant", lastOptionId);
+    await expect(options.last()).toHaveAttribute("aria-selected", "true");
+    await search.press("Enter");
+    await expect(map).toHaveAttribute("data-selected-geoid", lastOptionId.replace("search-option-", ""));
   });
 
   test("keeps the mobile layout usable without horizontal overflow", async ({ page }) => {
@@ -180,6 +233,60 @@ test.describe("critical cross-browser journeys", () => {
     await expect(tooltip).toContainText("2,794,356");
     await expect(tooltip.getByRole("status")).toHaveCount(0);
     await page.mouse.move(0, 0);
+    await expect(tooltip).toBeHidden();
+  });
+
+  test("comparison pointer leave wins over a queued hover frame", async ({ page }, testInfo) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    const panel = page.getByTestId("comparison-panel");
+    await expect(panel).toContainText("2,794,356");
+    const tooltip = panel.locator(".recharts-tooltip-wrapper");
+    await panel.locator(".recharts-bar-rectangle").first().hover();
+    await expect(tooltip).toBeVisible();
+
+    // Hold frames scheduled by an inside move until after mouseleave settles.
+    // This reproduces the rapid-exit race without relying on machine timing.
+    const eventOrder = await panel.locator(".recharts-wrapper").evaluate(async element => {
+      const bounds = element.querySelector(".recharts-bar-rectangle")!.getBoundingClientRect();
+      const outside = document.querySelector('[data-testid="comparison-panel"] table')!;
+      const events: string[] = [];
+      const pendingFrames = new Map<number, FrameRequestCallback>();
+      const originalFrame = window.requestAnimationFrame;
+      const originalCancelFrame = window.cancelAnimationFrame;
+      element.addEventListener("mousemove", () => events.push("mousemove"), { once: true });
+      element.addEventListener("mouseout", () => events.push("mouseout"), { once: true });
+      window.requestAnimationFrame = callback => {
+        const id = originalFrame(() => {});
+        pendingFrames.set(id, callback);
+        return id;
+      };
+      window.cancelAnimationFrame = id => {
+        pendingFrames.delete(id);
+        originalCancelFrame(id);
+      };
+      try {
+        element.dispatchEvent(new MouseEvent("mousemove", {
+          bubbles: true, clientX: bounds.x + bounds.width / 2, clientY: bounds.y + bounds.height / 2
+        }));
+        window.requestAnimationFrame = originalFrame;
+        element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: outside }));
+        await new Promise(resolve => originalFrame(resolve));
+        for (const [id, callback] of pendingFrames) {
+          pendingFrames.delete(id);
+          originalCancelFrame(id);
+          callback(performance.now());
+        }
+        await new Promise(resolve => originalFrame(() => originalFrame(resolve)));
+        events.push("animation-frames-complete");
+      } finally {
+        window.requestAnimationFrame = originalFrame;
+        window.cancelAnimationFrame = originalCancelFrame;
+        for (const id of pendingFrames.keys()) originalCancelFrame(id);
+      }
+      return events;
+    });
+    await testInfo.attach("pointer-event-order", { body: JSON.stringify(eventOrder), contentType: "application/json" });
+    expect(eventOrder).toEqual(["mousemove", "mouseout", "animation-frames-complete"]);
     await expect(tooltip).toBeHidden();
   });
 

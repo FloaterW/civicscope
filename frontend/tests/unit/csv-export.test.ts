@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildGeographyExportRows, CSV_HEADERS, rowsToCsv } from "@/lib/csv-export";
+import { getMetricDefinition } from "@/components/MetricTooltip";
 import type { CmhcMetricValues, MetricValues, TransitSnapshot } from "@/types";
 
 const metrics = {
@@ -53,6 +54,26 @@ const transitSnapshot: TransitSnapshot = {
 };
 
 describe("buildGeographyExportRows", () => {
+  it.each(["municipality", "census_tract"] as const)("attributes %s unabsorbed inventory to MAS while preserving the period and allocation status", (level) => {
+    const rows = buildGeographyExportRows(level, metrics, cmhc, 2023);
+    expect(rows.find((row) => row[0] === "Unabsorbed units")).toEqual([
+      "Unabsorbed units", "1", "December 2023",
+      `CMHC Market Absorption Survey — ${level === "municipality" ? "municipality" : "parent municipality"}`,
+      level === "municipality" ? "Published value" : "Allocated by renter-household share",
+      level === "municipality" ? "official" : "estimated"
+    ]);
+    expect(rows.find((row) => row[0] === "Units under construction")?.[3]).toContain("CMHC Starts & Completions Survey");
+    expect(rows.find((row) => row[0] === "Rental universe")?.[3]).toContain("CMHC Rental Market Survey");
+  });
+
+  it("explains the same MAS inventory scope and December period in the UI", () => {
+    const definition = getMetricDefinition("unabsorbed_units");
+    expect(definition?.source).toBe("CMHC Market Absorption Survey (MAS)");
+    expect(definition?.definition).toContain("not yet been sold");
+    expect(definition?.definition).toContain("December inventory");
+    expect(definition?.definition).toContain("allocated estimates");
+  });
+
   it("exports explicit periods, methods, and statuses", () => {
     const rows = buildGeographyExportRows("census_tract", metrics, cmhc, 2023);
 

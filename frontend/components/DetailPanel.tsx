@@ -16,6 +16,7 @@ import type {
   CmhcMetricValues,
   Geography,
   GeographyLevel,
+  MapMetricStatus,
   MetricFieldStatus,
   MetricKey,
   MetricValues,
@@ -39,7 +40,7 @@ type Props = {
   onRetryCmhc?: () => void;
   cmhcYear?: number;
   dataQualityLabel?: string;
-  metricStatus?: "official" | "derived" | "estimated" | "mixed" | "zone";
+  metricStatus?: MapMetricStatus;
   transitSnapshot?: TransitSnapshot;
   onClear: () => void;
 };
