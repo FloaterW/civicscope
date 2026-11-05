@@ -236,6 +236,60 @@ test.describe("critical cross-browser journeys", () => {
     await expect(tooltip).toBeHidden();
   });
 
+  test("comparison pointer leave wins over a queued hover frame", async ({ page }, testInfo) => {
+    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    const panel = page.getByTestId("comparison-panel");
+    await expect(panel).toContainText("2,794,356");
+    const tooltip = panel.locator(".recharts-tooltip-wrapper");
+    await panel.locator(".recharts-bar-rectangle").first().hover();
+    await expect(tooltip).toBeVisible();
+
+    // Hold frames scheduled by an inside move until after mouseleave settles.
+    // This reproduces the rapid-exit race without relying on machine timing.
+    const eventOrder = await panel.locator(".recharts-wrapper").evaluate(async element => {
+      const bounds = element.querySelector(".recharts-bar-rectangle")!.getBoundingClientRect();
+      const outside = document.querySelector('[data-testid="comparison-panel"] table')!;
+      const events: string[] = [];
+      const pendingFrames = new Map<number, FrameRequestCallback>();
+      const originalFrame = window.requestAnimationFrame;
+      const originalCancelFrame = window.cancelAnimationFrame;
+      element.addEventListener("mousemove", () => events.push("mousemove"), { once: true });
+      element.addEventListener("mouseout", () => events.push("mouseout"), { once: true });
+      window.requestAnimationFrame = callback => {
+        const id = originalFrame(() => {});
+        pendingFrames.set(id, callback);
+        return id;
+      };
+      window.cancelAnimationFrame = id => {
+        pendingFrames.delete(id);
+        originalCancelFrame(id);
+      };
+      try {
+        element.dispatchEvent(new MouseEvent("mousemove", {
+          bubbles: true, clientX: bounds.x + bounds.width / 2, clientY: bounds.y + bounds.height / 2
+        }));
+        window.requestAnimationFrame = originalFrame;
+        element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: outside }));
+        await new Promise(resolve => originalFrame(resolve));
+        for (const [id, callback] of pendingFrames) {
+          pendingFrames.delete(id);
+          originalCancelFrame(id);
+          callback(performance.now());
+        }
+        await new Promise(resolve => originalFrame(() => originalFrame(resolve)));
+        events.push("animation-frames-complete");
+      } finally {
+        window.requestAnimationFrame = originalFrame;
+        window.cancelAnimationFrame = originalCancelFrame;
+        for (const id of pendingFrames.keys()) originalCancelFrame(id);
+      }
+      return events;
+    });
+    await testInfo.attach("pointer-event-order", { body: JSON.stringify(eventOrder), contentType: "application/json" });
+    expect(eventOrder).toEqual(["mousemove", "mouseout", "animation-frames-complete"]);
+    await expect(tooltip).toBeHidden();
+  });
+
   for (const metric of ["population", "population_growth_pct", "median_income"]) {
     test(`comparison bar values fit inside the chart at desktop and mobile widths: ${metric}`, async ({ page }, testInfo) => {
       if (metric === "population_growth_pct") {
