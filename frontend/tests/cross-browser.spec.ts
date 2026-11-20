@@ -237,7 +237,7 @@ test.describe("critical cross-browser journeys", () => {
     await expect(tooltip).toBeHidden();
   });
 
-  test("delayed geography hydration dismisses chart hover and permits fresh interaction", async ({ page }) => {
+  test("delayed geography hydration dismisses chart hover and permits fresh interaction", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     let releaseMap!: () => void;
     const mapReady = new Promise<void>(resolve => { releaseMap = resolve; });
@@ -252,7 +252,6 @@ test.describe("critical cross-browser journeys", () => {
       await expect(panel).toContainText("2,794,356");
       await expect(panel.locator(".recharts-label-list .recharts-label")).toHaveCount(5);
       const chart = panel.getByRole("application", { name: /Population comparison chart/ });
-      const wrapper = panel.locator(".recharts-wrapper");
       const tooltip = panel.locator(".recharts-tooltip-wrapper");
       await panel.locator(".recharts-bar-rectangle").first().hover();
       await expect(tooltip).toContainText("Toronto");
@@ -263,12 +262,26 @@ test.describe("critical cross-browser journeys", () => {
       releaseMap();
       await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
       await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
-      await page.mouse.move(0, 0);
-      await expect.poll(() => wrapper.evaluate(element => element.matches(":hover"))).toBe(false);
+      const clearSelection = page.getByRole("button", { name: "Clear selected geography", exact: true });
+      // Use a real outside target: detached-hover CSS state can be stale.
+      await clearSelection.hover();
+      const outsidePointer = await clearSelection.evaluate(button => {
+        const bounds = button.getBoundingClientRect();
+        const x = bounds.x + bounds.width / 2;
+        const y = bounds.y + bounds.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        const chart = document.querySelector('[data-testid="comparison-panel"] .recharts-wrapper')!;
+        const chartBounds = chart.getBoundingClientRect();
+        return { point: { x, y }, buttonHit: button.contains(hit), chartHit: chart.contains(hit),
+          chartBounds: chartBounds.toJSON(),
+          outsideChartBounds: x < chartBounds.left || x >= chartBounds.right || y < chartBounds.top || y >= chartBounds.bottom };
+      });
+      await testInfo.attach("hydration-pointer-target", { body: JSON.stringify(outsidePointer), contentType: "application/json" });
+      expect(outsidePointer).toMatchObject({ buttonHit: true, chartHit: false, outsideChartBounds: true });
       await expect(tooltip).toBeHidden();
 
       // Returning to the original overview must not resurrect its old hover.
-      await page.getByRole("button", { name: "Clear selected geography", exact: true }).click();
+      await clearSelection.click();
       await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "");
       await page.mouse.move(0, 0);
       await expect(tooltip).toBeHidden();
