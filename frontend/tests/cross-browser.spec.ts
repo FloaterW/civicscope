@@ -192,6 +192,7 @@ test.describe("critical cross-browser journeys", () => {
 
   test("comparison values support keyboard navigation, dismissal, and pointer recovery", async ({ page }) => {
     await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
     const panel = page.getByTestId("comparison-panel");
     await expect(panel).toContainText("2,794,356");
     const chart = panel.getByRole("application", { name: /Population comparison chart/ });
@@ -234,6 +235,59 @@ test.describe("critical cross-browser journeys", () => {
     await expect(tooltip.getByRole("status")).toHaveCount(0);
     await page.mouse.move(0, 0);
     await expect(tooltip).toBeHidden();
+  });
+
+  test("delayed geography hydration dismisses chart hover and permits fresh interaction", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    let releaseMap!: () => void;
+    const mapReady = new Promise<void>(resolve => { releaseMap = resolve; });
+    await page.route("**/api/map-data?**", async route => {
+      const response = await route.fetch();
+      await mapReady;
+      await route.fulfill({ response });
+    });
+    try {
+      await page.goto("/?level=municipality&metric=population&geoid=3520005");
+      const panel = page.getByTestId("comparison-panel");
+      await expect(panel).toContainText("2,794,356");
+      await expect(panel.locator(".recharts-label-list .recharts-label")).toHaveCount(5);
+      const chart = panel.getByRole("application", { name: /Population comparison chart/ });
+      const wrapper = panel.locator(".recharts-wrapper");
+      const tooltip = panel.locator(".recharts-tooltip-wrapper");
+      await panel.locator(".recharts-bar-rectangle").first().hover();
+      await expect(tooltip).toContainText("Toronto");
+      await expect(tooltip).toBeVisible();
+
+      // In Firefox the inserted mobile detail panel can move/remove the hovered
+      // bar without delivering mouseout from it. The selection must dismiss it.
+      releaseMap();
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+      await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
+      await page.mouse.move(0, 0);
+      await expect.poll(() => wrapper.evaluate(element => element.matches(":hover"))).toBe(false);
+      await expect(tooltip).toBeHidden();
+
+      // Returning to the original overview must not resurrect its old hover.
+      await page.getByRole("button", { name: "Clear selected geography", exact: true }).click();
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "");
+      await page.mouse.move(0, 0);
+      await expect(tooltip).toBeHidden();
+
+      await panel.locator(".recharts-bar-rectangle").first().hover();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("2,794,356");
+      await page.mouse.move(0, 0);
+      await expect(tooltip).toBeHidden();
+      await chart.focus();
+      await expect(tooltip).toContainText("Toronto");
+      await chart.press("ArrowRight");
+      await expect(tooltip).toContainText("Mississauga");
+      await expect(tooltip.getByRole("status")).toHaveAttribute("aria-live", "polite");
+      await chart.press("Escape");
+      await expect(tooltip).toBeHidden();
+    } finally {
+      releaseMap();
+    }
   });
 
   test("comparison pointer leave wins over a queued hover frame", async ({ page }, testInfo) => {
