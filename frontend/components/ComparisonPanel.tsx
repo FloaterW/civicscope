@@ -58,6 +58,19 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
   // dismissing a tooltip; Recharts 3 no longer sends keyboard input to onMouseMove.
   const [chartTooltipDismissed, setChartTooltipDismissed] = useState(false);
   const [chartTooltipKeyboard, setChartTooltipKeyboard] = useState(false);
+  const selectedContext = selectedGeography?.geoid ?? null;
+  const [previousSelection, setPreviousSelection] = useState(selectedContext);
+  // Hydration can move/remove the hovered bar without a native mouseout.
+  // Invalidate every selection transition, including a return to an earlier area,
+  // before rendering children while preserving the chart DOM and keyboard focus.
+  if (previousSelection !== selectedContext) {
+    setPreviousSelection(selectedContext);
+    setChartTooltipDismissed(true);
+  }
+  const activateChartTooltip = (keyboard: boolean) => {
+    setChartTooltipDismissed(false);
+    setChartTooltipKeyboard(keyboard);
+  };
   const [compactChartLabels, setCompactChartLabels] = useState(true);
   const [shareMessage, setShareMessage] = useState("");
   const isTransit = isTransitMetric(metric);
@@ -232,23 +245,19 @@ export function ComparisonPanel({ comparison, metric, geographyLevel, loading, d
               : undefined
           }
           onFocusCapture={(event) => {
-            setChartTooltipDismissed(false);
-            setChartTooltipKeyboard(event.target.matches(":focus-visible"));
+            activateChartTooltip(event.target.matches(":focus-visible"));
           }}
           onBlurCapture={() => setChartTooltipDismissed(true)}
           onMouseMoveCapture={() => {
-            setChartTooltipDismissed(false);
-            setChartTooltipKeyboard(false);
+            activateChartTooltip(false);
           }}
           onTouchStartCapture={() => {
-            setChartTooltipDismissed(false);
-            setChartTooltipKeyboard(false);
+            activateChartTooltip(false);
           }}
           onKeyDownCapture={(event) => {
             if (event.key === "Escape") setChartTooltipDismissed(true);
             if (["ArrowLeft", "ArrowRight", "Enter"].includes(event.key)) {
-              setChartTooltipDismissed(false);
-              setChartTooltipKeyboard(true);
+              activateChartTooltip(true);
             }
           }}
         >

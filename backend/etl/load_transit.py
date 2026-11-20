@@ -55,6 +55,7 @@ AGENCY_NAMES = {
 BUFFER_METERS = 800
 MIN_AGENCIES = len(GTFS_FEEDS)
 DEFAULT_CACHE_MAX_AGE_HOURS = 24.0
+METHOD_VERSION = "routes-within-800m-all-tracts-v2"
 CANONICAL_SCORES_PATH = PROJECT_ROOT / "app" / "data" / "transit_scores.csv"
 CANONICAL_MANIFEST_PATH = PROJECT_ROOT / "app" / "data" / "transit_manifest.json"
 
@@ -321,8 +322,17 @@ def write_manifest(
         "schema_version": 1,
         "packaged_at": datetime.now(UTC).isoformat(),
         "coverage_status": "complete" if not missing else "partial",
-        "method_version": "routes-within-800m-v1",
+        "method_version": METHOD_VERSION,
         "buffer_meters": BUFFER_METERS,
+        "normalization": {
+            "method": "linear-10th-to-90th-percentiles-clamped-0-100",
+            "universe": "all-supported-census-tracts-including-zero-route-tracts",
+        },
+        "service_calendar_policy": {
+            "method": "all-trips-in-each-downloaded-feed",
+            "calendar_filtering": False,
+            "service_reference_date": None,
+        },
         "included_agencies": included,
         "missing_agencies": missing,
         "artifacts": {
@@ -334,6 +344,8 @@ def write_manifest(
         "notes": [
             "Scores count unique scheduled routes with a stop within 800 metres of a census tract boundary.",
             "The score does not measure service frequency or travel time.",
+            "All trips in the feed are included without calendar/calendar_dates filtering; retrieval time is not an operating-service date.",
+            "Coverage is relative to the configured agency list, not all transit operators in the GTA.",
         ],
     }
     path.parent.mkdir(parents=True, exist_ok=True)

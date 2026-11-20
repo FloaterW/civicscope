@@ -19,6 +19,7 @@ from app.api.routes import router as api_router
 from app.api.trreb_preview import router as trreb_preview_router
 from app.api.trreb_public import router as trreb_public_router
 from app.core.config import settings, validate_environment
+from app.core.release import release_commit
 from app.db.init_db import init_db
 from app.db.session import SessionLocal, get_db
 from app.services.seed import seed_cmhc_data, seed_cmhc_tract_data, seed_demo_data, seed_transit_scores
@@ -109,10 +110,10 @@ def create_app(auto_initialize: bool = True) -> FastAPI:
         except Exception:
             db_status = "unavailable"
         status = "ok" if db_status == "ok" else "degraded"
-        payload = {"status": status, "service": "civicscope-api", "database": db_status}
+        payload = {"status": status, "service": "civicscope-api", "database": db_status, "commit": release_commit()}
         if db_status != "ok":
-            return JSONResponse(status_code=503, content=payload)
-        return payload
+            return JSONResponse(status_code=503, content=payload, headers={"Cache-Control": "no-store"})
+        return JSONResponse(content=payload, headers={"Cache-Control": "no-store"})
 
     app.include_router(api_router)
     app.include_router(trreb_preview_router)

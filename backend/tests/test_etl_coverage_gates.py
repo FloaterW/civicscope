@@ -50,8 +50,8 @@ def test_tract_census_write_csv_produces_output(tmp_path: Path):
     assert len(lines) == 3  # header + 2 rows
 
 
-def test_tract_census_fetch_batch_returns_empty_on_http_error():
-    with patch("etl.load_tract_census.urlopen") as mock_urlopen:
+def test_tract_census_stops_after_bounded_http_retries():
+    with patch("etl.load_tract_census.urlopen") as mock_urlopen, patch("etl.http_retry.time.sleep") as sleep:
         from urllib.error import HTTPError
 
         mock_urlopen.side_effect = HTTPError(
@@ -59,8 +59,10 @@ def test_tract_census_fetch_batch_returns_empty_on_http_error():
         )
         from etl.load_tract_census import fetch_batch
 
-        result = fetch_batch(["2021S05075350001_00"])
-        assert result == []
+        with pytest.raises(HTTPError):
+            fetch_batch(["2021S05075350001_00"])
+        assert mock_urlopen.call_count == 3
+        assert sleep.call_count == 2
 
 
 def test_tract_census_coverage_gate_blocks_low_coverage():

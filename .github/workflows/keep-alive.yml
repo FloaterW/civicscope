@@ -34,9 +34,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CHECK_RESULT: ${{ steps.monitor.outcome }}
         run: python scripts/workflow_alert.py --title 'Production monitoring incident' --result "$CHECK_RESULT"
-      - name: Open or resolve one source verification issue
-        if: always() && (steps.monitor.outputs.freshness_result == 'success' || steps.monitor.outputs.freshness_result == 'failure')
+      - name: Reconcile independent source verification incidents
+        if: always() && steps.monitor.outputs.source_results != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          CHECK_RESULT: ${{ steps.monitor.outputs.freshness_result }}
-        run: python scripts/workflow_alert.py --title 'Source verification overdue or unknown' --result "$CHECK_RESULT"
+          SOURCE_RESULTS: ${{ steps.monitor.outputs.source_results }}
+        run: python scripts/workflow_alert.py --sources

@@ -18,6 +18,8 @@
     "screenshots": "node scripts/capture-screenshots.mjs",
     "start": "node .next/standalone/server.js",
     "test:unit": "vitest run",
+    "test:release-tools": "node --test scripts/release-smoke.test.mjs scripts/resolve-release-targets.test.mjs",
+    "smoke:release": "node scripts/release-smoke.mjs",
     "test:e2e": "playwright test",
     "test:e2e:trreb": "playwright test --config playwright.trreb.config.ts",
     "test:e2e:trreb-public": "playwright test --config playwright.trreb-public.config.ts",

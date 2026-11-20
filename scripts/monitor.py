@@ -7,6 +7,8 @@ import time
 import urllib.request
 from urllib.error import HTTPError
 
+SOURCES = ("census", "cmhc", "transit")
+
 
 def read(url):
     start = time.monotonic()
@@ -52,7 +54,7 @@ def check(api, frontend):
                 result["total_seconds"] = round(time.monotonic() - started, 3)
                 if label == "freshness":
                     sources = {source.get("source"): source for source in payload.get("sources", []) if isinstance(source, dict)}
-                    result["source_checks"] = [{"source": name, "status": sources.get(name, {}).get("check_status", "unknown"), "coverage": sources.get(name, {}).get("coverage")} for name in ("census", "cmhc", "transit")]
+                    result["source_checks"] = [{"source": name, "status": sources.get(name, {}).get("check_status", "unknown"), "coverage": sources.get(name, {}).get("coverage")} for name in SOURCES]
                     result["freshness_warning"] = any(source["status"] != "checked" for source in result["source_checks"])
                 results.append(result)
                 error = None
@@ -71,15 +73,21 @@ def check(api, frontend):
 
 
 def report(results):
-    """Separate availability failures from a deduplicated data-verification incident."""
+    """Separate availability from each source's independently recoverable incident."""
     availability_failed = any("error" in result for result in results)
     freshness = next((result for result in results if result["check"] == "freshness"), {})
     # An unavailable API cannot establish recovery of a previous freshness incident.
     freshness_result = "unknown" if not freshness or "error" in freshness else "failure" if freshness.get("freshness_warning") else "success"
+    checks = {entry["source"]: entry.get("status") for entry in freshness.get("source_checks", [])}
+    source_results = {
+        name: "unknown" if freshness_result == "unknown" else "success" if checks.get(name) == "checked" else "failure"
+        for name in SOURCES
+    }
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as stream:
             stream.write(f"freshness_result={freshness_result}\n")
+            stream.write(f"source_results={json.dumps(source_results, separators=(',', ':'))}\n")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as stream:
@@ -88,6 +96,8 @@ def report(results):
                 state = "FAILED" if "error" in result else "SLOW" if result.get("slow") else "OK"
                 stream.write(f"- {result['check']}: {state}; {result.get('total_seconds', 0)} seconds total\n")
             stream.write(f"\nSource verification: {freshness_result}. See structured log for source details.\n")
+            for name, state in source_results.items():
+                stream.write(f"- {name}: {state}\n")
     return int(availability_failed)
 
 

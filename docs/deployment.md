@@ -29,7 +29,7 @@ Required environment variables:
 Install command:
 
 ```bash
-python -m pip install --require-hashes -r requirements.lock
+python -m pip install --require-hashes -r requirements.txt
 ```
 
 Release or migration command:
@@ -144,7 +144,13 @@ diagnostic and must not be deployed.
 - `/health` returns HTTP 200; HTTP 503 means the database is unavailable.
 - `CORS_ORIGINS` includes the deployed frontend origin.
 - No real secrets are committed; use `.env.example` only as a template.
-- `pip-audit --require-hashes -r requirements.lock` and `npm audit --audit-level=high` report no actionable vulnerabilities.
+- `pip-audit --require-hashes -r requirements.txt` and `npm audit --audit-level=high` report no actionable vulnerabilities.
 - The transit snapshot manifest reports the agencies and coverage status expected for the release.
 - GitHub branch protection requires the CI and CodeQL checks before merging to `main`.
 - Configure external uptime/error monitoring for `/health`; the keep-alive workflow now fails visibly on a persistent non-200 response.
+
+After merging, follow [release verification](release-verification.md). The maintained
+smoke checks the expected Git commit on both services and exercises real dashboard
+flows. GitHub runs it after successful main CI. An older service commit is accepted
+only with a recorded Git proof that its service files and deployment configuration
+are unchanged from main.

@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Each main push gets its own group; only obsolete PR commits are cancelled.
+concurrency:
+  group: civicscope-ci-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   dependency-review:
     name: Review high-severity dependency changes
@@ -25,13 +30,10 @@ jobs:
         with:
           fail-on-severity: high
 
-  test:
-    name: Backend, frontend, and browser checks
+  backend-tests:
+    name: Backend unit and contract checks
     runs-on: ubuntu-24.04
-    # Four browser suites plus backend/build checks can exceed 45 minutes on a
-    # slower runner. Keep per-test timeouts and failure checks unchanged.
-    timeout-minutes: 60
-
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -40,21 +42,130 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
 
       - name: Install backend dependencies
         working-directory: backend
-        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements-dev.lock
+        run: python -m pip install --require-hashes -r requirements-dev.txt
 
-      - name: Audit backend dependencies
+      # Vulnerability audits remain required in dependency-security.yml. Check
+      # input/lock parity here as well so tests cannot exercise stale locks.
+      - name: Check backend dependency lock consistency
         working-directory: backend
-        run: |
-          python scripts/check_dependency_locks.py
-          pip-audit --require-hashes -r requirements.lock
-          pip-audit --require-hashes -r requirements-dev.lock
+        run: python scripts/check_dependency_locks.py
 
       - name: Run backend tests
         working-directory: backend
         run: pytest
+
+  windows-locks:
+    name: Windows dependency lock closure
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Verify portable hashed dependencies and requested extras
+        working-directory: backend
+        run: |
+          # The hosted Windows Python includes runner tools such as pipx whose
+          # dependencies are unrelated to this application. Check a clean env.
+          $lockEnvironment = Join-Path $env:RUNNER_TEMP 'civicscope-locks'
+          python -m venv $lockEnvironment
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $lockPython = Join-Path $lockEnvironment 'Scripts/python.exe'
+          & $lockPython -m pip install --require-hashes -r requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $lockPython scripts/check_dependency_locks.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $lockPython -m pip check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $lockPython -m pytest -q tests/test_dependency_locks.py
+
+  frontend-checks:
+    name: Frontend unit, type, lint, and build checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm run test:unit
+
+      - name: Test maintained release verification tooling
+        working-directory: frontend
+        run: npm run test:release-tools
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  browsers:
+    name: Browser regressions (${{ matrix.suite }})
+    needs: [backend-tests, frontend-checks]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - suite: dashboard
+            command: npm run test:e2e
+          - suite: trreb-preview
+            command: npm run test:e2e:trreb
+          - suite: trreb-public
+            command: npm run test:e2e:trreb-public
+          - suite: trreb-archive
+            command: npx playwright test --config playwright.trreb-archive.config.ts
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: python -m pip install --require-hashes -r requirements-dev.txt
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
@@ -70,26 +181,6 @@ jobs:
       - name: Install Playwright browsers
         working-directory: frontend
         run: npx playwright install --with-deps chromium firefox webkit
-
-      - name: Typecheck frontend
-        working-directory: frontend
-        run: npm run typecheck
-
-      - name: Run frontend unit tests
-        working-directory: frontend
-        run: npm run test:unit
-
-      - name: Lint frontend
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-        run: npm run lint
-
-      - name: Build frontend
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-        run: npm run build
 
       - name: Start backend API
         working-directory: backend
@@ -115,44 +206,50 @@ jobs:
           raise SystemExit("Backend did not become healthy")
           PY
 
-      - name: Show backend log on failure
+      # Public and archive modes have different build-time flags. Their own
+      # Playwright configurations build isolated production bundles in each job.
+      - name: Run browser suite
+        working-directory: frontend
+        run: ${{ matrix.command }}
+
+      - name: Show backend log after a browser or startup failure
         if: failure()
         working-directory: backend
         run: cat backend.log || true
 
-      - name: Run browser regression tests
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-        run: npm run test:e2e
+      - name: Stop owned backend process
+        if: always()
+        working-directory: backend
+        run: |
+          if [ -f backend.pid ]; then
+            kill "$(cat backend.pid)" 2>/dev/null || true
+          fi
 
-      - name: Run gated TRREB preview browser tests with synthetic data
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-        run: npm run test:e2e:trreb
-
-      - name: Run production TRREB browser tests with synthetic data
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-        run: npm run test:e2e:trreb-public
-
-      - name: Verify bundled TRREB archive and production dashboard
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-        run: npx playwright test --config playwright.trreb-archive.config.ts
-
-      - name: Upload browser failure evidence
+      - name: Upload browser and backend failure evidence
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: playwright-report
+          name: browser-failure-${{ matrix.suite }}
           path: |
             frontend/playwright-report
             frontend/test-results
+            backend/backend.log
           if-no-files-found: ignore
+
+  test:
+    # Preserve the protected-branch check name while aggregating every split job.
+    name: Backend, frontend, and browser checks
+    needs: [dependency-review, backend-tests, windows-locks, frontend-checks, browsers, postgis, containers]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Require successful complete validation
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: python scripts/check_ci_results.py
 
   postgis:
     name: PostgreSQL/PostGIS migration and geometry checks
@@ -190,7 +287,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements-dev.lock
+        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements-dev.txt
 
       - name: Verify reversible migrations
         working-directory: backend

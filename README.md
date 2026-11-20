@@ -183,7 +183,7 @@ docker compose up -d db
 
 # 2. Backend (DATABASE_URL must point at PostGIS; .env.example has this value).
 cd backend
-python -m pip install --require-hashes -r requirements-dev.lock
+python -m pip install --require-hashes -r requirements-dev.txt
 export DATABASE_URL="postgresql+psycopg://civicscope:civicscope@localhost:5432/civicscope"
 alembic upgrade head
 uvicorn app.main:app --reload

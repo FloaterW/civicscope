@@ -192,6 +192,7 @@ test.describe("critical cross-browser journeys", () => {
 
   test("comparison values support keyboard navigation, dismissal, and pointer recovery", async ({ page }) => {
     await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
     const panel = page.getByTestId("comparison-panel");
     await expect(panel).toContainText("2,794,356");
     const chart = panel.getByRole("application", { name: /Population comparison chart/ });
@@ -236,25 +237,106 @@ test.describe("critical cross-browser journeys", () => {
     await expect(tooltip).toBeHidden();
   });
 
+  test("delayed geography hydration dismisses chart hover and permits fresh interaction", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    let releaseMap!: () => void;
+    const mapReady = new Promise<void>(resolve => { releaseMap = resolve; });
+    await page.route("**/api/map-data?**", async route => {
+      const response = await route.fetch();
+      await mapReady;
+      await route.fulfill({ response });
+    });
+    try {
+      await page.goto("/?level=municipality&metric=population&geoid=3520005");
+      const panel = page.getByTestId("comparison-panel");
+      await expect(panel).toContainText("2,794,356");
+      await expect(panel.locator(".recharts-label-list .recharts-label")).toHaveCount(5);
+      const chart = panel.getByRole("application", { name: /Population comparison chart/ });
+      const tooltip = panel.locator(".recharts-tooltip-wrapper");
+      await panel.locator(".recharts-bar-rectangle").first().hover();
+      await expect(tooltip).toContainText("Toronto");
+      await expect(tooltip).toBeVisible();
+
+      // In Firefox the inserted mobile detail panel can move/remove the hovered
+      // bar without delivering mouseout from it. The selection must dismiss it.
+      releaseMap();
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "3520005");
+      await expect(page.getByTestId("detail-panel")).toContainText("Toronto");
+      const clearSelection = page.getByRole("button", { name: "Clear selected geography", exact: true });
+      // Use a real outside target: detached-hover CSS state can be stale.
+      await clearSelection.hover();
+      const outsidePointer = await clearSelection.evaluate(button => {
+        const bounds = button.getBoundingClientRect();
+        const x = bounds.x + bounds.width / 2;
+        const y = bounds.y + bounds.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        const chart = document.querySelector('[data-testid="comparison-panel"] .recharts-wrapper')!;
+        const chartBounds = chart.getBoundingClientRect();
+        return { point: { x, y }, buttonHit: button.contains(hit), chartHit: chart.contains(hit),
+          chartBounds: chartBounds.toJSON(),
+          outsideChartBounds: x < chartBounds.left || x >= chartBounds.right || y < chartBounds.top || y >= chartBounds.bottom };
+      });
+      await testInfo.attach("hydration-pointer-target", { body: JSON.stringify(outsidePointer), contentType: "application/json" });
+      expect(outsidePointer).toMatchObject({ buttonHit: true, chartHit: false, outsideChartBounds: true });
+      await expect(tooltip).toBeHidden();
+
+      // Returning to the original overview must not resurrect its old hover.
+      await clearSelection.click();
+      await expect(page.getByTestId("civic-map")).toHaveAttribute("data-selected-geoid", "");
+      await page.mouse.move(0, 0);
+      await expect(tooltip).toBeHidden();
+
+      await panel.locator(".recharts-bar-rectangle").first().hover();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("2,794,356");
+      await page.mouse.move(0, 0);
+      await expect(tooltip).toBeHidden();
+      await chart.focus();
+      await expect(tooltip).toContainText("Toronto");
+      await chart.press("ArrowRight");
+      await expect(tooltip).toContainText("Mississauga");
+      await expect(tooltip.getByRole("status")).toHaveAttribute("aria-live", "polite");
+      await chart.press("Escape");
+      await expect(tooltip).toBeHidden();
+    } finally {
+      releaseMap();
+    }
+  });
+
   test("comparison pointer leave wins over a queued hover frame", async ({ page }, testInfo) => {
-    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    // Exercise event ordering independently of shared-selection hydration. That
+    // transition can replace the chart while this controlled race is running.
+    await page.goto("/?level=municipality&metric=population");
     const panel = page.getByTestId("comparison-panel");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-feature-count", "25");
     await expect(panel).toContainText("2,794,356");
+    // LabelList mounts after bar animation, so the target geometry is settled.
+    await expect(panel.locator(".recharts-label-list .recharts-label")).toHaveCount(5);
     const tooltip = panel.locator(".recharts-tooltip-wrapper");
     await panel.locator(".recharts-bar-rectangle").first().hover();
     await expect(tooltip).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(tooltip).toBeHidden();
 
     // Hold frames scheduled by an inside move until after mouseleave settles.
-    // This reproduces the rapid-exit race without relying on machine timing.
+    // The real pointer stays outside: a synthetic mouseout does not move it and
+    // must not compete with legitimate native hover events during rendering.
     const eventOrder = await panel.locator(".recharts-wrapper").evaluate(async element => {
       const bounds = element.querySelector(".recharts-bar-rectangle")!.getBoundingClientRect();
       const outside = document.querySelector('[data-testid="comparison-panel"] table')!;
-      const events: string[] = [];
+      const events: { type: string; trusted: boolean; x: number; y: number }[] = [];
+      const recordEvent = (event: Event) => {
+        if (event instanceof MouseEvent) events.push({
+          type: event.type, trusted: event.isTrusted, x: event.clientX, y: event.clientY
+        });
+      };
+      if (element.matches(":hover")) throw new Error("The real pointer must be outside the controlled chart race");
       const pendingFrames = new Map<number, FrameRequestCallback>();
       const originalFrame = window.requestAnimationFrame;
       const originalCancelFrame = window.cancelAnimationFrame;
-      element.addEventListener("mousemove", () => events.push("mousemove"), { once: true });
-      element.addEventListener("mouseout", () => events.push("mouseout"), { once: true });
+      element.addEventListener("mousemove", recordEvent);
+      element.addEventListener("mouseout", recordEvent);
       window.requestAnimationFrame = callback => {
         const id = originalFrame(() => {});
         pendingFrames.set(id, callback);
@@ -277,16 +359,20 @@ test.describe("critical cross-browser journeys", () => {
           callback(performance.now());
         }
         await new Promise(resolve => originalFrame(() => originalFrame(resolve)));
-        events.push("animation-frames-complete");
       } finally {
         window.requestAnimationFrame = originalFrame;
         window.cancelAnimationFrame = originalCancelFrame;
         for (const id of pendingFrames.keys()) originalCancelFrame(id);
+        element.removeEventListener("mousemove", recordEvent);
+        element.removeEventListener("mouseout", recordEvent);
       }
-      return events;
+      return { events, pointerOutside: !element.matches(":hover") };
     });
     await testInfo.attach("pointer-event-order", { body: JSON.stringify(eventOrder), contentType: "application/json" });
-    expect(eventOrder).toEqual(["mousemove", "mouseout", "animation-frames-complete"]);
+    expect(eventOrder.events.map(({ type, trusted }) => ({ type, trusted }))).toEqual([
+      { type: "mousemove", trusted: false }, { type: "mouseout", trusted: false }
+    ]);
+    expect(eventOrder.pointerOutside).toBe(true);
     await expect(tooltip).toBeHidden();
   });
 

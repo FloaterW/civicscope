@@ -60,6 +60,11 @@ def test_generated_transit_candidate_hashes_survive_lf_checkout(tmp_path, monkey
         (folder / "demo_seed.json").write_bytes(json.dumps(seed).encode())
     refresh_candidate.validate_candidate("transit", candidate, checkout)
     manifest = json.loads((checkout / "transit_manifest.json").read_bytes())
+    assert manifest["method_version"] == "routes-within-800m-all-tracts-v2"
+    assert manifest["normalization"]["universe"] == "all-supported-census-tracts-including-zero-route-tracts"
+    assert manifest["service_calendar_policy"] == {
+        "method": "all-trips-in-each-downloaded-feed", "calendar_filtering": False, "service_reference_date": None,
+    }
     for name in names:
         assert evidence["sources"]["transit"]["artifacts"][name]["sha256"] == packaged_digest(checkout / name)
     assert manifest["artifacts"]["transit_scores.csv"]["sha256"] == packaged_digest(checkout / "transit_scores.csv")

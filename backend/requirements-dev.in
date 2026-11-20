@@ -1,5 +1,5 @@
 # Keep the tested backend dependencies identical to the production lock.
--c requirements.lock
+-c requirements.txt
 -r requirements.in
 
 httpx2>=2.13.0,<3.0
