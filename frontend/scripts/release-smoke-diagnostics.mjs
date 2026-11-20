@@ -1,5 +1,16 @@
 import assert from 'node:assert/strict';
 
+export function selectedDataReady(requests, { documentId, geoid, apiOrigin }) {
+  return ['/api/summary', '/api/compare'].every(endpoint => {
+    const latest = requests.filter(item => item.documentId === documentId && item.method === 'GET' &&
+      new URL(item.url).pathname === endpoint).at(-1);
+    if (!latest) return false;
+    const url = new URL(latest.url);
+    return url.origin === apiOrigin && (url.searchParams.get('ids') ?? '').split(',')[0] === geoid &&
+      latest.status === 200 && Number.isFinite(latest.finishedMs) && latest.finishedMs >= latest.createdMs;
+  });
+}
+
 function externalMapUrl(raw) {
   try {
     const host = new URL(raw).hostname;

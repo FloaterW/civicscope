@@ -1,11 +1,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { classifyErrors, verifyClassifierOffline } from './release-smoke-diagnostics.mjs';
+import { classifyErrors, verifyClassifierOffline, selectedDataReady } from './release-smoke-diagnostics.mjs';
 import { parseOptions, matchesRelease, classifyApiTarget, isOptionalTelemetryScript } from './release-smoke-options.mjs';
 
 const sha = 'a'.repeat(40);
 const args = ['--run', '--base=https://web.example', '--api=https://api.example',
   `--expected-frontend-sha=${sha}`, `--expected-backend-sha=${sha}`];
+
+test('selected data readiness requires both latest responses and tolerates completed hydration duplicates', () => {
+  const selection = { documentId: 2, geoid: '3520005', apiOrigin: 'https://api.example' };
+  const summary = { documentId: 2, method: 'GET', url: 'https://api.example/api/summary?ids=3520005', createdMs: 10, finishedMs: 20, status: 200 };
+  const compare = { ...summary, url: 'https://api.example/api/compare?ids=3520005,3524001' };
+  assert.equal(selectedDataReady([summary, compare], selection), true);
+  assert.equal(selectedDataReady([summary, compare, { ...compare, createdMs: 21, finishedMs: 30 }], selection), true);
+  assert.equal(selectedDataReady([summary, { ...summary }], selection), false);
+  for (const change of [{ finishedMs: undefined }, { status: 500 }, { createdMs: 50 },
+    { url: 'https://old.example/api/compare?ids=3520005' }, { url: 'https://api.example/api/compare?ids=3524001' }]) {
+    assert.equal(selectedDataReady([summary, compare, { ...compare, ...change }], selection), false);
+  }
+  assert.equal(selectedDataReady([summary, compare], { ...selection, documentId: 3 }), false);
+});
 
 test('running requires explicit origins and full expected identities', () => {
   assert.equal(parseOptions([]).mode, 'help');

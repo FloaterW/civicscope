@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { externalMapUrl, classifyErrors, verifyClassifierOffline } from './release-smoke-diagnostics.mjs';
+import { externalMapUrl, classifyErrors, verifyClassifierOffline, selectedDataReady } from './release-smoke-diagnostics.mjs';
 import { parseOptions, matchesRelease, classifyApiTarget, isOptionalTelemetryScript } from './release-smoke-options.mjs';
 
 const config = parseOptions(process.argv.slice(2));
@@ -533,12 +533,9 @@ async function main() {
     }
     // Archive completion precedes the queued summary/comparison responses after
     // reload. Preserve proof of those replacements before closing our browser.
-    await expect.poll(() => results.browserRequests.filter(item => {
-      const url = new URL(item.url);
-      return item.documentId === documentId && ['/api/summary', '/api/compare'].includes(url.pathname) &&
-        (url.searchParams.get('ids') ?? '').split(',')[0] === '3520005' &&
-        item.status === 200 && Number.isFinite(item.finishedMs);
-    }).length, { timeout: 90000 }).toBe(2);
+    await expect.poll(() => selectedDataReady(results.browserRequests, {
+      documentId, geoid: '3520005', apiOrigin: api.origin,
+    }), { timeout: 90000 }).toBe(true);
     return { geography: 'Toronto', annual2025: { median: 855000, sales: 23196 }, january2020: { median: 725000, sales: 1603 }, widths: [390, 320] };
   });
   await checkpoint('Browser data came from the verified API origin', async () => {
