@@ -7,7 +7,7 @@
 git clone <repo-url> && cd civicscope
 docker compose up -d          # PostgreSQL + backend + frontend
 # OR run locally:
-cd backend && python -m pip install --require-hashes -r requirements-dev.lock
+cd backend && python -m pip install --require-hashes -r requirements-dev.txt
 cd ../frontend && npm install
 ```
 
@@ -92,11 +92,17 @@ frontend/
 ## Updating Dependencies
 
 Runtime and development inputs live in `backend/requirements.in` and
-`backend/requirements-dev.in`. Regenerate both hash-locked environments with
-`pip-tools`, review the resolved changes, and run `pip-audit` before committing:
+`backend/requirements-dev.in`. Use CPython 3.12 and regenerate both portable
+hash-locked environments with pinned `uv`, runtime first. From the repository
+root, using a separate tooling environment:
 
 ```bash
-pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements.lock requirements.in
-pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements-dev.lock requirements-dev.in
-pip-audit --require-hashes -r requirements.lock
+python -m pip install uv==0.13.7
+uv pip compile backend/requirements.in --universal --python-version 3.12 --generate-hashes --no-strip-markers --index-url https://pypi.org/simple --output-file backend/requirements.txt
+uv pip compile backend/requirements-dev.in --universal --python-version 3.12 --generate-hashes --no-strip-markers --index-url https://pypi.org/simple --output-file backend/requirements-dev.txt
 ```
+
+Review the resolved versions and platform markers, then run the hashed installs,
+lock checks, security audits and tests described in
+[Backend dependency locks](docs/backend-dependency-locks.md). CI verifies Linux
+and Windows dependency closure; a host-only compile is insufficient.

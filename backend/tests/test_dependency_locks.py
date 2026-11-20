@@ -1,6 +1,7 @@
 from email.message import Message
 from importlib import metadata
 from pathlib import Path
+import shutil
 from types import SimpleNamespace
 
 import pytest
@@ -11,8 +12,21 @@ from scripts.check_dependency_locks import validate_installed_closure, validate_
 def test_committed_locks_satisfy_inputs_and_runtime_constraints():
     backend = Path(__file__).resolve().parents[1]
     for name in ("requirements", "requirements-dev"):
-        assert validate_lock(backend / f"{name}.in", backend / f"{name}.lock") == []
-        assert validate_installed_closure(backend / f"{name}.in", backend / f"{name}.lock") == []
+        assert validate_lock(backend / f"{name}.in", backend / f"{name}.txt") == []
+        assert validate_installed_closure(backend / f"{name}.in", backend / f"{name}.txt") == []
+
+
+def test_dependabot_supported_file_types_include_both_lock_pairs_and_constraints(tmp_path):
+    backend = Path(__file__).resolve().parents[1]
+    # Dependabot's pip-compile discovery retains .in/.txt files, not arbitrary
+    # .lock constraints. Validate the complete inputs in that staged subset.
+    for path in backend.iterdir():
+        if path.suffix in {".in", ".txt"}:
+            shutil.copyfile(path, tmp_path / path.name)
+    for name in ("requirements", "requirements-dev"):
+        assert (tmp_path / f"{name}.in").is_file()
+        assert (tmp_path / f"{name}.txt").is_file()
+        assert validate_lock(tmp_path / f"{name}.in", tmp_path / f"{name}.txt") == []
 
 
 def test_input_minimum_cannot_silently_exceed_tested_lock(tmp_path):

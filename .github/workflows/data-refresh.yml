@@ -45,14 +45,14 @@ jobs:
           python-version: '3.12'
       - name: Install pinned dependencies
         if: github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source
-        run: python -m pip install --require-hashes -r backend/requirements.lock
+        run: python -m pip install --require-hashes -r backend/requirements.txt
       - name: Fetch and validate isolated candidate
         id: refresh
         if: github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source
         env:
           REFRESH_SOURCE: ${{ matrix.source }}
           REFRESH_POSTGIS_URL: postgresql+psycopg://refresh:local-refresh-only@127.0.0.1:5432/refresh
-        run: python backend/etl/refresh_candidate.py --source "$REFRESH_SOURCE" --output "out/candidate-$REFRESH_SOURCE"
+        run: python backend/etl/refresh_candidate.py --source "$REFRESH_SOURCE" --output "out/candidate-$REFRESH_SOURCE" --diagnostics-output "out/diagnostics-$REFRESH_SOURCE"
       - name: Save validated candidate for review
         if: success() && (github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -60,6 +60,14 @@ jobs:
           name: candidate-${{ matrix.source }}
           path: out/candidate-${{ matrix.source }}
           if-no-files-found: error
+          retention-days: 30
+      - name: Save sanitized refresh diagnostics including failed attempts
+        if: always() && (github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: refresh-diagnostics-${{ matrix.source }}
+          path: out/diagnostics-${{ matrix.source }}
+          if-no-files-found: warn
           retention-days: 30
       - name: Open or resolve a source refresh incident
         if: always() && (github.event_name == 'schedule' || inputs.source == 'all' || inputs.source == matrix.source)

@@ -21,6 +21,7 @@ from app.models import ETLRun, Geography, Metric
 from app.services.metric_calculations import calculate_affordability_index
 from etl.load_geo import GTA_MUNICIPALITIES
 from etl.census_flags import observation_value
+from etl.http_retry import read_with_retry
 
 PROFILE_BASE_URL = "https://api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_CSD"
 
@@ -116,8 +117,7 @@ def build_profile_url(csd_uids: list[str], characteristic_ids: list[str] | None 
 
 
 def fetch_profile_csv(url: str) -> str:
-    with urlopen(url, timeout=60) as response:
-        return response.read().decode("utf-8-sig")
+    return read_with_retry(url, opener=urlopen, label="census-municipalities").decode("utf-8-sig")
 
 
 def fetch_official_gta_metrics(csd_uids: list[str] | None = None) -> list[MetricInput]:

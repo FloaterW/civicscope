@@ -1,0 +1,121 @@
+name: Verify deployed release
+
+on:
+  workflow_run:
+    workflows: [CivicScope CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Production is shared and runs are paced. Never overlap or cancel an active
+# verification; queued obsolete revisions are rejected before contacting it.
+concurrency:
+  group: production-release-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify the current deployed main revision
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Resolve the eligible current main revision
+        id: revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          if [[ "$EVENT_NAME" == workflow_run && "$CANDIDATE_SHA" != "$current_sha" ]]; then
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'Skipped: the completed CI revision has been superseded on main.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "sha=$current_sha" >> "$GITHUB_OUTPUT"
+          echo 'eligible=true' >> "$GITHUB_OUTPUT"
+
+      - name: Check out only the resolved main revision
+        if: steps.revision.outputs.eligible == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.revision.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        if: steps.revision.outputs.eligible == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install the locked verification tooling
+        if: steps.revision.outputs.eligible == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install the lock-matched Chromium browser
+        if: steps.revision.outputs.eligible == 'true'
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Reject a revision superseded during setup
+        id: current
+        if: steps.revision.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ steps.revision.outputs.sha }}
+        run: |
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          if [[ "$EXPECTED_SHA" != "$current_sha" ]]; then
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'Skipped: main advanced while verification tooling was being installed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo 'eligible=true' >> "$GITHUB_OUTPUT"
+
+      - name: Resolve exact service identities with Git equivalence proof
+        id: targets
+        if: steps.current.outputs.eligible == 'true'
+        working-directory: frontend
+        env:
+          TARGET_SHA: ${{ steps.revision.outputs.sha }}
+        run: node scripts/resolve-release-targets.mjs --target-sha="$TARGET_SHA" --output=output/release-verification
+
+      - name: Verify exact frontend and backend release identities and user flows
+        if: steps.current.outputs.eligible == 'true'
+        working-directory: frontend
+        env:
+          EXPECTED_FRONTEND_SHA: ${{ steps.targets.outputs.frontend_sha }}
+          EXPECTED_BACKEND_SHA: ${{ steps.targets.outputs.backend_sha }}
+        run: |
+          npm run smoke:release -- --run \
+            --base=https://civicscope-gold.vercel.app \
+            --api=https://civicscope.onrender.com \
+            --expected-frontend-sha="$EXPECTED_FRONTEND_SHA" \
+            --expected-backend-sha="$EXPECTED_BACKEND_SHA" \
+            --wait-for-release-seconds=1200 \
+            --output=output/release-verification
+
+      - name: Retain release verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: frontend/output/release-verification
+          if-no-files-found: ignore
+          retention-days: 30

@@ -117,3 +117,66 @@ failed request. `--skip-download` is the explicit offline-cache mode.
 Every canonical generation also writes `app/data/transit_manifest.json` with agency
 coverage, timestamps, method parameters, and artifact hashes. As with the other loaders,
 `--allow-partial` requires an explicit noncanonical output and cannot update the database.
+
+New transit candidates identify the calculation as
+`routes-within-800m-all-tracts-v2`: percentile normalization includes every supported
+tract, including zero-route tracts. The manifest explicitly records that the importer
+uses all trips in each feed without evaluating service calendars. A feed retrieval
+date is not a claim that those routes operate on that date. This method/version change
+applies to newly generated candidates; it does not revise the published snapshot.
+
+## Isolated refreshes and incident handling
+
+Run from the repository root, with the backend dependencies installed:
+
+```bash
+python backend/etl/refresh_candidate.py --source census --output out/candidate-census --diagnostics-output out/diagnostics-census
+```
+
+Use new, separate directories. The candidate appears only after complete source
+coverage and validation pass. The diagnostics directory is also emitted after an ETL
+failure, containing step status, exception types, HTTP status, hashed request identifiers
+and staged file hashes. It excludes response bodies, request URLs, subprocess output,
+headers and environment values. Failed staged hashes are evidence only, never proof
+that the corresponding files are fit to publish. A setup failure before the refresh
+starts may have no diagnostics artifact.
+
+Census reads make at most three attempts for transient network failures or HTTP
+408/429/500/502/503/504. Delays are 1 and 2 seconds unless a valid `Retry-After` asks
+for longer. Both seconds and HTTP dates are supported; a requested delay above
+30 seconds aborts the candidate instead of retrying early. Certificate, permanent
+HTTP, schema, suppression-flag and coverage failures are not retried. See
+[HTTP Retry-After semantics](https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after).
+
+The data-refresh workflow retains candidates and sanitized diagnostics for 30 days.
+Transit candidates also retain the exact downloaded public GTFS ZIPs under
+`source-inputs/`, with their hashes, source URLs and retrieval dates in
+`source-inputs.json`. Missing or mismatched ZIPs block candidate export. These are
+review inputs, not application assets: preserve upstream attribution and terms;
+do not commit or serve them as dashboard downloads. Download evidence before its
+Actions artifact expiry when review will take longer. Hashes alone cannot reproduce
+inputs that have expired upstream.
+
+For transit review, validate calendar coverage and exceptions from the retained
+archives before accepting a service-date interpretation. GTFS defines weekly service
+dates in `calendar.txt` and additions/removals (or all dates) in `calendar_dates.txt`.
+See the [GTFS Schedule reference](https://gtfs.org/documentation/schedule/reference/#calendartxt).
+Also inspect every configured agency, tract coverage, changed counts versus changed
+normalization, overlay consistency, and zero/missing semantics. “Complete” coverage
+means the configured feed list, not every agency operating in the GTA.
+
+Production monitoring maintains separate bot-owned `Source verification - census`,
+`Source verification - cmhc`, and `Source verification - transit` issues. A stale or
+unknown source reported by a reachable API opens its own incident; repeated unchanged
+states create no new comments. An unavailable status endpoint is indeterminate and
+cannot close any source incident. The old combined issue is retired only after all
+states are known and every outstanding failure has a confirmed replacement issue.
+Newly created issues are confirmed directly by their returned URL, avoiding GitHub
+search-index delays during migration.
+Availability and refresh-execution incidents remain separate from source freshness.
+
+Candidate validation does not update production or silently mark a source verified.
+Review and promote only the relevant source's artifacts/manifest entry in a separate
+data change; never copy a candidate's whole manifest over later reviews of other
+sources. The [November 20 review](source-refresh-review-2026-11-20.md) records the
+existing candidates' dispositions.

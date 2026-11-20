@@ -62,8 +62,9 @@ try {
       response.end(credentials.cert);
       return;
     }
-    // Telemetry and the bundled resale archive are owned by Next.js.
-    const apiRequest = requestPath.startsWith("/api/") && !requestPath.startsWith("/api/client-errors") && !requestPath.startsWith("/api/trreb-archive/");
+    // Telemetry, release identity and the bundled resale archive are owned by Next.js.
+    const requestPathname = requestPath.split("?")[0];
+    const apiRequest = requestPath.startsWith("/api/") && requestPathname !== "/api/release" && !requestPath.startsWith("/api/client-errors") && !requestPath.startsWith("/api/trreb-archive/");
     const targetOrigin = apiRequest ? upstream.origin : `http://127.0.0.1:${frontendPort}`;
     let target;
     try {

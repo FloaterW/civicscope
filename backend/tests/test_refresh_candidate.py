@@ -2,6 +2,7 @@
 import json
 import importlib.util
 import subprocess
+import sys
 import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -131,6 +132,97 @@ def test_validation_failure_never_creates_output(isolated_root, tmp_path, monkey
     with pytest.raises(ValueError, match="invalid artifact"):
         refresh.refresh("census", output)
     assert not output.exists()
+
+
+def test_failed_refresh_retains_sanitized_evidence_without_publishing(isolated_root, tmp_path, monkeypatch):
+    def fail(*args, **kwargs):
+        Path(kwargs["env"]["REFRESH_DIAGNOSTICS_FILE"]).write_text(json.dumps({
+            "dataset": "census-tracts", "attempt": 3, "outcome": "failed", "http_status": 503,
+            "response_body": "sensitive response", "environment": "secret database URL",
+        }) + "\n")
+        raise subprocess.CalledProcessError(1, ["secret command"], stderr="sensitive response")
+    monkeypatch.setattr(refresh.subprocess, "run", fail)
+    output, evidence = tmp_path / "candidate", tmp_path / "diagnostics"
+    with pytest.raises(subprocess.CalledProcessError):
+        refresh.refresh("census", output, evidence)
+    assert not output.exists()
+    summary = json.loads((evidence / "refresh-diagnostics.json").read_text())
+    assert summary["status"] == "failed"
+    assert summary["steps"] == [{"command": "etl/load_census.py", "status": "failed", "error_type": "CalledProcessError", "exit_code": 1}]
+    events = json.loads((evidence / "fetch-events.json").read_text())
+    assert events == [{"dataset": "census-tracts", "attempt": 3, "outcome": "failed", "http_status": 503}]
+    for path in evidence.iterdir():
+        assert "sensitive" not in path.read_text()
+        assert "secret" not in path.read_text()
+
+
+def test_validated_candidate_and_success_evidence_are_separate(isolated_root, tmp_path, monkeypatch):
+    monkeypatch.setattr(refresh.subprocess, "run", MagicMock())
+    output, evidence = tmp_path / "candidate", tmp_path / "diagnostics"
+    refresh.refresh("census", output, evidence)
+    assert (output / "demo_seed.json").is_file()
+    assert json.loads((evidence / "refresh-diagnostics.json").read_text())["status"] == "validated-candidate"
+    assert not (output / "refresh-diagnostics.json").exists()
+
+
+def test_diagnostic_failure_preserves_original_refresh_error(isolated_root, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(refresh.subprocess, "run", MagicMock(side_effect=subprocess.CalledProcessError(1, ["etl"])))
+    monkeypatch.setattr(refresh, "save_diagnostics", MagicMock(side_effect=OSError("sensitive diagnostic path")))
+    with pytest.raises(subprocess.CalledProcessError):
+        refresh.refresh("census", tmp_path / "candidate", tmp_path / "diagnostics")
+    assert capsys.readouterr().err == "Unable to retain refresh diagnostics: OSError\n"
+    assert not (tmp_path / "candidate").exists()
+
+
+@pytest.mark.parametrize("layout", ["inside", "ancestor", "same", "existing"])
+def test_diagnostics_never_overlap_or_overwrite_candidate(isolated_root, tmp_path, monkeypatch, layout):
+    output = tmp_path / "candidate"
+    evidence = {"inside": output / "diagnostics", "ancestor": tmp_path, "same": output, "existing": tmp_path / "existing"}[layout]
+    if layout == "existing":
+        evidence.mkdir()
+    run = MagicMock()
+    monkeypatch.setattr(refresh.subprocess, "run", run)
+    with pytest.raises(ValueError, match="diagnostics directory"):
+        refresh.refresh("census", output, evidence)
+    run.assert_not_called()
+
+
+def test_transit_source_archives_are_preserved_exactly(tmp_path):
+    after, candidate = tmp_path / "staged", tmp_path / "candidate"
+    (after / "gtfs_cache").mkdir(parents=True)
+    candidate.mkdir()
+    original = after / "gtfs_cache/ttc.zip"
+    original.write_bytes(b"exact upstream ZIP bytes")
+    put_json(after / "transit_manifest.json", {"included_agencies": [{
+        "id": "ttc", "feed_sha256": refresh.digest(original), "feed_retrieved_at": "2026-11-20T00:00:00Z",
+    }]})
+    evidence = refresh.retain_transit_inputs(after, candidate)
+    assert (candidate / "source-inputs/ttc.zip").read_bytes() == original.read_bytes()
+    assert evidence["source-inputs/ttc.zip"]["sha256"] == refresh.digest(original)
+    # CI executes this file as a script, without pytest's backend import path.
+    script_candidate = tmp_path / "script-candidate"
+    script_candidate.mkdir()
+    subprocess.run([
+        sys.executable, "-I", "-c",
+        "import runpy,sys; from pathlib import Path; module=runpy.run_path(sys.argv[1]); "
+        "module['retain_transit_inputs'](Path(sys.argv[2]),Path(sys.argv[3]))",
+        str(Path(refresh.__file__).resolve()), str(after), str(script_candidate),
+    ], cwd=tmp_path, check=True, timeout=30)
+    assert (script_candidate / "source-inputs/ttc.zip").read_bytes() == original.read_bytes()
+
+
+@pytest.mark.parametrize("fault", ["missing", "changed", "unexpected"])
+def test_transit_source_archive_integrity_blocks_candidate(tmp_path, fault):
+    after, candidate = tmp_path / "staged", tmp_path / "candidate"
+    (after / "gtfs_cache").mkdir(parents=True)
+    candidate.mkdir()
+    if fault == "changed":
+        (after / "gtfs_cache/ttc.zip").write_bytes(b"changed")
+    put_json(after / "transit_manifest.json", {"included_agencies": [{
+        "id": "../outside" if fault == "unexpected" else "ttc", "feed_sha256": "not-the-hash",
+    }]})
+    with pytest.raises(ValueError, match="agency|missing or changed"):
+        refresh.retain_transit_inputs(after, candidate)
 
 
 @pytest.mark.parametrize("url", ["", "postgresql://user:127.0.0.1@remote.example/db", "postgresql://remote.example/127.0.0.1", "postgresql://127.0.0.1.evil.example/db"])
@@ -296,7 +388,9 @@ def test_monitor_reports_freshness_separately_from_availability(monitor, monkeyp
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     assert monitor.report(monitor.check("https://api.example", "https://frontend.example")) == 0
-    assert output.read_text() == f"freshness_result={expected}\n"
+    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    assert outputs["freshness_result"] == expected
+    assert json.loads(outputs["source_results"]) == {name: expected for name in ("census", "cmhc", "transit")}
 
 
 def test_unavailable_freshness_cannot_close_existing_incident(monitor, monkeypatch, tmp_path):
@@ -304,7 +398,23 @@ def test_unavailable_freshness_cannot_close_existing_incident(monitor, monkeypat
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     assert monitor.report([{"check": "freshness", "error": "TimeoutError"}]) == 1
-    assert output.read_text() == "freshness_result=unknown\n"
+    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    assert outputs["freshness_result"] == "unknown"
+    assert set(json.loads(outputs["source_results"]).values()) == {"unknown"}
+
+
+def test_monitor_emits_each_sources_independent_result(monitor, monkeypatch, tmp_path):
+    output = tmp_path / "outputs"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    results = [{"check": "freshness", "freshness_warning": True, "source_checks": [
+        {"source": "census", "status": "checked"},
+        {"source": "cmhc", "status": "overdue"},
+        {"source": "transit", "status": "unknown"},
+    ]}]
+    assert monitor.report(results) == 0
+    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    assert json.loads(outputs["source_results"]) == {"census": "success", "cmhc": "failure", "transit": "failure"}
 
 
 @pytest.mark.parametrize("field,value", [("median_price", True), ("median_price", float("nan")), ("property_days", float("inf")), ("sales", True), ("preview_only", True)])

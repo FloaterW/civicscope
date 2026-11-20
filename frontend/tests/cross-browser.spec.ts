@@ -237,24 +237,39 @@ test.describe("critical cross-browser journeys", () => {
   });
 
   test("comparison pointer leave wins over a queued hover frame", async ({ page }, testInfo) => {
-    await page.goto("/?level=municipality&metric=population&geoid=3520005");
+    // Exercise event ordering independently of shared-selection hydration. That
+    // transition can replace the chart while this controlled race is running.
+    await page.goto("/?level=municipality&metric=population");
     const panel = page.getByTestId("comparison-panel");
+    await expect(page.getByTestId("summary-panel")).toContainText("25 GTA municipalities");
+    await expect(page.getByTestId("civic-map")).toHaveAttribute("data-feature-count", "25");
     await expect(panel).toContainText("2,794,356");
+    // LabelList mounts after bar animation, so the target geometry is settled.
+    await expect(panel.locator(".recharts-label-list .recharts-label")).toHaveCount(5);
     const tooltip = panel.locator(".recharts-tooltip-wrapper");
     await panel.locator(".recharts-bar-rectangle").first().hover();
     await expect(tooltip).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(tooltip).toBeHidden();
 
     // Hold frames scheduled by an inside move until after mouseleave settles.
-    // This reproduces the rapid-exit race without relying on machine timing.
+    // The real pointer stays outside: a synthetic mouseout does not move it and
+    // must not compete with legitimate native hover events during rendering.
     const eventOrder = await panel.locator(".recharts-wrapper").evaluate(async element => {
       const bounds = element.querySelector(".recharts-bar-rectangle")!.getBoundingClientRect();
       const outside = document.querySelector('[data-testid="comparison-panel"] table')!;
-      const events: string[] = [];
+      const events: { type: string; trusted: boolean; x: number; y: number }[] = [];
+      const recordEvent = (event: Event) => {
+        if (event instanceof MouseEvent) events.push({
+          type: event.type, trusted: event.isTrusted, x: event.clientX, y: event.clientY
+        });
+      };
+      if (element.matches(":hover")) throw new Error("The real pointer must be outside the controlled chart race");
       const pendingFrames = new Map<number, FrameRequestCallback>();
       const originalFrame = window.requestAnimationFrame;
       const originalCancelFrame = window.cancelAnimationFrame;
-      element.addEventListener("mousemove", () => events.push("mousemove"), { once: true });
-      element.addEventListener("mouseout", () => events.push("mouseout"), { once: true });
+      element.addEventListener("mousemove", recordEvent);
+      element.addEventListener("mouseout", recordEvent);
       window.requestAnimationFrame = callback => {
         const id = originalFrame(() => {});
         pendingFrames.set(id, callback);
@@ -277,16 +292,20 @@ test.describe("critical cross-browser journeys", () => {
           callback(performance.now());
         }
         await new Promise(resolve => originalFrame(() => originalFrame(resolve)));
-        events.push("animation-frames-complete");
       } finally {
         window.requestAnimationFrame = originalFrame;
         window.cancelAnimationFrame = originalCancelFrame;
         for (const id of pendingFrames.keys()) originalCancelFrame(id);
+        element.removeEventListener("mousemove", recordEvent);
+        element.removeEventListener("mouseout", recordEvent);
       }
-      return events;
+      return { events, pointerOutside: !element.matches(":hover") };
     });
     await testInfo.attach("pointer-event-order", { body: JSON.stringify(eventOrder), contentType: "application/json" });
-    expect(eventOrder).toEqual(["mousemove", "mouseout", "animation-frames-complete"]);
+    expect(eventOrder.events.map(({ type, trusted }) => ({ type, trusted }))).toEqual([
+      { type: "mousemove", trusted: false }, { type: "mouseout", trusted: false }
+    ]);
+    expect(eventOrder.pointerOutside).toBe(true);
     await expect(tooltip).toBeHidden();
   });
 

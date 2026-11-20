@@ -24,7 +24,6 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +31,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from etl.census_flags import observation_value
+from etl.http_retry import read_with_retry
 
 SDMX_BASE_URL = (
     "https://api.statcan.gc.ca/census-recensement/profile/sdmx/rest/data/STC_CP,DF_CT"
@@ -120,15 +120,9 @@ def fetch_batch(dguids: list[str]) -> list[TractMetric]:
     char_str = "+".join(CHARACTERISTIC_IDS.values())
     url = f"{SDMX_BASE_URL}/A5.{dguid_str}.1.{char_str}.1?format=csv&detail=full"
 
-    try:
-        with urlopen(Request(url), timeout=60) as response:
-            text = response.read().decode("utf-8-sig")
-    except HTTPError as exc:
-        print(f"  Warning: HTTP {exc.code} for batch of {len(dguids)} tracts", file=sys.stderr)
-        return []
-    except Exception as exc:
-        print(f"  Warning: {exc} for batch of {len(dguids)} tracts", file=sys.stderr)
-        return []
+    # Stop on an exhausted batch rather than fetch every remaining batch only to
+    # reject incomplete coverage at the end. No staged files have been published.
+    text = read_with_retry(Request(url), opener=urlopen, label="census-tracts").decode("utf-8-sig")
 
     # Parse SDMX CSV into grouped metrics
     grouped: dict[str, dict[str, Any]] = {}

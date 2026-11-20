@@ -10,6 +10,18 @@ const resaleEndpoint = archiveResale ? "/api/trreb-archive/resale" : publicResal
 const section = (page: Page) => page.locator('details[data-topic="resale"]');
 
 if (publicResale) {
+  test("production release identity stays frontend-owned through the TLS proxy", async ({ request }) => {
+    const rawCommit = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.CIVICSCOPE_BUILD_SHA ?? "";
+    const expectedCommit = /^[0-9a-fA-F]{40}$/.test(rawCommit) && rawCommit.length === 40 ? rawCommit.toLowerCase() : null;
+    for (const target of ["/api/release", "/api/release?probe=identity"]) {
+      const response = await request.get(target);
+      expect(response.status()).toBe(200);
+      expect(response.headers()["cache-control"]).toBe("no-store");
+      expect(response.headers()["x-content-type-options"]).toBe("nosniff");
+      expect(await response.json()).toEqual({ service: "civicscope-frontend", commit: expectedCommit });
+    }
+  });
+
   test("production TLS preserves CSP, same-origin telemetry and a loopback-only proxy", async ({ request }) => {
     const origin = "https://127.0.0.1:3105";
     const response = await request.get("/");

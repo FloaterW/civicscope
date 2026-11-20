@@ -127,7 +127,7 @@ def main():
     try:
         errors = [error for name in ("requirements", "requirements-dev")
                   for validate in (validate_lock, validate_installed_closure)
-                  for error in validate(backend / f"{name}.in", backend / f"{name}.lock")]
+                  for error in validate(backend / f"{name}.in", backend / f"{name}.txt")]
     except (OSError, ValueError) as exc:
         errors = [str(exc)]
     if errors:

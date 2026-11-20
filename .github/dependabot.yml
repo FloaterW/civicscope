@@ -9,6 +9,9 @@ updates:
     ignore:
       - dependency-name: typescript
         versions: [">=7.0.0 <8.0.0"]
+      # Runtime and CI use Node 22; newer type majors can expose unavailable APIs.
+      - dependency-name: "@types/node"
+        versions: [">=23.0.0"]
     groups:
       frontend-dependencies:
         patterns: ["*"]
@@ -27,13 +30,28 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
+    # Python minors are compatibility migrations, not routine image updates.
+    # Continue receiving supported 3.12 patch/security image updates.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /frontend
     schedule:
       interval: weekly
+    # Keep the image aligned with engines.node and CI until a runtime migration.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      codeql:
+        patterns: ["github/codeql-action*"]
+      codeql-security:
+        applies-to: security-updates
+        patterns: ["github/codeql-action*"]
